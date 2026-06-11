@@ -1,0 +1,16 @@
+# ==============================================================================
+#                         Dicas e Comandos Editor VIM
+# ==============================================================================
+# Atualizado em: 02/06/2026                                    By LucasOlidev
+# ==============================================================================
+# ==================================
+# Busca e Substituição
+# ==================================
+No modo normal, digite : para entrar na linha de comando:
+
+:%s/palavra_velha/palavra_nova/g: Substitui todas as ocorrências no arquivo.
+
+:%s/velha/nova/gc: O mesmo, mas pede confirmação (c) antes de cada substituição.
+
+# ==================================
+# ==================================
