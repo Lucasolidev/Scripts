@@ -99,6 +99,6 @@ echo "Processo concluído!"
 echo -e "--------------------------------------------------------${RESET}"
 echo -e "${CIANO}Exibindo os logs do Zabbix Agent (/var/log/zabbix/zabbix_agentd.log):${RESET}"
 echo "--------------------------------------------------------"
-sleep 2
+sleep 10
 cat /var/log/zabbix/zabbix_agentd.log
 echo "--------------------------------------------------------"
