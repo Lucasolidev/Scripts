@@ -7,7 +7,18 @@
 # Criação de usuário e grupo TI com suas retrições (Opcional)
 # Adicionadr regras no firewall de SSH e Zabbix Agent porém não ativa o firewall
 # ==============================================================================
-
+# visualizar o script antes de executar:
+#
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
+#
+# Executar via URL
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh | bash
+#
+# ==============================================================================
+#
 # Cores ANSI
 VERDE="\033[0;32m"
 AMARELO="\033[1;33m"
