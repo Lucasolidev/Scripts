@@ -6,12 +6,13 @@
 # ==============================================================================
 # visualizar o script antes de executar:
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh
 #
 # Executar via URL
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh | bash
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh | bash
 #
 # ==============================================================================
 # Cores ANSI
