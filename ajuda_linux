@@ -1,0 +1,7 @@
+==== Dica e Ajuda ====
+
+# Listar usuarios
+cut -d: -f1 /etc/passwd
+
+# Listar grupo sudo
+getent group sudo
