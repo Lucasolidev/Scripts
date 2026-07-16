@@ -5,3 +5,24 @@ cut -d: -f1 /etc/passwd
 
 # Listar grupo sudo
 getent group sudo
+
+
+=== Aumento de Armazenamento ===
+# Force o sistema a re-escanear o tamanho do disco
+df -hT
+echo 1 > /sys/class/block/sdc/device/rescan
+lsblk
+
+# Atualize a lista de pacotes e instale a ferramenta
+apt update && apt install -y cloud-guest-utils
+
+ # Agora expanda a partição 1 do disco sdX
+root@servprogdb:~# growpart /dev/sdX 1
+CHANGED: partition=1 start=2048 old: size=146798559 end=146800607 new: size=188741599 end=188743647
+
+# Expanda o sistema de arquivos (ext4)
+resize2fs /dev/sdc1
+
+# Verificando o resultado
+lsblk
+df -hT
