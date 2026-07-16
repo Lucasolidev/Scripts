@@ -7,32 +7,80 @@
 
 export DEBIAN_FRONTEND=noninteractive
 
-VERDE='\033[0;32m'
-AMARELO='\033[1;33m'
-PADRAO='\033[0m'
+# ==========================================
+# PALETA DE CORES (ANSI ESCAPE CODES) E FUNÇÕES
+# ==========================================
+NC='\033[0m'
+BOLD='\033[1m'
+DIM='\033[2m'
+UNDERLINE='\033[4m'
 
-main() {
-    clear
-    echo "=================================================================="
-    echo "  Configurando o Editor Vim e Plugins"
-    echo "=================================================================="
-    
-    # Valida o sudo logo no início da execução
-    echo -e "${AMARELO}[!] Solicitando credenciais de administrador...${PADRAO}"
-    sudo -v
-    while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+FG_CYAN='\033[36m'
+FG_YELLOW='\033[33m'
+FG_GREEN='\033[32m'
+FG_RED='\033[31m'
+FG_WHITE='\033[37m'
 
-    echo -e "${VERDE}[*] Verificando e instalando dependências base...${PADRAO}"
-    sudo apt-get update && sudo apt-get install -y nala curl git
-    sudo nala install -y vim python3-pip
+ARROW="❯"
 
-    echo -e "${VERDE}[*] Baixando o gerenciador de plugins 'vim-plug'...${PADRAO}"
-    curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
-        https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+draw_separator() {
+    echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
+}
 
-    echo -e "${VERDE}[*] Criando o arquivo de configuração ~/.vimrc...${PADRAO}"
-    
-    cat << 'EOF' > ~/.vimrc
+print_header() {
+    local title="$1"
+    echo -e ""
+    echo -e "${FG_CYAN}${BOLD}=== SYSTEM MANAGER ===${NC}"
+    echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
+    draw_separator
+}
+
+log_info()    { echo -e "  ${FG_CYAN}[i]${NC}  ${BOLD}INFO:${NC}      $1"; }
+log_success() { echo -e "  ${FG_GREEN}[+]${NC}  ${FG_GREEN}${BOLD}SUCESSO:${NC}   $1"; }
+log_warning() { echo -e "  ${FG_YELLOW}[!]${NC}  ${FG_YELLOW}${BOLD}ATENÇÃO:${NC}   $1"; }
+log_error()   { echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"; }
+
+print_alert_box() {
+    local msg="$1"
+    echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
+}
+
+# ==============================================================================
+# INÍCIO DO SCRIPT
+# ==============================================================================
+
+clear
+
+print_header "CONFIGURANDO O EDITOR VIM E PLUGINS"
+
+# Valida o sudo logo no início da execução
+log_warning "Solicitando credenciais de administrador..."
+sudo -v
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
+print_header "INSTALAÇÃO DE PACOTES"
+log_info "Verificando e instalando dependências base (nala, curl, git)..."
+if sudo apt-get update > /dev/null 2>&1 && sudo apt-get install -y nala curl git > /dev/null 2>&1; then
+    log_success "Dependências instaladas."
+else
+    log_error "Falha ao instalar dependências base."
+fi
+
+log_info "Instalando vim e python3-pip via nala..."
+if sudo nala install -y vim python3-pip > /dev/null 2>&1; then
+    log_success "Vim e python3-pip instalados."
+else
+    log_error "Falha ao instalar vim e pip."
+fi
+
+print_header "CONFIGURAÇÃO DO VIM"
+log_info "Baixando o gerenciador de plugins 'vim-plug'..."
+curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim > /dev/null 2>&1
+log_success "Vim-plug baixado."
+
+log_info "Criando o arquivo de configuração ~/.vimrc..."
+cat << 'EOF' > ~/.vimrc
 " Seção de Plugins (vim-plug) """""""""""""""""""""""""""""""""""""""""""""""""
 call plug#begin('~/.vim/plugged')
 
@@ -97,11 +145,14 @@ let g:airline_theme = 'sonokai'
 let g:airline#extensions#tabline#enabled = 1
 let g:airline_powerline_fonts = 1
 EOF
+log_success "Arquivo ~/.vimrc criado com sucesso."
 
-    echo -e "${VERDE}[*] Instalando os plugins do Vim de forma isolada...${PADRAO}"
-    vim -u NONE -N -e -s -c "source ~/.vimrc" -c "PlugInstall" -c "qa!"
-    
-    echo -e "\n${VERDE}[+] Editor Vim instalado e personalizado com sucesso!${PADRAO}"
-}
+log_info "Instalando os plugins do Vim de forma isolada..."
+vim -u NONE -N -e -s -c "source ~/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1
+log_success "Plugins do Vim instalados."
 
-main
+print_header "RESUMO DO SISTEMA"
+log_success "Editor Vim instalado e personalizado com sucesso!"
+echo ""
+draw_separator
+echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
