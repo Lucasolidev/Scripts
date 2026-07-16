@@ -15,52 +15,110 @@
 # curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh | bash
 #
 # ==============================================================================
-# Cores ANSI
-VERDE="\033[0;32m"
-AMARELO="\033[1;33m"
-CIANO="\033[0;36m"
-VERMELHO="\033[0;31m"
-RESET="\033[0m"
+
+# ==========================================
+# PALETA DE CORES (ANSI ESCAPE CODES) E FUNÇÕES
+# ==========================================
+NC='\033[0m'
+BOLD='\033[1m'
+DIM='\033[2m'
+UNDERLINE='\033[4m'
+
+FG_CYAN='\033[36m'
+FG_YELLOW='\033[33m'
+FG_GREEN='\033[32m'
+FG_RED='\033[31m'
+FG_WHITE='\033[37m'
+
+ARROW="❯"
+
+draw_separator() {
+    echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
+}
+
+print_header() {
+    local title="$1"
+    echo -e ""
+    echo -e "${FG_CYAN}${BOLD}=== SYSTEM MANAGER ===${NC}"
+    echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
+    draw_separator
+}
+
+log_info()    { echo -e "  ${FG_CYAN}[i]${NC}  ${BOLD}INFO:${NC}      $1"; }
+log_success() { echo -e "  ${FG_GREEN}[+]${NC}  ${FG_GREEN}${BOLD}SUCESSO:${NC}   $1"; }
+log_warning() { echo -e "  ${FG_YELLOW}[!]${NC}  ${FG_YELLOW}${BOLD}ATENÇÃO:${NC}   $1"; }
+log_error()   { echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"; }
+
+print_alert_box() {
+    local msg="$1"
+    echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
+}
+
+# ==============================================================================
+# INÍCIO DO SCRIPT
+# ==============================================================================
+
+clear
 
 # Verificar se o script está rodando como root
 if [ "$EUID" -ne 0 ]; then 
-  echo -e "${VERMELHO}Por favor, execute como root (sudo)${RESET}"
-  exit
+  log_error "Por favor, execute como root (sudo)"
+  exit 1
 fi
 
 # Configurações padrão
 DEFAULT_HOSTNAME="Cliente_ServBkp"
 DEFAULT_SERVER="192.168.1.254"
 
-echo -e "${CIANO}--- Configuração do Zabbix Agent ---${RESET}"
+# ==============================================================================
+# BLOCO DE INTERATIVIDADE E COLETAS DE PARÂMETROS
+# ==============================================================================
+print_header "COLETA DE PARÂMETROS"
 
-# Perguntas
-read -p "$(echo -e ${AMARELO}"Digite o Hostname (Padrão: $DEFAULT_HOSTNAME): "${RESET})" INPUT_HOSTNAME
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o Hostname (Padrão: $DEFAULT_HOSTNAME): ${NC}")" INPUT_HOSTNAME
 HOSTNAME=${INPUT_HOSTNAME:-$DEFAULT_HOSTNAME}
 
-read -p "$(echo -e ${AMARELO}"Digite o IP do Servidor Zabbix (Padrão: $DEFAULT_SERVER): "${RESET})" INPUT_SERVER
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (Padrão: $DEFAULT_SERVER): ${NC}")" INPUT_SERVER
 SERVER=${INPUT_SERVER:-$DEFAULT_SERVER}
 
-read -p "$(echo -e ${AMARELO}"Deseja aplicar estas configurações ao arquivo final? (s/n): "${RESET})" CONFIRMAR
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar estas configurações ao arquivo final? (s/n): ${NC}")" CONFIRMAR
 
-# 1. Download e Instalação do repositório
-echo -e "${CIANO}Configurando repositório Zabbix...${RESET}"
+draw_separator
+log_info "Parâmetros coletados. Iniciando instalação..."
+
+# ==============================================================================
+# 1. DOWNLOAD E INSTALAÇÃO DO REPOSITÓRIO
+# ==============================================================================
+print_header "INSTALAÇÃO DO ZABBIX AGENT"
+log_info "Configurando repositório Zabbix..."
 wget -q https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
-dpkg -i zabbix-release_latest_7.0+ubuntu24.04_all.deb > /dev/null
-apt update -y
+if dpkg -i zabbix-release_latest_7.0+ubuntu24.04_all.deb > /dev/null 2>&1; then
+    log_success "Repositório configurado."
+else
+    log_error "Falha ao configurar o repositório Zabbix."
+fi
 
-# 2. Instalação do agente e criação de diretórios de runtime
-echo -e "${CIANO}Instalando Zabbix Agent...${RESET}"
-apt install -y zabbix-agent
+log_info "Atualizando pacotes e instalando Zabbix Agent..."
+apt update -y > /dev/null 2>&1
+if apt install -y zabbix-agent > /dev/null 2>&1; then
+    log_success "Zabbix Agent instalado."
+else
+    log_error "Falha ao instalar o Zabbix Agent."
+fi
 
+log_info "Configurando permissões e diretórios..."
 mkdir -p /var/log/zabbix
 mkdir -p /var/run/zabbix
 chown -R zabbix:zabbix /var/log/zabbix
 chown -R zabbix:zabbix /var/run/zabbix
+log_success "Diretórios configurados."
 
-# 3. Configuração do arquivo zabbix_agentd.conf
-if [ "$CONFIRMAR" == "s" ] || [ "$CONFIRMAR" == "S" ]; then
-    echo -e "${CIANO}Aplicando arquivo de configurações customizadas...${RESET}"
+# ==============================================================================
+# 3. CONFIGURAÇÃO DO ARQUIVO ZABBIX_AGENTD.CONF
+# ==============================================================================
+print_header "CONFIGURAÇÃO DO SERVIÇO"
+if [[ "$CONFIRMAR" =~ ^[Ss]$ ]]; then
+    log_info "Aplicando arquivo de configurações customizadas..."
     cat <<EOF > /etc/zabbix/zabbix_agentd.conf
 ### Agente Zabbix ###
 
@@ -78,29 +136,47 @@ Timeout=30
 # Endereco IP WAN
 UserParameter=net.ipaddress,curl -s -L -k http://www.geset.com.br/suporte/ip.php
 EOF
+    log_success "Configurações aplicadas com sucesso."
 else
-    echo -e "${AMARELO}Configuração automática pulada. Ajuste manualmente.${RESET}"
+    log_warning "Configuração automática pulada. Ajuste manualmente."
 fi
 
-# 4. Configurar Regras de Firewall (UFW) sem ativar o serviço
+# ==============================================================================
+# 4. CONFIGURAR REGRAS DE FIREWALL (UFW)
+# ==============================================================================
 if command -v ufw >/dev/null 2>&1; then
-  echo -e "${CIANO}Configurando regra no UFW...${RESET}"
-  ufw allow 10050/tcp comment 'Zabbix Agent Port'
+  log_info "Configurando regra no UFW..."
+  if ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1; then
+      log_success "Regra 10050/tcp (Zabbix) configurada."
+  fi
 else
-  echo -e "${AMARELO}UFW não encontrado. Pulando firewall.${RESET}"
+  log_warning "UFW não encontrado. Pulando firewall."
 fi
 
-# 5. Habilitar e iniciar o serviço
+# ==============================================================================
+# 5. HABILITAR E INICIAR O SERVIÇO
+# ==============================================================================
+log_info "Reiniciando serviço Zabbix Agent..."
 chown -R zabbix:zabbix /var/run/zabbix
-systemctl enable zabbix-agent
-systemctl restart zabbix-agent
+if systemctl enable zabbix-agent > /dev/null 2>&1 && systemctl restart zabbix-agent > /dev/null 2>&1; then
+    log_success "Zabbix Agent reiniciado e habilitado."
+else
+    log_error "Falha ao reiniciar o serviço Zabbix Agent."
+fi
 
-# OUTCOME VISUAL FINAL DO AGENTE
-echo -e "${VERDE}--------------------------------------------------------"
-echo "Processo concluído!"
-echo -e "--------------------------------------------------------${RESET}"
-echo -e "${CIANO}Exibindo os logs do Zabbix Agent (/var/log/zabbix/zabbix_agentd.log):${RESET}"
-echo "--------------------------------------------------------"
-sleep 10
-cat /var/log/zabbix/zabbix_agentd.log
-echo "--------------------------------------------------------"
+# ==============================================================================
+# OUTCOME VISUAL FINAL
+# ==============================================================================
+print_header "RESUMO DO SISTEMA"
+log_success "Instalação do Zabbix Agent concluída com sucesso!"
+
+echo -e "\n  ${FG_CYAN}${BOLD}Status do Serviço:${NC}"
+echo -e "  ${DIM}────────────────────────────────────────${NC}"
+echo -e "  ${FG_WHITE}Zabbix Agent : ${NC}$(systemctl is-active zabbix-agent 2>/dev/null)"
+echo -e "  ${FG_WHITE}Log Recente  : ${NC}"
+sleep 3
+tail -n 5 /var/log/zabbix/zabbix_agentd.log 2>/dev/null | sed 's/^/    /' || echo "    (Sem logs gerados no momento)"
+
+echo ""
+draw_separator
+echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
