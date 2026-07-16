@@ -26,135 +26,237 @@
 
 export DEBIAN_FRONTEND=noninteractive
 
-# Cores ANSI para legibilidade dos logs
-VERDE="\033[0;32m"
-AMARELO="\033[1;33m"
-CIANO="\033[0;36m"
-VERMELHO="\033[0;31m"
-RESET="\033[0m"
+# ==========================================
+# PALETA DE CORES (ANSI ESCAPE CODES)
+# ==========================================
+NC='\033[0m'              # Reset (Sem Cor)
+BOLD='\033[1m'
+DIM='\033[2m'
+UNDERLINE='\033[4m'
+
+# Cores de Fonte (Foreground)
+FG_BLACK='\033[30m'
+FG_RED='\033[31m'
+FG_GREEN='\033[32m'
+FG_YELLOW='\033[33m'
+FG_BLUE='\033[34m'
+FG_MAGENTA='\033[35m'
+FG_CYAN='\033[36m'
+FG_WHITE='\033[37m'
+
+# Cores de Fundo (Background)
+BG_BLACK='\033[40m'
+BG_RED='\033[41m'
+BG_GREEN='\033[42m'
+BG_YELLOW='\033[43m'
+BG_BLUE='\033[44m'
+BG_MAGENTA='\033[45m'
+BG_CYAN='\033[46m'
+BG_WHITE='\033[47m'
+
+# Símbolos Customizados
+ARROW="❯"
+
+# ==========================================
+# FUNÇÕES DE HIGHLIGHT E LOGGING
+# ==========================================
+
+draw_separator() {
+    echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
+}
+
+print_header() {
+    local title="$1"
+    echo -e ""
+    echo -e "${FG_CYAN}${BOLD}=== SYSTEM MANAGER ===${NC}"
+    echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
+    draw_separator
+}
+
+log_info() {
+    echo -e "  ${FG_CYAN}[i]${NC}  ${BOLD}INFO:${NC}      $1"
+}
+
+log_success() {
+    echo -e "  ${FG_GREEN}[+]${NC}  ${FG_GREEN}${BOLD}SUCESSO:${NC}   $1"
+}
+
+log_warning() {
+    echo -e "  ${FG_YELLOW}[!]${NC}  ${FG_YELLOW}${BOLD}ATENÇÃO:${NC}   $1"
+}
+
+log_error() {
+    echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"
+}
+
+print_alert_box() {
+    local msg="$1"
+    echo -e ""
+    echo -e "  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}"
+    echo -e ""
+}
+
+# ==============================================================================
+# INÍCIO DO SCRIPT
+# ==============================================================================
+
+clear
 
 # Verificar se o script está rodando como root
 if [ "$EUID" -ne 0 ]; then 
-  echo -e "${VERMELHO}Por favor, execute como root (sudo)${RESET}"
+  log_error "Por favor, execute como root (sudo)"
   exit 1
 fi
 
-echo -e "${CIANO}--- Iniciando Pós-Instalação do Servidor ---${RESET}"
-
-# ==============================================================================
-# BLOCO DE INTERATIVIDADE ECOLETAS DE PARÂMETROS
-# ==============================================================================
-
-# Sugestão de Melhoria 1: SSH por padrão desabilitado, necessitando de ação explícita 'yes' para abrir o Root.
-read -p "$(echo -e ${AMARELO}"Visando segurança, o padrão é desabilitar o login de Root via SSH. Deseja forçar a ativação (yes)? (s/n): "${RESET})" PERMIT_ROOT
-
-# Alteração: Criação assistida do usuário administrador tradicional
-read -p "$(echo -e ${AMARELO}"Deseja criar o usuário padrão 'administrador' com acesso total ao Sudo? (s/n): "${RESET})" CRIAR_ADMIN
-if [[ "$CRIAR_ADMIN" =~ ^[Ss]$ ]]; then
-  if id "administrador" &>/dev/null; then
-    echo -e "${AMARELO}[!] O usuário 'administrador' já existe no sistema.${RESET}"
-  fi
-fi
-
-# Alteração: Escolha dinâmica de Grupo Customizado para restrição via Visudo
-read -p "$(echo -e ${AMARELO}"Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/n): "${RESET})" CRIAR_USUARIO
-
-if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
-  # Escolha do nome do grupo customizado
-  read -p "$(echo -e ${AMARELO}"Digite o nome do GRUPO que deseja criar (ex: TI, DEV, SUPORTE): "${RESET})" NOME_GRUPO
-  while [ -z "$NOME_GRUPO" ]; do
-    read -p "$(echo -e ${VERMELHO}"O nome do grupo não pode ser vazio. Digite novamente: "${RESET})" NOME_GRUPO
-  done
-
-  # Coleta do nome do usuário exclusivo deste grupo
-  read -p "$(echo -e ${AMARELO}"Digite o nome do novo usuário para o grupo $NOME_GRUPO: "${RESET})" NOVO_USER
-  while [ -z "$NOVO_USER" ]; do
-    read -p "$(echo -e ${VERMELHO}"O nome do usuário não pode ser vazio. Digite novamente: "${RESET})" NOVO_USER
-  done
-fi
-
-echo "--------------------------------------------------------"
-echo -e "${CIANO}Configurações coletadas. Iniciando os procedimentos...${RESET}"
-echo "--------------------------------------------------------"
+print_header "INICIANDO PÓS-INSTALAÇÃO DO SERVIDOR"
 
 # ==============================================================================
 # 1. ATUALIZAÇÃO DO SISTEMA
 # ==============================================================================
-echo -e "${CIANO}Atualizando a lista de pacotes (apt update)...${RESET}"
+print_alert_box "O sistema será atualizado antes de prosseguirmos com as configurações."
+
+log_info "Atualizando a lista de pacotes (apt update)..."
 apt update -y
 
-echo -e "${CIANO}Aplicando atualizações de segurança e sistema (apt upgrade)...${RESET}"
+log_info "Aplicando atualizações de segurança e sistema (apt upgrade)..."
 apt upgrade -y
+log_success "Sistema atualizado."
+
+# ==============================================================================
+# BLOCO DE INTERATIVIDADE E COLETAS DE PARÂMETROS
+# ==============================================================================
+print_header "COLETA DE PARÂMETROS"
+
+# Sugestão de Melhoria 1: SSH por padrão desabilitado.
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja desabilitar o login de ROOT via SSH? (s/n): ${NC}")" DESABILITAR_ROOT
+
+# Pergunta sobre criação de usuários padrão
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/n): ${NC}")" CRIAR_ADMIN
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset'? (s/n): ${NC}")" CRIAR_GESET
+
+# Alteração: Escolha dinâmica de Grupo Customizado para restrição via Visudo
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/n): ${NC}")" CRIAR_USUARIO
+
+if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
+  # Escolha do nome do grupo customizado
+  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do GRUPO que deseja criar (ex: TI, DEV, SUPORTE): ${NC}")" NOME_GRUPO
+  while [ -z "$NOME_GRUPO" ]; do
+    read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do grupo não pode ser vazio. Digite novamente: ${NC}")" NOME_GRUPO
+  done
+
+  # Coleta do nome do usuário exclusivo deste grupo
+  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do novo usuário para o grupo ${BOLD}$NOME_GRUPO${NC}${FG_YELLOW}: ${NC}")" NOVO_USER
+  while [ -z "$NOVO_USER" ]; do
+    read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do usuário não pode ser vazio. Digite novamente: ${NC}")" NOVO_USER
+  done
+fi
+
+draw_separator
+log_info "Configurações coletadas. Iniciando os procedimentos..."
 
 # ==============================================================================
 # 2. INSTALAÇÃO DE PACOTES E UTILLITÁRIOS
 # ==============================================================================
-echo -e "${CIANO}Instalando utilitários e agentes Hypervisor (QEMU, VMware, ncdu, fastfetch)...${RESET}"
-apt install -y qemu-guest-agent open-vm-tools ncdu fastfetch
+print_header "INSTALAÇÃO DE UTILITÁRIOS"
 
-systemctl enable --now qemu-guest-agent open-vm-tools > /dev/null 2>&1
+PACOTES=(qemu-guest-agent open-vm-tools ncdu fastfetch)
+for pacote in "${PACOTES[@]}"; do
+  log_info "Instalando o pacote: $pacote..."
+  if apt install -y "$pacote" > /dev/null 2>&1; then
+    log_success "Pacote $pacote instalado com sucesso."
+    if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" ]]; then
+      systemctl enable --now "$pacote" > /dev/null 2>&1
+    fi
+  else
+    log_warning "Não foi possível instalar o pacote: $pacote (pode não estar disponível)."
+  fi
+done
 
 # ==============================================================================
 # 3. CONFIGURAÇÃO DO SSH (Aumento de segurança padrão)
 # ==============================================================================
+print_header "CONFIGURAÇÃO DO SSH"
 # Modificado: Se o usuário não disser Explicitamente "Sim", o script blinda a config para "no"
-if [[ "$PERMIT_ROOT" =~ ^[Ss]$ ]]; then
-  echo -e "${AMARELO}[!] Alerta de Segurança: Configurando PermitRootLogin para 'yes' no SSH...${RESET}"
+if [[ "$DESABILITAR_ROOT" =~ ^[Nn]$ ]]; then
+  log_warning "Alerta de Segurança: Configurando PermitRootLogin para 'yes' no SSH..."
   sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
   echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 else
-  echo -e "${VERDE}[+] Segurança Aplicada: Desabilitando explicitamente o login de Root via SSH (Padrão).${RESET}"
+  log_success "Segurança Aplicada: Desabilitando explicitamente o login de Root via SSH (Padrão)."
   sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
   echo "PermitRootLogin no" >> /etc/ssh/sshd_config
 fi
 systemctl restart sshd
+log_info "Serviço SSH reiniciado."
 
 # ==============================================================================
-# OTIMIZAÇÃO EXTRA: CRIÇÃO DO USUÁRIO ADMINISTRADOR BÁSICO
+# VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
 # ==============================================================================
+print_header "GERENCIAMENTO DE USUÁRIOS PADRÃO"
+log_info "Verificando usuários padrão (administrador e geset)..."
+
 if [[ "$CRIAR_ADMIN" =~ ^[Ss]$ ]]; then
   if ! id "administrador" &>/dev/null; then
-    echo -e "${CIANO}Criando usuário administrativo padrão ('administrador')...${RESET}"
+    log_warning "Usuário 'administrador' não encontrado. Criando com acesso Sudo..."
     useradd -m -s /bin/bash -G sudo administrador
-    echo -e "${AMARELO}Defina a senha para o usuário 'administrador':${RESET}"
+    echo -e "  ${FG_YELLOW}${ARROW} Defina a senha para o usuário 'administrador':${NC}"
     passwd administrador
+  else
+    log_success "Usuário 'administrador' já existe."
   fi
+else
+  log_info "Criação do usuário 'administrador' pulada."
+fi
+
+if [[ "$CRIAR_GESET" =~ ^[Ss]$ ]]; then
+  if ! id "geset" &>/dev/null; then
+    log_warning "Usuário 'geset' não encontrado. Criando..."
+    useradd -m -s /bin/bash geset
+    echo -e "  ${FG_YELLOW}${ARROW} Defina a senha para o usuário 'geset':${NC}"
+    passwd geset
+  else
+    log_success "Usuário 'geset' já existe."
+  fi
+else
+  log_info "Criação do usuário 'geset' pulada."
 fi
 
 # ==============================================================================
 # 4. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
 # ==============================================================================
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
+  print_header "GRUPO CUSTOMIZADO E VISUDO"
+  
   # Higieniza a string transformando o nome do grupo em letras maiúsculas para o padrão Unix
   NOME_GRUPO=$(echo "$NOME_GRUPO" | tr '[:lower:]' '[:upper:]')
 
-  echo -e "${CIANO}Criando/Verificando o grupo customizado '$NOME_GRUPO'...${RESET}"
+  log_info "Criando/Verificando o grupo customizado '$NOME_GRUPO'..."
   getent group "$NOME_GRUPO" > /dev/null || groupadd "$NOME_GRUPO"
 
-  echo -e "${CIANO}Criando o usuário '$NOVO_USER'...${RESET}"
+  log_info "Criando o usuário '$NOVO_USER'..."
   if id "$NOVO_USER" &>/dev/null; then
-    echo -e "${AMARELO}Aviso: O usuário '$NOVO_USER' já existe. Vinculando ao grupo $NOME_GRUPO...${RESET}"
+    log_warning "O usuário '$NOVO_USER' já existe. Vinculando ao grupo $NOME_GRUPO..."
   else
     useradd -m -s /bin/bash "$NOVO_USER"
-    echo -e "${AMARELO}Defina a senha para o usuário '$NOVO_USER':${RESET}"
+    echo -e "  ${FG_YELLOW}${ARROW} Defina a senha para o usuário '$NOVO_USER':${NC}"
     passwd "$NOVO_USER"
   fi
 
   # Garante que o usuário pertença ao grupo customizado
   usermod -aG "$NOME_GRUPO" "$NOVO_USER"
-  echo -e "${VERDE}Usuário '$NOVO_USER' configurado e adicionado ao grupo $NOME_GRUPO.${RESET}"
+  log_success "Usuário '$NOVO_USER' configurado e adicionado ao grupo $NOME_GRUPO."
 
   # Sugestão de Melhoria 2: Validação se o usuário 'geset' existe para evitar erros de sintaxe no Sudoers
-  echo -e "${CIANO}Auditando existência do usuário 'geset' para regras do Sudoers...${RESET}"
+  log_info "Auditando existência do usuário 'geset' para regras do Sudoers..."
   if id "geset" &>/dev/null; then
     REGRA_GESET=", !/usr/bin/passwd geset"
-    echo -e "${VERDE}[+] Usuário geset localizado. Amarra de proteção adicionada ao Visudo.${RESET}"
+    log_success "Usuário geset localizado. Amarra de proteção adicionada ao Visudo."
   else
     REGRA_GESET=""
-    echo -e "${AMARELO}[-] Usuário geset não existe neste servidor. Removendo amarra pendente para evitar falha no Visudo.${RESET}"
+    log_warning "Usuário geset não existe neste servidor. Removendo amarra pendente para evitar falha no Visudo."
   fi
 
-  echo -e "${CIANO}Aplicando restrições de segurança dinâmicas para o grupo $NOME_GRUPO no visudo...${RESET}"
+  log_info "Aplicando restrições de segurança dinâmicas para o grupo $NOME_GRUPO no visudo..."
   SUDOERS_TMP=$(mktemp)
   
   # Criação do payload customizado baseado na string capturada no início do script
@@ -169,9 +271,9 @@ EOF
   if visudo -cf "$SUDOERS_TMP" > /dev/null 2>&1; then
     mv "$SUDOERS_TMP" "/etc/sudoers.d/$ARQUIVO_FINAL_SUDO"
     chmod 0440 "/etc/sudoers.d/$ARQUIVO_FINAL_SUDO"
-    echo -e "${VERDE}Regras do visudo para o grupo $NOME_GRUPO aplicadas com sucesso!${RESET}"
+    log_success "Regras do visudo para o grupo $NOME_GRUPO aplicadas com sucesso!"
   else
-    echo -e "${VERMELHO}Erro crítico: Sintaxe das regras do visudo inválida. As restrições NÃO foram aplicadas.${RESET}"
+    log_error "Erro crítico: Sintaxe das regras do visudo inválida. As restrições NÃO foram aplicadas."
     rm -f "$SUDOERS_TMP"
   fi
 fi
@@ -179,37 +281,47 @@ fi
 # ==============================================================================
 # 5. CONFIGURAR REGRAS DE FIREWALL (UFW)
 # ==============================================================================
+print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
 if command -v ufw >/dev/null 2>&1; then
-  echo -e "${CIANO}Configurando regras básicas no UFW...${RESET}"
-  ufw allow 22/tcp comment 'Acesso SSH Remoto'
-  ufw allow 10050/tcp comment 'Zabbix Agent Port'
+  log_info "Configurando regras básicas no UFW..."
+  ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
+  ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
+  log_success "Regras do UFW configuradas."
 else
-  echo -e "${AMARELO}UFW não encontrado. Instalação e parametrização pulada.${RESET}"
+  log_warning "UFW não encontrado. Instalação e parametrização pulada."
 fi
 
 # ==============================================================================
 # OUTCOME VISUAL FINAL DO SERVIDOR
 # ==============================================================================
-echo -e "${VERDE}--------------------------------------------------------"
-echo "Pós-instalação concluída com sucesso!"
-echo -e "--------------------------------------------------------${RESET}"
-echo -e "${CIANO}Status dos Agentes Instalados:${RESET}"
-echo " - QEMU Guest Agent: $(systemctl is-active qemu-guest-agent)"
-echo " - Open VM Tools:   $(systemctl is-active open-vm-tools)"
-echo "--------------------------------------------------------"
-echo -e "${CIANO}Regras atuais pré-configuradas no UFW:${RESET}"
-ufw show added
-echo "--------------------------------------------------------"
+print_header "RESUMO DO SISTEMA"
+log_success "Pós-instalação concluída com sucesso!"
+
+echo -e "\n  ${FG_CYAN}${BOLD}Status dos Agentes Instalados:${NC}"
+echo -e "  ${DIM}────────────────────────────────────────${NC}"
+  echo -e "  ${FG_WHITE}QEMU Guest Agent : ${NC}$(systemctl is-active qemu-guest-agent 2>/dev/null)"
+  echo -e "  ${FG_WHITE}Open VM Tools    : ${NC}$(systemctl is-active open-vm-tools 2>/dev/null)"
+
+if command -v ufw >/dev/null 2>&1; then
+  echo -e "\n  ${FG_CYAN}${BOLD}Regras atuais pré-configuradas no UFW:${NC}"
+  echo -e "  ${DIM}────────────────────────────────────────${NC}"
+  ufw show added | sed 's/^/  /'
+fi
 
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
-  echo -e "${CIANO}Informações do usuário exclusivo criado:${RESET}"
-  id "$NOVO_USER"
-  echo "--------------------------------------------------------"
-  echo -e "${CIANO}Verificação do arquivo de restrições do grupo $NOME_GRUPO:${RESET}"
+  echo -e "\n  ${FG_CYAN}${BOLD}Informações do usuário exclusivo criado:${NC}"
+  echo -e "  ${DIM}────────────────────────────────────────${NC}"
+  id "$NOVO_USER" | sed 's/^/  /'
+  
+  echo -e "\n  ${FG_CYAN}${BOLD}Verificação do arquivo de restrições (${NOME_GRUPO}):${NC}"
+  echo -e "  ${DIM}────────────────────────────────────────${NC}"
   if [ -f "/etc/sudoers.d/$ARQUIVO_FINAL_SUDO" ]; then
-    echo -e "${VERDE}Arquivo /etc/sudoers.d/$ARQUIVO_FINAL_SUDO criado e ativo.${RESET}"
+    log_success "Arquivo /etc/sudoers.d/$ARQUIVO_FINAL_SUDO ativo."
   else
-    echo -e "${VERMELHO}Aviso: Arquivo de restrições (/etc/sudoers.d/$ARQUIVO_FINAL_SUDO) falhou na validação.${RESET}"
+    log_error "Arquivo de restrições falhou na validação."
   fi
-  echo "--------------------------------------------------------"
 fi
+
+echo ""
+draw_separator
+echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
