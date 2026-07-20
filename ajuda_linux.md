@@ -92,6 +92,50 @@ O utilitário `find` é extremamente poderoso para localizar itens com base em r
   find /diretorio/de/busca -type f -name "*.tmp" -exec rm -f {} \;
   ```
 
+### Alterar Proprietário e Grupo (`chown`)
+O comando `chown` (change owner) altera o dono e/ou o grupo de arquivos e diretórios:
+* **Alterar apenas o proprietário (dono) do arquivo:**
+  ```bash
+  sudo chown usuario arquivo.txt
+  ```
+* **Alterar apenas o grupo do arquivo:**
+  ```bash
+  sudo chown :grupo arquivo.txt
+  ```
+* **Alterar o proprietário E o grupo simultaneamente (Mais comum):**
+  ```bash
+  sudo chown usuario:grupo arquivo.txt
+  ```
+* **Alterar de forma recursiva (aplica para a pasta e tudo dentro dela):**
+  ```bash
+  sudo chown -R usuario:grupo /caminho/da/pasta
+  ```
+
+### Alterar Permissões de Acesso (`chmod`)
+O comando `chmod` (change mode) define quem pode ler (`r`), escrever (`w`) ou executar (`x`) arquivos e pastas:
+
+* **Tabela rápida de valores octais (Mais comuns):**
+  * **`7`** (`rwx`) — Leitura, escrita e execução (controle total).
+  * **`6`** (`rw-`) — Leitura e escrita.
+  * **`5`** (`r-x`) — Leitura e execução (comum para diretórios e scripts).
+  * **`4`** (`r--`) — Apenas leitura.
+
+* **Exemplos práticos usando números (Octal):**
+  ```bash
+  chmod 755 script.sh      # Dono: total | Grupo e Outros: ler e executar (padrão para scripts)
+  chmod 644 arquivo.txt    # Dono: ler/escrever | Grupo e Outros: apenas ler (padrão de arquivos)
+  chmod 600 id_ed25519     # Apenas o dono lê e escreve (obrigatório para chaves SSH privadas)
+  chmod -R 755 /pasta      # Aplica as permissões de forma recursiva em todo o conteúdo
+  ```
+
+* **Exemplos práticos usando letras (Simbólico):**
+  ```bash
+  chmod +x script.sh       # Torna o script executável para qualquer usuário
+  chmod -x script.sh       # Remove a permissão de execução de todos
+  chmod u+w arquivo.txt    # Adiciona permissão de escrita apenas para o dono (user)
+  chmod g-r arquivo.txt    # Remove permissão de leitura do grupo (group)
+  ```
+
 ### Compactação & Descompactação (`tar`, `zip`, `unzip`, `gzip`, `bzip2`)
 Guia rápido para empacotar, compactar e extrair arquivos:
 
@@ -174,14 +218,51 @@ sudo usermod -aG sudo nome_usuario
 sudo usermod -L nome_usuario
 ```
 
-### Verificar usuários atualmente logados no sistema (w vs who)
-* **`who`** — Mostra uma lista direta dos usuários logados, indicando o terminal (TTY), data/hora de login e IP de origem.
+### Verificar usuários ativos no sistema (w, who, whoami)
+* **`who`** — Mostra uma lista direta dos usuários conectados, indicando o terminal (TTY), data/hora de login e IP de origem.
   ```bash
   who
   ```
 * **`w`** — Mais completo. Além de listar quem está logado, mostra o uptime/carga do sistema, tempo ocioso de cada terminal e **o que** cada usuário está executando no momento.
   ```bash
   w
+  ```
+* **`whoami`** — Exibe o nome do usuário atual com o qual você está logado na sessão do terminal.
+  ```bash
+  whoami
+  ```
+
+## 📦 Gerenciamento de Pacotes (dpkg & APT)
+
+### Principais comandos do `dpkg` (Gerenciador local de pacotes `.deb`)
+* **Instalar um pacote `.deb` local:**
+  ```bash
+  sudo dpkg -i pacote.deb
+  ```
+* **Remover um pacote (mantendo arquivos de configuração):**
+  ```bash
+  sudo dpkg -r nome_do_pacote
+  ```
+* **Remover completamente (Purge — remove pacotes e arquivos de configuração):**
+  ```bash
+  sudo dpkg -P nome_do_pacote
+  ```
+* **Listar todos os pacotes instalados no sistema (ou filtrar por nome):**
+  ```bash
+  dpkg -l
+  dpkg -l | grep nome_do_pacote
+  ```
+* **Listar os arquivos instalados no sistema por um pacote específico:**
+  ```bash
+  dpkg -L nome_do_pacote
+  ```
+* **Identificar a qual pacote pertence um arquivo específico no sistema:**
+  ```bash
+  dpkg -S /caminho/do/arquivo
+  ```
+* **Ver informações detalhadas de um pacote `.deb` antes de instalá-lo:**
+  ```bash
+  dpkg -I pacote.deb
   ```
 
 ## 🔐 SSH & Segurança
