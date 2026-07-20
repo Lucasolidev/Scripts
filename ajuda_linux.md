@@ -215,6 +215,12 @@ Para conseguir se conectar sem senha, você precisa registrar a sua **chave púb
      echo "cole_aqui_a_chave_publica_copiada" >> ~/.ssh/authorized_keys
      ```
 
+### Ajustar permissões rígidas da pasta e chaves SSH no servidor de destino
+```bash
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+```
+
 ### Testar alterações no sshd_config antes de reiniciar
 ```bash
 sudo sshd -t
@@ -253,12 +259,6 @@ sudo ufw allow 22/tcp comment 'Acesso SSH principal'
 ### Ver status do UFW com detalhes
 ```bash
 sudo ufw status verbose
-```
-
-### Ajustar permissões rígidas da pasta e chaves SSH do usuário
-```bash
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/authorized_keys
 ```
 
 ## 💾 Aumento de Armazenamento - Partição Simples (EXT4)
