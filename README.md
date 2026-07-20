@@ -15,6 +15,6 @@ O objetivo deste diretório é centralizar scripts úteis (`.sh`) para automaç�
 
 Para facilitar a consulta a comandos e configurações frequentes, acesse os guias abaixo:
 
-* [Guia de Ajuda Linux](file:///c:/Users/Lucas/Documents/Linux-Scripts/ajuda_linux.md) - Atalhos, comandos essenciais e dicas de administração Linux.
-* [Guia de Ajuda Vim](file:///c:/Users/Lucas/Documents/Linux-Scripts/ajuda_vim.md) - Atalhos de teclado, comandos de movimentação e edição no editor Vim.
+* [Guia de Ajuda Linux](https://github.com/Lucasolidev/Scripts/blob/main/ajuda_linux.md) - Atalhos, comandos essenciais e dicas de administração Linux.
+* [Guia de Ajuda Vim](https://github.com/Lucasolidev/Scripts/blob/main/ajuda_vim.md) - Atalhos de teclado, comandos de movimentação e edição no editor Vim.
 
