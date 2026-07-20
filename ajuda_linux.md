@@ -1,7 +1,7 @@
 🐧 Cheat Sheet - Administração Linux (Ubuntu Server)
 👤 Gerenciamento de Usuários e Grupos
 Bash
-# Listar todos os usuários do sistema
+## Listar todos os usuários do sistema
 cut -d: -f1 /etc/passwd
 
 # Listar usuários com acesso sudo
