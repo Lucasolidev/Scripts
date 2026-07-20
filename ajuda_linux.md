@@ -1,5 +1,152 @@
 # 🐧 Cheat Sheet - Administração Linux (Ubuntu Server)
 
+## 🖥️ Informações do Sistema
+
+### Verificar o sistema operacional e versão detalhada
+```bash
+cat /etc/os-release
+```
+
+### Exibir a versão do Kernel do Linux
+```bash
+uname -a
+```
+
+### Verificar hostname, versão do OS e arquitetura de forma geral
+```bash
+hostnamectl
+```
+
+## 📁 Manipulação de Arquivos & Diretórios
+
+### Criar Diretórios (`mkdir`)
+* **Criar pastas alinhadas (estrutura recursiva/pais):** Cria todas as pastas intermediárias caso não existam.
+  ```bash
+  mkdir -p /caminho/da/pasta/nova
+  ```
+* **Modo detalhado (Verbose):** Mostra uma mensagem para cada diretório criado.
+  ```bash
+  mkdir -pv pasta1/pasta2
+  ```
+
+### Copiar Arquivos e Pastas (`cp`)
+* **Copiar pasta inteira recursivamente:**
+  ```bash
+  cp -r /origem/pasta /destino/pasta
+  ```
+* **Preservar atributos (permissões, datas de modificação e dono):**
+  ```bash
+  cp -p arquivo.txt /destino/
+  ```
+* **Copiar de forma interativa (pede confirmação antes de sobrescrever):**
+  ```bash
+  cp -i arquivo.txt /destino/
+  ```
+* **Copiar apenas arquivos mais novos (Update):**
+  ```bash
+  cp -u arquivo.txt /destino/
+  ```
+
+### Remover Arquivos e Pastas (`rm`) — Dicas de Segurança ⚠️
+* **Remover pastas e subpastas recursivamente:**
+  ```bash
+  rm -rf /caminho/da/pasta
+  ```
+* **💡 Como remover com Segurança:**
+  * **Confirmação Interativa (`-i` ou `-I`):** 
+    Use `-i` para pedir confirmação em cada arquivo ou `-I` para confirmar uma única vez antes de apagar mais de 3 arquivos ou pastas recursivamente.
+    ```bash
+    rm -rI /caminho/da/pasta
+    ```
+  * **Visualizar antes de apagar (Regra de Ouro):** 
+    Substitua o `rm` por `ls` antes para ter certeza do que será apagado:
+    ```bash
+    # Primeiro liste para confirmar:
+    ls -la /caminho/pasta/*.log
+    # Se estiver correto, execute a remoção:
+    rm /caminho/pasta/*.log
+    ```
+  * **Cuidado com caminhos relativos:** Evite usar `rm -rf .*` (pode tentar apagar o diretório pai `..`). Dê preferência a caminhos absolutos completos.
+
+### Buscar Arquivos e Pastas (`find`)
+O utilitário `find` é extremamente poderoso para localizar itens com base em regras:
+* **Buscar por nome (Ignorando maiúsculas/minúsculas - Case Insensitive):**
+  ```bash
+  find /diretorio/de/busca -iname "nome_do_arquivo.txt"
+  ```
+* **Buscar apenas arquivos (`-type f`) ou apenas pastas (`-type d`):**
+  ```bash
+  find /diretorio/de/busca -type f -name "*.log"
+  find /diretorio/de/busca -type d -name "backup*"
+  ```
+* **Buscar arquivos por tamanho (ex: maiores que 100MB):**
+  ```bash
+  find /diretorio/de/busca -type f -size +100M
+  ```
+* **Buscar arquivos modificados nos últimos X dias (ex: últimos 7 dias):**
+  ```bash
+  find /diretorio/de/busca -type f -mtime -7
+  ```
+* **Buscar e executar uma ação (ex: buscar todos os `.tmp` e excluí-los):**
+  ```bash
+  find /diretorio/de/busca -type f -name "*.tmp" -exec rm -f {} \;
+  ```
+
+### Compactação & Descompactação (`tar`, `zip`, `unzip`, `gzip`, `bzip2`)
+Guia rápido para empacotar, compactar e extrair arquivos:
+
+* **Compactar pasta em `.tar.gz` (Gzip — Rápido e muito comum):**
+  ```bash
+  tar -czvf arquivo.tar.gz /caminho/da/pasta
+  ```
+  *(Parâmetros: `-c` cria, `-z` compacta com gzip, `-v` verbose, `-f` define o arquivo destino)*
+
+* **Descompactar um arquivo `.tar.gz`:**
+  ```bash
+  tar -xzvf arquivo.tar.gz -C /diretorio/destino
+  ```
+
+* **Compactar pasta em `.tar.bz2` (Bzip2 — Maior compactação, mais lento):**
+  ```bash
+  tar -cjvf arquivo.tar.bz2 /caminho/da/pasta
+  ```
+  *(Parâmetros: `-j` compacta com bzip2)*
+
+* **Descompactar um arquivo `.tar.bz2`:**
+  ```bash
+  tar -xjvf arquivo.tar.bz2 -C /diretorio/destino
+  ```
+
+* **Compactar pasta em `.zip` (Compatível com Windows):**
+  ```bash
+  zip -r arquivo.zip /caminho/da/pasta
+  ```
+
+* **Descompactar um arquivo `.zip`:**
+  ```bash
+  unzip arquivo.zip -d /diretorio/destino
+  ```
+
+* **Compactar um único arquivo diretamente com `gzip` ou `bzip2`:**
+  ```bash
+  gzip arquivo.txt         # Gera arquivo.txt.gz e APAGA o original
+  gzip -k arquivo.txt      # Gera arquivo.txt.gz e MANTÉM o original (-k)
+  
+  bzip2 arquivo.txt        # Gera arquivo.txt.bz2 (compactação mais forte que gzip)
+  bzip2 -k arquivo.txt     # Gera arquivo.txt.bz2 e MANTÉM o original
+  ```
+
+* **Descompactar arquivos `.gz` ou `.bz2` diretamente:**
+  ```bash
+  gunzip arquivo.txt.gz    # Ou: gzip -d arquivo.txt.gz
+  bunzip2 arquivo.txt.bz2  # Ou: bzip2 -d arquivo.txt.bz2
+  ```
+
+* **Visualizar o conteúdo de um `.tar.gz` sem extrair:**
+  ```bash
+  tar -tzf arquivo.tar.gz
+  ```
+
 ## 👤 Gerenciamento de Usuários e Grupos
 
 ### Listar todos os usuários do sistema
