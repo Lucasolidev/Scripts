@@ -39,6 +39,35 @@ sudo usermod -L nome_usuario
 
 ## 🔐 SSH & Segurança
 
+### Gerar novas chaves SSH (Par de chaves Pública/Privada)
+* **Recomendado (Algoritmo ED25519 — mais seguro e rápido):**
+  ```bash
+  ssh-keygen -t ed25519 -C "seu_email@exemplo.com"
+  ```
+* **Legado/Compatibilidade (Algoritmo RSA de 4096 bits):**
+  ```bash
+  ssh-keygen -t rsa -b 4096 -C "seu_email@exemplo.com"
+  ```
+
+### Copiar a chave pública para o servidor (Autorizar o acesso)
+Para conseguir se conectar sem senha, você precisa registrar a sua **chave pública** (arquivo `.pub`) dentro do arquivo `authorized_keys` no servidor de destino.
+
+* **Método Automático (Recomendado via terminal Linux/macOS):**
+  ```bash
+  ssh-copy-id -i ~/.ssh/id_ed25519.pub usuario@ip_do_servidor
+  ```
+* **Método Manual (Caso esteja usando Windows ou fazendo direto no console do servidor):**
+  1. Na sua máquina local, exiba o conteúdo da sua chave pública:
+     ```bash
+     cat ~/.ssh/id_ed25519.pub
+     ```
+  2. Copie todo o conteúdo retornado (a linha inteira).
+  3. No servidor de destino, crie a pasta `.ssh` (se não existir) e adicione a chave no final do arquivo:
+     ```bash
+     mkdir -p ~/.ssh
+     echo "cole_aqui_a_chave_publica_copiada" >> ~/.ssh/authorized_keys
+     ```
+
 ### Testar alterações no sshd_config antes de reiniciar
 ```bash
 sudo sshd -t
