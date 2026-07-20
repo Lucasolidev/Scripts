@@ -2,7 +2,8 @@
 # Invoke-RestMethod -Uri "https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.ps1"
 
 # Para executar o script pelo powerhell
-# irm https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.ps1 | iex
+# irm https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.ps1 | iex
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.ps1 | iex
 
 # Permissão de Execução: Se for a primeira vez que você executa um script PowerShell, pode ser necessário liberar a execução. Abra o PowerShell como Administrador e digite:
 # Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
