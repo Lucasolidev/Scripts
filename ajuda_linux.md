@@ -143,15 +143,69 @@ sudo apt autoremove --purge && sudo apt clean
 journalctl --disk-usage
 sudo journalctl --vacuum-time=3d
 ```
+## 🔍 Análise de Logs & Erros (tail & journalctl)
+
+### Principais arquivos de log no Ubuntu Server
+* `/var/log/syslog` — Registro geral de eventos do sistema.
+* `/var/log/auth.log` — Log de autenticação, acessos SSH, tentativas de login e uso do `sudo`.
+* `/var/log/kern.log` — Mensagens do Kernel, avisos de hardware e problemas com dispositivos.
+* `/var/log/dpkg.log` — Histórico de instalação, atualização e remoção de pacotes via APT.
+
+### Monitorar o log do sistema em tempo real
+```bash
+tail -f /var/log/syslog
+```
+
+### Ver as últimas 100 linhas de um log
+```bash
+tail -n 100 /var/log/syslog
+```
+
+### Mostrar as últimas 50 linhas e continuar acompanhando em tempo real
+```bash
+tail -n 50 -f /var/log/syslog
+```
+
+### Filtrar apenas erros ou falhas em tempo real
+```bash
+tail -f /var/log/syslog | grep -i -E "error|fail|warning"
+```
+
+### Monitorar múltiplos logs simultaneamente (syslog e auth.log)
+```bash
+tail -f /var/log/syslog /var/log/auth.log
+```
+
+### Filtrar erros e buscar problemas com journalctl
+* **Ver apenas erros/falhas do boot atual:**
+  ```bash
+  sudo journalctl -p err -b
+  ```
+* **Ver logs do boot anterior (útil após travamentos):**
+  ```bash
+  sudo journalctl -b -1
+  ```
+* **Ver logs de um serviço específico em tempo real (ex: SSH, Apache, Nginx):**
+  ```bash
+  sudo journalctl -u ssh -f
+  ```
+* **Filtrar logs por tempo (ex: última 1 hora, ou período específico):**
+  ```bash
+  sudo journalctl --since "1 hour ago"
+  sudo journalctl --since "2026-07-20 14:00:00" --until "2026-07-20 16:00:00"
+  ```
+* **Ver logs apenas relacionados ao Kernel (equivalente ao dmesg):**
+  ```bash
+  sudo journalctl -k
+  ```
+* **Acompanhar todos os logs do sistema em tempo real:**
+  ```bash
+  sudo journalctl -f
+  ```
 
 ## 🚀 Processos & Monitoramento
 
 ### Monitor interativo de CPU e RAM
 ```bash
 htop
-```
-
-### Ver logs em tempo real de um serviço (ex: SSH)
-```bash
-sudo journalctl -u ssh -f -n 50
 ```
