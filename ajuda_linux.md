@@ -1,4 +1,5 @@
 #🐧 Cheat Sheet - Administração Linux (Ubuntu Server)
+
 #👤 Gerenciamento de Usuários e Grupos
 
 ### Listar todos os usuários do sistema
