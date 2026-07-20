@@ -92,6 +92,35 @@ O utilitário `find` é extremamente poderoso para localizar itens com base em r
   find /diretorio/de/busca -type f -name "*.tmp" -exec rm -f {} \;
   ```
 
+### Buscar Texto Dentro de Arquivos (`grep`)
+O comando `grep` localiza strings e padrões de texto dentro de arquivos:
+* **Busca simples (Diferencia maiúsculas/minúsculas):**
+  ```bash
+  grep "termo_de_busca" arquivo.txt
+  ```
+* **Busca ignorando maiúsculas/minúsculas (`-i`):**
+  ```bash
+  grep -i "termo_de_busca" arquivo.txt
+  ```
+* **Busca recursiva em pastas (`-r`) exibindo o número da linha do resultado (`-n`):**
+  ```bash
+  grep -rn "termo_de_busca" /caminho/da/pasta/
+  ```
+* **Inverter a busca (exibir linhas que NÃO contêm o termo — `-v`):**
+  ```bash
+  grep -v "ignorar_isto" arquivo.txt
+  ```
+* **Buscar múltiplos termos usando lógica OR/Regex (`-E`):**
+  ```bash
+  grep -E "erro|falha|critico" arquivo.txt
+  ```
+* **Exibir contexto ao redor do resultado (linhas antes/depois):**
+  ```bash
+  grep -A 3 "erro" arquivo.txt      # Exibe o erro e 3 linhas DEPOIS (After)
+  grep -B 3 "erro" arquivo.txt      # Exibe o erro e 3 linhas ANTES (Before)
+  grep -C 3 "erro" arquivo.txt      # Exibe o erro e 3 linhas ao redor (Context)
+  ```
+
 ### Alterar Proprietário e Grupo (`chown`)
 O comando `chown` (change owner) altera o dono e/ou o grupo de arquivos e diretórios:
 * **Alterar apenas o proprietário (dono) do arquivo:**
