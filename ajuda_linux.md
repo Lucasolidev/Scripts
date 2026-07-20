@@ -27,6 +27,16 @@ sudo usermod -aG sudo nome_usuario
 sudo usermod -L nome_usuario
 ```
 
+### Verificar usuários atualmente logados no sistema (w vs who)
+* **`who`** — Mostra uma lista direta dos usuários logados, indicando o terminal (TTY), data/hora de login e IP de origem.
+  ```bash
+  who
+  ```
+* **`w`** — Mais completo. Além de listar quem está logado, mostra o uptime/carga do sistema, tempo ocioso de cada terminal e **o que** cada usuário está executando no momento.
+  ```bash
+  w
+  ```
+
 ## 🔐 SSH & Segurança
 
 ### Testar alterações no sshd_config antes de reiniciar
@@ -208,4 +218,39 @@ tail -f /var/log/syslog /var/log/auth.log
 ### Monitor interativo de CPU e RAM
 ```bash
 htop
+```
+
+### Listar todos os processos ativos no sistema
+```bash
+ps aux
+```
+
+### Encontrar um processo específico pelo nome
+```bash
+ps aux | grep nome_do_processo
+```
+
+### Matar um processo de forma forçada usando o PID
+```bash
+kill -9 PID
+```
+
+### Matar processos pelo nome
+```bash
+killall nome_do_processo
+```
+
+### Verificar uso de memória RAM e Swap de forma legível
+```bash
+free -h
+```
+
+### Identificar qual processo está ocupando uma porta específica (ex: 80)
+```bash
+sudo lsof -i :80
+```
+
+### Exibir o uptime (tempo online) e as médias de carga do processador (load average)
+```bash
+uptime
 ```
