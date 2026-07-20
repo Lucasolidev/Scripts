@@ -1,49 +1,51 @@
-🐧 Cheat Sheet - Administração Linux (Ubuntu Server)
-👤 Gerenciamento de Usuários e Grupos
-Bash
+#🐧 Cheat Sheet - Administração Linux (Ubuntu Server)
+#👤 Gerenciamento de Usuários e Grupos
+
 ## Listar todos os usuários do sistema
 cut -d: -f1 /etc/passwd
 
-# Listar usuários com acesso sudo
+## Listar usuários com acesso sudo
 getent group sudo
 
-# Criar um novo usuário com pasta home
+## Criar um novo usuário com pasta home
 sudo adduser nome_usuario
 
-# Adicionar usuário existente ao grupo sudo
+## Adicionar usuário existente ao grupo sudo
 sudo usermod -aG sudo nome_usuario
 
-# Bloquear login por senha para um usuário específico
+## Bloquear login por senha para um usuário específico
 sudo usermod -L nome_usuario
-🔐 SSH & Segurança
-Bash
-# Testar alterações no sshd_config antes de reiniciar
+
+#🔐 SSH & Segurança
+
+## Testar alterações no sshd_config antes de reiniciar
 sudo sshd -t
 
-# Reiniciar o serviço SSH com segurança
+## Reiniciar o serviço SSH com segurança
 sudo systemctl restart ssh
 
-# Ativar o firewall local UFW
+## Ativar o firewall local UFW
 sudo ufw enable
 
-# Liberar porta SSH no UFW
+## Liberar porta SSH no UFW
 sudo ufw allow 22/tcp
 
-# Ver status do UFW com detalhes
+## Ver status do UFW com detalhes
 sudo ufw status verbose
 
-# Ajustar permissões rígidas da pasta e chaves SSH do usuário
+## Ajustar permissões rígidas da pasta e chaves SSH do usuário
 chmod 700 ~/.ssh
 chmod 600 ~/.ssh/authorized_keys
-💾 Aumento de Armazenamento - Partição Simples (EXT4)
-Bash
-# 1. Verificar montagens atuais
+
+#💾 Aumento de Armazenamento - Partição Simples (EXT4)
+
+## 1. Verificar montagens atuais
 df -hT
 
-# 2. Forçar o Kernel a reconhecer o novo tamanho do disco (ex: sdc)
+## 2. Forçar o Kernel a reconhecer o novo tamanho do disco (ex: sdc)
 echo 1 > /sys/class/block/sdc/device/rescan
 
-# 3. Confirmar se o disco principal cresceu no lsblk
+## 3. Confirmar se o disco principal cresceu no lsblk
 lsblk
 
 # 4. Instalar ferramenta de expansão de partição
