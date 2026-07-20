@@ -230,10 +230,25 @@ sudo systemctl restart ssh
 sudo ufw enable
 ```
 
-### Liberar porta SSH no UFW
+### Liberar porta no UFW (com comentário identificador)
 ```bash
-sudo ufw allow 22/tcp
+sudo ufw allow 22/tcp comment 'Acesso SSH principal'
 ```
+
+### Excluir uma regra ativa no UFW
+* **Método 1 — Excluir especificando a regra original:**
+  ```bash
+  sudo ufw delete allow 22/tcp
+  ```
+* **Método 2 — Excluir pelo número da regra (Recomendado/Mais prático):**
+  1. Liste todas as regras ativas numeradas:
+     ```bash
+     sudo ufw status numbered
+     ```
+  2. Apague a regra desejada informando o número correspondente (ex: regra 2):
+     ```bash
+     sudo ufw delete 2
+     ```
 
 ### Ver status do UFW com detalhes
 ```bash
