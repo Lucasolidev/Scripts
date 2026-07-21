@@ -40,5 +40,31 @@
 > 5. **Resultado Final Estruturado**:
 >    No final do script, utilize a função `print_header "RESUMO DO SISTEMA"` e exiba informações importantes tabuladas de forma minimalista, separadas por linhas discretas com `${DIM}────────────────────────────────────────${NC}`.
 > 
+> 6. **Cabeçalho de Metadados e Comentários**:
+>    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual que está sendo criado nas URLs de exemplo:
+>    ```bash
+>    #!/bin/bash
+>    # ------------------------------------------------
+>    # Version: 1.0
+>    # ------------------------------------------------
+>    VERSION="1.0"
+>    # ==============================================================================
+>    # [TITULO DO SCRIPT AQUI]
+>    # ==============================================================================
+>    # Execução recomendada via repositório: lucasolidev NOME_DO_SCRIPT_AQUI.sh
+>    # ==============================================================================
+>    # visualizar o script antes de executar:
+>    #
+>    # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
+>    # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
+>    #
+>    # Executar via URL
+>    # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
+>    # bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh)
+>    # curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh | bash
+>    #
+>    # ==============================================================================
+>    ```
+> 
 > Aqui está o script original que deve ser adaptado:
 > `[INSIRA O SCRIPT AQUI]`"
