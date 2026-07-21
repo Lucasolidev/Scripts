@@ -193,7 +193,7 @@ load-script() {
         echo \"Uso: load-script nome_do_script.sh\"
         return 1
     fi
-    curl -fsSL \"https://raw.githubusercontent.com/lucasolidev/linux/main/\$1\" | bash
+    curl -fsSL \"https://raw.githubusercontent.com/lucasolidev/scripts/main/\$1\" | bash
 }
 alias lucasolidev=\"load-script\"
 # === FIM DO BLOCO DO SCRIPT ===

@@ -4,11 +4,11 @@
 # ------------------------------------------------
 VERSION="1.0"
 # visualizar o script antes de executar
-# curl -s https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh
-
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh
+#
 # Executar via URL
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh)
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh)
 
 # Solicita a hora no formato HH:MM
 echo "Digite o horário que deseja reiniciar (formato HH:MM, ex: 23:30):"
