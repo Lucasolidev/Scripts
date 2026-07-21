@@ -6,17 +6,17 @@ VERSION="1.0"
 # ==============================================================================
 # SCRIPT DE INSTALAÇÃO E ZABBIX AGENT 7.0 - UBUNTU 24.04
 # ==============================================================================
-# Execução recomendada via repositório: lucasolidev install_zabbix_agent.sh
+# Execução recomendada via repositório: lucasolidev install_zabbix7_agent.sh
 # ==============================================================================
 # visualizar o script antes de executar:
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh
 #
 # Executar via URL
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix_agent.sh | bash
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh | bash
 #
 # ==============================================================================
 
