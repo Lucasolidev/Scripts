@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
-    Analisa o repositório de componentes (WinSxS) no Windows Server e executa a limpeza se recomendado.
+    Analisa o repositorio de componentes (WinSxS) no Windows Server e executa a limpeza se recomendado.
 .DESCRIPTION
-    Script PowerShell compatível com versões antigas do PowerShell (2.0+).
+    Script PowerShell compativel com versoes antigas do PowerShell (2.0+).
     Executa 'Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore' e, caso a limpeza seja recomendada ('Sim' / 'Yes'),
     inicia automaticamente 'Dism.exe /Online /Cleanup-Image /StartComponentCleanup'.
 .EXAMPLE
@@ -10,20 +10,20 @@
 .VERSION
     1.0
 .NOTES
-    Requer privilégios de Administrador.
+    Requer privilegios de Administrador.
 #>
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " Iniciando análise do repositório de componentes (WinSxS)..." -ForegroundColor Cyan
+Write-Host " Iniciando analise do repositorio de componentes (WinSxS)..." -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# Executa o comando de análise e armazena a saída
+# Executa o comando de analise e armazena a saida
 $analise = & Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore 2>&1 | Out-String
 
-# Exibe o resultado da análise no console
+# Exibe o resultado da analise no console
 Write-Host $analise
 
-# Expressão regular para identificar se a limpeza foi recomendada (suporta Português e Inglês, ignorando caracteres corrompidos)
+# Expressao regular para identificar se a limpeza foi recomendada (suporta Portugues e Ingles, ignorando caracteres corrompidos)
 $padraoLimpezaRecomendada = '(Limpeza.*Componentes Recomendada\s*:\s*Sim)|(Component Store Cleanup Recommended\s*:\s*Yes)'
 
 if ($analise -match $padraoLimpezaRecomendada) {
@@ -31,16 +31,16 @@ if ($analise -match $padraoLimpezaRecomendada) {
     Write-Host " Limpeza RECOMENDADA! Executando StartComponentCleanup... " -ForegroundColor Green
     Write-Host "==========================================================" -ForegroundColor Green
     
-    # Executa a limpeza do repositório
+    # Executa a limpeza do repositorio
     & Dism.exe /Online /Cleanup-Image /StartComponentCleanup
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "`nOperação de limpeza concluída com êxito!" -ForegroundColor Green
+        Write-Host "`nOperacao de limpeza concluida com exito!" -ForegroundColor Green
     } else {
-        Write-Host "`nOcorreu um erro durante a limpeza. Código de saída: $LASTEXITCODE" -ForegroundColor Red
+        Write-Host "`nOcorreu um erro durante a limpeza. Codigo de saida: $LASTEXITCODE" -ForegroundColor Red
     }
 } else {
     Write-Host "==========================================================" -ForegroundColor Yellow
-    Write-Host " Limpeza NÃO é necessária no momento.                     " -ForegroundColor Yellow
+    Write-Host " Limpeza NAO e necessaria no momento.                     " -ForegroundColor Yellow
     Write-Host "==========================================================" -ForegroundColor Yellow
 }
