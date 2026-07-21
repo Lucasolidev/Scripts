@@ -10,11 +10,11 @@ VERSION="1.0"
 # ==============================================================================
 # visualizar o script antes de executar:
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_proxy.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_proxy.sh
 #
 # Executar via URL
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh)
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_proxy.sh)
 #
 # ==============================================================================
 
