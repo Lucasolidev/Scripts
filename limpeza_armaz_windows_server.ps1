@@ -8,11 +8,12 @@
 .EXAMPLE
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/lucasolidev/scripts/main/limpeza_armaz_windows_server.ps1 | iex
 .VERSION
-    1.0
+    1.1
 .NOTES
     Requer privilegios de Administrador.
 #>
 
+Write-Host " Script de limpeza da pasta updates (SXS) v1.1" -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " Iniciando analise do repositorio de componentes (WinSxS)..." -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
