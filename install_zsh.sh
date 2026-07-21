@@ -7,7 +7,18 @@ VERSION="1.0"
 # ==============================================================================
 # SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO ZSH - UBUNTU 26.04 (CORRIGIDO)
 # ==============================================================================
-# Execução recomendada via repositório: lucasolidev config_zsh.sh
+# Execução recomendada via repositório: lucasolidev install_zsh.sh
+# ==============================================================================
+# visualizar o script antes de executar:
+#
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh
+#
+# Executar via URL
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh | bash
+#
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive

@@ -4,6 +4,20 @@
 # ------------------------------------------------
 VERSION="1.0"
 # ==============================================================================
+# Execução recomendada via repositório: lucasolidev gerencia_backup_veeam.sh
+# ==============================================================================
+# visualizar o script antes de executar:
+#
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh
+#
+# Executar via URL
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh | bash
+#
+# ==============================================================================
+# ==============================================================================
 # SCRIPT: gerencia_backup_veeam.sh
 # DESCRIÇÃO: Este script provê um menu interativo para gerenciar usuários,
 #            pastas e cotas de disco (XFS) focados no serviço de cópia de

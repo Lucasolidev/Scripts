@@ -27,6 +27,8 @@ VERSION="1.0"
 # curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh | bash
 #
 # ==============================================================================
+#
+# ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive
 

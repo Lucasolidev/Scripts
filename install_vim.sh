@@ -6,7 +6,19 @@ VERSION="1.0"
 # ==============================================================================
 # SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO EDITOR VIM - UBUNTU 26.04
 # ==============================================================================
+# ==============================================================================
 # Execução recomendada via repositório: lucasolidev install_vim.sh
+# ==============================================================================
+# visualizar o script antes de executar:
+#
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_vim.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_vim.sh
+#
+# Executar via URL
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_vim.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_vim.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_vim.sh | bash
+#
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive
