@@ -7,6 +7,8 @@
     inicia automaticamente 'Dism.exe /Online /Cleanup-Image /StartComponentCleanup'.
 .EXAMPLE
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/lucasolidev/scripts/main/limpeza_armaz_windows_server.ps1 | iex
+.VERSION
+    1.0
 .NOTES
     Requer privilégios de Administrador.
 #>

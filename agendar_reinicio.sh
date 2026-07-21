@@ -1,4 +1,8 @@
 #!/bin/bash
+# ------------------------------------------------
+# Version: 1.0
+# ------------------------------------------------
+VERSION="1.0"
 # visualizar o script antes de executar
 # curl -s https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.sh

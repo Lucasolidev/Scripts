@@ -1,3 +1,7 @@
+<#
+.VERSION
+    1.0
+#>
 # Altera o registro para desativar o Bing na barra de pesquisa
 $Path = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search"
 $Name = "BingSearchEnabled"

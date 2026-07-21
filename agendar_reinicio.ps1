@@ -1,3 +1,7 @@
+<#
+.VERSION
+    1.0
+#>
 # Para ver o script no terminal powershell
 # Invoke-RestMethod -Uri "https://raw.githubusercontent.com/lucasolidev/linux/main/agendar_reinicio.ps1"
 
