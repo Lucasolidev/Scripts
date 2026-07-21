@@ -13,9 +13,6 @@
     Requer privilégios de Administrador.
 #>
 
-# Configura codificação de saída do console para tratar acentuação corretamente
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " Iniciando análise do repositório de componentes (WinSxS)..." -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -26,8 +23,8 @@ $analise = & Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore 2>&1 | Out-S
 # Exibe o resultado da análise no console
 Write-Host $analise
 
-# Expressão regular para identificar se a limpeza foi recomendada (suporta Português e Inglês)
-$padraoLimpezaRecomendada = '(Limpeza do Repositório de Componentes Recomendada\s*:\s*Sim)|(Component Store Cleanup Recommended\s*:\s*Yes)'
+# Expressão regular para identificar se a limpeza foi recomendada (suporta Português e Inglês, ignorando caracteres corrompidos)
+$padraoLimpezaRecomendada = '(Limpeza.*Componentes Recomendada\s*:\s*Sim)|(Component Store Cleanup Recommended\s*:\s*Yes)'
 
 if ($analise -match $padraoLimpezaRecomendada) {
     Write-Host "==========================================================" -ForegroundColor Green
