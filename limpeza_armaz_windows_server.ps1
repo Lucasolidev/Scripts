@@ -16,10 +16,11 @@
 Write-Host " Script de limpeza da pasta updates (SXS) v1.2" -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " Iniciando analise do repositorio de componentes (WinSxS)..." -ForegroundColor Cyan
+Write-Host " (Essa operacao pode demorar alguns minutos. O console nao exibira o progresso. Aguarde...)" -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # Executa o comando de analise e armazena a saida
-$analise = & Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore 2>&1 | Out-String
+$analise = & Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore /NoRestart 2>&1 | Out-String
 
 # Exibe o resultado da analise no console
 Write-Host $analise
