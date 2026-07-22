@@ -36,7 +36,7 @@ if ($analise -match $padraoLimpezaRecomendada) {
     $espacoLivreAntes = (Get-PSDrive -Name C).Free
 
     # Executa a limpeza do repositorio
-    & Dism.exe /Online /Cleanup-Image /StartComponentCleanup
+    & Dism.exe /Online /Cleanup-Image /StartComponentCleanup /NoRestart
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`nOperacao de limpeza concluida com exito!" -ForegroundColor Green
