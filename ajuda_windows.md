@@ -95,3 +95,11 @@
   ```cmd
   sfc /scannow
   ```
+* **Verificar componentes do sistema** (Analisa o armazenamento de componentes):
+  ```cmd
+  Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore
+  ```
+* **Limpeza de componentes do sistema** (Inicia a limpeza da imagem do Windows):
+  ```cmd
+  Dism.exe /Online /Cleanup-Image /StartComponentCleanup
+  ```
