@@ -422,10 +422,21 @@ pvresize /dev/sdX1
 
 ## 📊 Diagnóstico de Rede & Portas
 
-### Ver conexões ativas e portas escutando (substituto moderno do netstat)
+### Ver conexões ativas, aplicações e portas escutando (substituto moderno do netstat)
 ```bash
 ss -tulpn
 ```
+
+### Portas Mais Usadas
+
+| Porta Padrão | Serviço Típico | Nome do Processo Comum |
+| :--- | :--- | :--- |
+| 80 / 443 | Servidor Web | `nginx`, `apache2`, `httpd` |
+| 3306 / 33060 | Banco de Dados | `mysqld` (MySQL/MariaDB) |
+| 5432 | Banco de Dados | `postgres` (PostgreSQL) |
+| 27017 | Banco de Dados | `mongod` (MongoDB) |
+| 6379 | Banco de Cache | `redis-server` |
+| 22 | Acesso Remoto | `sshd` |
 
 ### Testar se uma porta remota está aberta (ex: teste de NAT/Firewall)
 ```bash
