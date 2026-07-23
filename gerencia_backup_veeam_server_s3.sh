@@ -4,21 +4,22 @@
 # ------------------------------------------------
 VERSION="1.0"
 # ==============================================================================
-# Execução recomendada via repositório: lucasolidev gerencia_backup_veeam.sh
+# ==============================================================================
+# Execução recomendada via repositório: lucasolidev gerencia_backup_veeam_server_s3.sh
 # ==============================================================================
 # visualizar o script antes de executar:
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh
 #
 # Executar via URL
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam.sh | bash
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh | bash
 #
 # ==============================================================================
 # ==============================================================================
-# SCRIPT: gerencia_backup_veeam.sh
+# SCRIPT: gerencia_backup_veeam_server_s3.sh
 # DESCRIÇÃO: Este script provê um menu interativo para gerenciar usuários,
 #            pastas e cotas de disco (XFS) focados no serviço de cópia de
 #            backups do Veeam.
