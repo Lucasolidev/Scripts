@@ -432,15 +432,53 @@ ss -tulpn
 | Porta Padrão | Serviço Típico | Nome do Processo Comum |
 | :--- | :--- | :--- |
 | 80 / 443 | Servidor Web | `nginx`, `apache2`, `httpd` |
+| 8080 / 8443 | Web Alternativo / Proxy | `tomcat`, `nginx`, `node` |
 | 3306 / 33060 | Banco de Dados | `mysqld` (MySQL/MariaDB) |
 | 5432 | Banco de Dados | `postgres` (PostgreSQL) |
+| 1433 | Banco de Dados | `sqlservr` (SQL Server) |
 | 27017 | Banco de Dados | `mongod` (MongoDB) |
 | 6379 | Banco de Cache | `redis-server` |
-| 22 | Acesso Remoto | `sshd` |
+| 22 | Acesso Remoto (SSH) | `sshd` |
+| 3389 | Acesso Remoto (RDP) | `xrdp` |
+| 53 | Servidor DNS | `bind9`, `systemd-resolved` |
+| 21 | Servidor FTP | `vsftpd`, `proftpd` |
+| 25 / 587 | Servidor de E-mail (SMTP) | `postfix`, `exim4` |
+| 1194 | Servidor VPN | `openvpn` |
+| 5672 / 15672 | Fila de Mensagens | `rabbitmq-server` |
 
 ### Testar se uma porta remota está aberta (ex: teste de NAT/Firewall)
 ```bash
 nc -zv 187.32.48.193 35222
+```
+
+### Testar conectividade básica e latência (`ping`)
+```bash
+ping -c 4 google.com
+```
+
+### Testar requisições web, APIs ou ler cabeçalhos HTTP (`curl`)
+```bash
+curl -I https://google.com
+```
+
+### Consultar registros DNS de um domínio (`dig`)
+```bash
+dig +short google.com
+```
+
+### Mapear serviços e portas abertas em uma máquina remota (`nmap`)
+```bash
+nmap -p- 192.168.1.10
+```
+
+### Analisar pacotes passando pela interface de rede (Sniffer / `tcpdump`)
+```bash
+sudo tcpdump -i eth0 port 80
+```
+
+### Mapear a rota dos pacotes até o destino (`traceroute` / `tracepath`)
+```bash
+tracepath google.com
 ```
 
 ### Ver IP local das interfaces
