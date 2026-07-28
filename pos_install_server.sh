@@ -117,24 +117,17 @@ fi
 print_header "INICIANDO PÓS-INSTALAÇÃO DO SERVIDOR"
 
 # ==============================================================================
-# 1. ATUALIZAÇÃO DO SISTEMA
-# ==============================================================================
-print_alert_box "O sistema será atualizado antes de prosseguirmos com as configurações."
-
-log_info "Atualizando a lista de pacotes (apt update)..."
-apt update -y
-
-log_info "Aplicando atualizações de segurança e sistema (apt upgrade)..."
-apt upgrade -y
-log_success "Sistema atualizado."
-
-# ==============================================================================
 # BLOCO DE INTERATIVIDADE E COLETAS DE PARÂMETROS
 # ==============================================================================
 print_header "COLETA DE PARÂMETROS"
 
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/n): ${NC}")" EXEC_UPDATE
+
 # Sugestão de Melhoria 1: SSH por padrão desabilitado.
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja desabilitar o login de ROOT via SSH? (s/n): ${NC}")" DESABILITAR_ROOT
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja configurar o SSH? (s/n): ${NC}")" EXEC_SSH
+if [[ "$EXEC_SSH" =~ ^[Ss]$ ]]; then
+  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja desabilitar o login de ROOT via SSH? (s/n): ${NC}")" DESABILITAR_ROOT
+fi
 
 # Pergunta sobre criação de usuários padrão
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/n): ${NC}")" CRIAR_ADMIN
@@ -157,13 +150,33 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   done
 fi
 
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja configurar regras de Firewall (UFW)? (s/n): ${NC}")" EXEC_UFW
+
 draw_separator
 log_info "Configurações coletadas. Iniciando os procedimentos..."
+
+# ==============================================================================
+# 1. ATUALIZAÇÃO DO SISTEMA
+# ==============================================================================
+if [[ "$EXEC_UPDATE" =~ ^[Ss]$ ]]; then
+  print_header "ATUALIZAÇÃO DO SISTEMA"
+  print_alert_box "O sistema será atualizado antes de prosseguirmos com as configurações."
+
+  log_info "Atualizando a lista de pacotes (apt update)..."
+  apt update -y
+
+  log_info "Aplicando atualizações de segurança e sistema (apt upgrade)..."
+  apt upgrade -y
+  log_success "Sistema atualizado."
+else
+  log_info "Atualização do sistema pulada."
+fi
 
 # ==============================================================================
 # 2. INSTALAÇÃO DE PACOTES E UTILLITÁRIOS
 # ==============================================================================
 print_header "INSTALAÇÃO DE UTILITÁRIOS"
+print_alert_box "Pacotes obrigatórios (qemu-guest-agent, open-vm-tools, etc) serão instalados agora."
 
 PACOTES=(qemu-guest-agent open-vm-tools ncdu fastfetch)
 for pacote in "${PACOTES[@]}"; do
@@ -181,19 +194,23 @@ done
 # ==============================================================================
 # 3. CONFIGURAÇÃO DO SSH (Aumento de segurança padrão)
 # ==============================================================================
-print_header "CONFIGURAÇÃO DO SSH"
-# Modificado: Se o usuário não disser Explicitamente "Sim", o script blinda a config para "no"
-if [[ "$DESABILITAR_ROOT" =~ ^[Nn]$ ]]; then
-  log_warning "Alerta de Segurança: Configurando PermitRootLogin para 'yes' no SSH..."
-  sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
-  echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+if [[ "$EXEC_SSH" =~ ^[Ss]$ ]]; then
+  print_header "CONFIGURAÇÃO DO SSH"
+  # Modificado: Se o usuário não disser Explicitamente "Sim", o script blinda a config para "no"
+  if [[ "$DESABILITAR_ROOT" =~ ^[Nn]$ ]]; then
+    log_warning "Alerta de Segurança: Configurando PermitRootLogin para 'yes' no SSH..."
+    sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
+    echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+  else
+    log_success "Segurança Aplicada: Desabilitando explicitamente o login de Root via SSH (Padrão)."
+    sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
+    echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+  fi
+  systemctl restart sshd
+  log_info "Serviço SSH reiniciado."
 else
-  log_success "Segurança Aplicada: Desabilitando explicitamente o login de Root via SSH (Padrão)."
-  sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
-  echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+  log_info "Configuração do SSH pulada."
 fi
-systemctl restart sshd
-log_info "Serviço SSH reiniciado."
 
 # ==============================================================================
 # VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
@@ -287,14 +304,18 @@ fi
 # ==============================================================================
 # 5. CONFIGURAR REGRAS DE FIREWALL (UFW)
 # ==============================================================================
-print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
-if command -v ufw >/dev/null 2>&1; then
-  log_info "Configurando regras básicas no UFW..."
-  ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
-  ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
-  log_success "Regras do UFW configuradas."
+if [[ "$EXEC_UFW" =~ ^[Ss]$ ]]; then
+  print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
+  if command -v ufw >/dev/null 2>&1; then
+    log_info "Configurando regras básicas no UFW..."
+    ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
+    ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
+    log_success "Regras do UFW configuradas."
+  else
+    log_warning "UFW não encontrado. Instalação e parametrização pulada."
+  fi
 else
-  log_warning "UFW não encontrado. Instalação e parametrização pulada."
+  log_info "Configuração de Firewall (UFW) pulada."
 fi
 
 # ==============================================================================
