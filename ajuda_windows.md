@@ -103,3 +103,26 @@
   ```cmd
   Dism.exe /Online /Cleanup-Image /StartComponentCleanup
   ```
+
+### 💽 Armazenamento e Discos
+* **Forçar leitura do disco após aumento de armazenamento (CMD):**
+  ```cmd
+  diskpart
+  ```
+  *(Dentro do diskpart, digite `rescan`)*
+
+* **Forçar leitura do disco em linha única (PowerShell - O mais rápido):**
+  Abre o diskpart, envia a instrução de rescan para reavaliar os discos e encerra a execução em um único segundo.
+  ```powershell
+  echo "rescan" | diskpart
+  ```
+
+* **Comando nativo do PowerShell (Sem usar Diskpart):**
+  O Windows Server possui um cmdlet nativo para atualizar o barramento de armazenamento:
+  ```powershell
+  Update-HostStorageCache
+  ```
+  Em seguida, para forçar a atualização dos tamanhos reconhecidos das partições no sistema, rode:
+  ```powershell
+  Get-Partition | Get-Volume
+  ```
