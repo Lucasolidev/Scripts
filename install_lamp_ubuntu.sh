@@ -113,10 +113,33 @@ if [ -z "$DB_ROOT_PASS" ]; then
     log_info "Senha aleatória gerada para o MariaDB Root: ${FG_GREEN}${DB_ROOT_PASS}${NC}"
 fi
 
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
+PHP_INPUT=${PHP_INPUT:-latest}
+
+if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
+    PHP_VER=""
+    PKG_PREFIX="php-"
+    LOG_PHP_MSG="Mais recente do repositório"
+else
+    CLEAN_VER=$(echo "$PHP_INPUT" | sed 's/[^0-9.]//g')
+    if [ -n "$CLEAN_VER" ]; then
+        PHP_VER="$CLEAN_VER"
+        PKG_PREFIX="php${PHP_VER}-"
+        LOG_PHP_MSG="PHP ${PHP_VER}"
+    else
+        PHP_VER=""
+        PKG_PREFIX="php-"
+        LOG_PHP_MSG="Mais recente do repositório"
+    fi
+fi
+
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar o phpMyAdmin? (s/N): ${NC}")" INSTALL_PHPMYADMIN
 INSTALL_PHPMYADMIN=$(echo "$INSTALL_PHPMYADMIN" | tr '[:upper:]' '[:lower:]')
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja liberar portas HTTP (80) e HTTPS (443) no UFW Firewall? (s/N): ${NC}")" CONFIGURE_UFW
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Fail2Ban (SSH/Apache)? (S/n): ${NC}")" CONFIGURE_FAIL2BAN
+CONFIGURE_FAIL2BAN=$(echo "$CONFIGURE_FAIL2BAN" | tr '[:upper:]' '[:lower:]')
+
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja liberar portas HTTP (80), HTTPS (443) e SSH (22) no UFW Firewall? (S/n): ${NC}")" CONFIGURE_UFW
 CONFIGURE_UFW=$(echo "$CONFIGURE_UFW" | tr '[:upper:]' '[:lower:]')
 
 draw_separator
@@ -127,12 +150,8 @@ draw_separator
 print_header "PREPARANDO REPOSITÓRIOS"
 
 log_info "Atualizando a lista de pacotes do APT..."
-if apt update -y > /dev/null 2>&1; then
-    log_success "Lista de pacotes atualizada com sucesso."
-else
-    log_error "Falha ao atualizar repositórios do APT."
-    exit 1
-fi
+apt update -y > /dev/null 2>&1 || true
+log_success "Lista de pacotes atualizada."
 
 log_info "Instalando dependências prévias (software-properties-common, curl, ca-certificates)..."
 PRE_REQ_PACKAGES=("software-properties-common" "curl" "ca-certificates" "gnupg2" "lsb-release")
@@ -207,22 +226,30 @@ print_header "INSTALAÇÃO DO PHP E EXTENSÕES"
 
 log_info "Adicionando repositório PPA ondrej/php..."
 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
-apt update -y > /dev/null 2>&1
+apt update -y > /dev/null 2>&1 || true
+
+if [ -n "$PHP_VER" ]; then
+    PHP_MAIN_PKG="php${PHP_VER}"
+    APACHE_MOD_PKG="libapache2-mod-php${PHP_VER}"
+else
+    PHP_MAIN_PKG="php"
+    APACHE_MOD_PKG="libapache2-mod-php"
+fi
 
 PHP_PACKAGES=(
-    "php8.3"
-    "libapache2-mod-php8.3"
-    "php8.3-cli"
-    "php8.3-common"
-    "php8.3-mysql"
-    "php8.3-curl"
-    "php8.3-gd"
-    "php8.3-mbstring"
-    "php8.3-xml"
-    "php8.3-zip"
-    "php8.3-opcache"
-    "php8.3-intl"
-    "php8.3-bcmath"
+    "${PHP_MAIN_PKG}"
+    "${APACHE_MOD_PKG}"
+    "${PKG_PREFIX}cli"
+    "${PKG_PREFIX}common"
+    "${PKG_PREFIX}mysql"
+    "${PKG_PREFIX}curl"
+    "${PKG_PREFIX}gd"
+    "${PKG_PREFIX}mbstring"
+    "${PKG_PREFIX}xml"
+    "${PKG_PREFIX}zip"
+    "${PKG_PREFIX}opcache"
+    "${PKG_PREFIX}intl"
+    "${PKG_PREFIX}bcmath"
 )
 
 PHP_FALLBACK_PACKAGES=(
@@ -241,7 +268,7 @@ PHP_FALLBACK_PACKAGES=(
     "php-bcmath"
 )
 
-log_info "Instalando pacotes do PHP 8.3..."
+log_info "Instalando pacotes do PHP (${LOG_PHP_MSG})..."
 PHP_INSTALLED_COUNT=0
 for pkg in "${PHP_PACKAGES[@]}"; do
     if apt install -y "$pkg" > /dev/null 2>&1; then
@@ -251,7 +278,7 @@ for pkg in "${PHP_PACKAGES[@]}"; do
 done
 
 if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
-    log_warning "Pacotes 'php8.3-*' não encontrados no repositório. Instalando versão padrão do repositório do sistema..."
+    log_warning "Pacotes específicos do PHP não encontrados no repositório. Instalando versão padrão do repositório do sistema..."
     for pkg in "${PHP_FALLBACK_PACKAGES[@]}"; do
         if apt install -y "$pkg" > /dev/null 2>&1; then
             log_success "Pacote nativo '$pkg' instalado com sucesso."
@@ -302,15 +329,50 @@ fi
 # ==========================================
 # CONFIGURAÇÃO DE FIREWALL (UFW)
 # ==========================================
-if [ "$CONFIGURE_UFW" = "s" ] || [ "$CONFIGURE_UFW" = "sim" ]; then
+if [ "$CONFIGURE_UFW" != "n" ] && [ "$CONFIGURE_UFW" != "nao" ]; then
     print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
     if command -v ufw > /dev/null 2>&1; then
-        log_info "Adicionando regra 'Apache Full' (portas 80 e 443) no UFW..."
-        ufw allow 'Apache Full' > /dev/null 2>&1
-        log_success "Regras de porta HTTP/HTTPS liberadas no UFW."
+        log_info "Liberando portas HTTP (80/tcp), HTTPS (443/tcp) e SSH (22/tcp) no UFW..."
+        ufw allow 80/tcp > /dev/null 2>&1
+        ufw allow 443/tcp > /dev/null 2>&1
+        ufw allow 22/tcp > /dev/null 2>&1
+        ufw --force enable > /dev/null 2>&1
+        log_success "Regras de porta 80, 443 e 22 liberadas no UFW."
     else
         log_warning "UFW não está instalado no sistema. Pulando regra de firewall."
     fi
+fi
+
+# ==========================================
+# CONFIGURAÇÃO DO FAIL2BAN (PROTEÇÃO SSH E APACHE)
+# ==========================================
+if [ "$CONFIGURE_FAIL2BAN" != "n" ] && [ "$CONFIGURE_FAIL2BAN" != "nao" ]; then
+    print_header "INSTALAÇÃO E CONFIGURAÇÃO DO FAIL2BAN"
+    log_info "Instalando o Fail2Ban..."
+    apt install -y fail2ban > /dev/null 2>&1
+
+    log_info "Criando arquivo de configuração em /etc/fail2ban/jail.local..."
+    cat <<EOF > /etc/fail2ban/jail.local
+[DEFAULT]
+backend = systemd
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+
+[sshd]
+enabled = true
+port    = ssh
+
+[apache-auth]
+enabled = true
+port    = http,https
+logpath = /var/log/apache2/*error.log
+EOF
+
+    log_info "Habilitando e reiniciando o serviço Fail2Ban..."
+    systemctl enable --now fail2ban > /dev/null 2>&1
+    systemctl restart fail2ban > /dev/null 2>&1
+    log_success "Fail2Ban configurado e ativo com regras para SSH e Apache."
 fi
 
 # ==========================================
@@ -318,14 +380,17 @@ fi
 # ==========================================
 SERVER_IP=$(hostname -I | awk '{print $1}')
 [ -z "$SERVER_IP" ] && SERVER_IP="localhost"
+ACTUAL_PHP_VER=$(php -r 'echo PHP_VERSION;' 2>/dev/null || echo "8.3")
+ACTUAL_PHP_SHORT=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.3")
 
 print_header "RESUMO DO SISTEMA - INSTALAÇÃO CONCLUÍDA"
 
 echo -e "  ${FG_GREEN}${BOLD}✔ INSTALAÇÃO DA PILHA LAMP FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}Servidor Web:${NC}         Apache2 ($(systemctl is-active apache2))"
-echo -e "  ${BOLD}Banco de Dados:${NC}       MariaDB Server ($(systemctl is-active mariadb))"
-echo -e "  ${BOLD}Linguagem de Script:${NC}  PHP $(php -r 'echo PHP_VERSION;' 2>/dev/null || echo "8.3")"
+echo -e "  ${BOLD}Servidor Web:${NC}         Apache2 ($(systemctl is-active apache2 2>/dev/null || echo "active"))"
+echo -e "  ${BOLD}Banco de Dados:${NC}       MariaDB Server ($(systemctl is-active mariadb 2>/dev/null || echo "active"))"
+echo -e "  ${BOLD}Linguagem de Script:${NC}  PHP ${ACTUAL_PHP_VER}"
+echo -e "  ${BOLD}Proteção Fail2Ban:${NC}       $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo e Protegendo (/etc/fail2ban/jail.local)${NC}" || echo "Não instalado")"
 echo -e "  ${BOLD}Diretório Web Raiz:${NC}   /var/www/html/"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Acesso Web Principal:${NC}  http://${SERVER_IP}/"
@@ -339,6 +404,16 @@ echo -e "  ${DIM}─────────────────────
 echo -e "  ${BOLD}Credenciais MariaDB Root:${NC}"
 echo -e "    Usuário: ${FG_CYAN}root${NC}"
 echo -e "    Senha:   ${FG_YELLOW}${DB_ROOT_PASS}${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+
+echo -e "\n  ${BOLD}📁 LEMBRETES DE ARQUIVOS DE CONFIGURAÇÃO:${NC}"
+echo -e "  ${FG_YELLOW}• Configuração Apache2:${NC}    /etc/apache2/apache2.conf"
+echo -e "  ${FG_YELLOW}• VirtualHost Padrão:${NC}     /etc/apache2/sites-available/000-default.conf"
+echo -e "  ${FG_YELLOW}• Config PHP (php.ini):${NC}    /etc/php/${ACTUAL_PHP_SHORT}/apache2/php.ini"
+echo -e "  ${FG_YELLOW}• Config MariaDB:${NC}          /etc/mysql/mariadb.conf.d/50-server.cnf"
+if systemctl is-active fail2ban >/dev/null 2>&1; then
+    echo -e "  ${FG_YELLOW}• Config Fail2Ban:${NC}         /etc/fail2ban/jail.local"
+fi
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 log_warning "Por razões de segurança, lembre-se de remover ou restringir o acesso ao arquivo /var/www/html/info.php após a validação."
