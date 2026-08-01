@@ -13,7 +13,7 @@ VERSION="1.0"
 # curl -s "https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh?v=$(date +%s)"
 #
 # Executar via URL sem cache:
-# bash <(curl -s "https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh?v=\$(date +%s)")
+# bash <(curl -s "https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh?v=$(date +%s)")
 #
 # ==============================================================================
 
