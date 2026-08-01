@@ -1,5 +1,10 @@
 # 🪟 Cheat Sheet - Administração Windows
 
+![Windows](https://img.shields.io/badge/Windows-0078D4?style=flat&logo=windows&logoColor=white)
+![Windows Server](https://img.shields.io/badge/Windows_Server-0078D4?style=flat&logo=windows&logoColor=white)
+![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white)
+![CMD](https://img.shields.io/badge/Command_Prompt-4D4D4D?style=flat&logo=windows-terminal&logoColor=white)
+
 ## 📌 Meus comandos pessoais mais usados
 
 ### 🛠️ Sistema e Ferramentas
@@ -69,7 +74,7 @@
   ```cmd
   ncpa.cpl
   ```
-* **Testar conectividade e porta específica (PowerShell):**
+* **Testar conectividade e porta específica (![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white)):**
   ```powershell
   Test-NetConnection -ComputerName rdp.agroexport.agr.br -Port 43306
   ```
@@ -111,13 +116,13 @@
   ```
   *(Dentro do diskpart, digite `rescan`)*
 
-* **Forçar leitura do disco em linha única (PowerShell - O mais rápido):**
+* **Forçar leitura do disco em linha única (![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white) - O mais rápido):**
   Abre o diskpart, envia a instrução de rescan para reavaliar os discos e encerra a execução em um único segundo.
   ```powershell
   echo "rescan" | diskpart
   ```
 
-* **Comando nativo do PowerShell (Sem usar Diskpart):**
+* **Comando nativo do ![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white) (Sem usar Diskpart):**
   O Windows Server possui um cmdlet nativo para atualizar o barramento de armazenamento:
   ```powershell
   Update-HostStorageCache
