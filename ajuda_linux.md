@@ -334,8 +334,8 @@ Para conseguir se conectar sem senha, você precisa registrar a sua **chave púb
   ssh-copy-id -i ~/.ssh/id_ed25519.pub usuario@ip_do_servidor
   ```
 
-* **Método Automático via Windows <span style="color: #0078D4;">PowerShell</span>:**
-  No Windows <span style="color: #0078D4;">PowerShell</span>, como o `ssh-copy-id` não está disponível por padrão, você pode ler e enviar a chave pública diretamente em um único comando:
+* **Método Automático via Windows <font color="#38bdf8">PowerShell</font>:**
+  No Windows <font color="#38bdf8">PowerShell</font>, como o `ssh-copy-id` não está disponível por padrão, você pode ler e enviar a chave pública diretamente em um único comando:
   ```powershell
   # Gerar chave no PowerShell (caso ainda não tenha):
   ssh-keygen -t ed25519 -C "seu_email@exemplo.com"
