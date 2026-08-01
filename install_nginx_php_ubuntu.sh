@@ -232,7 +232,7 @@ server {
     listen 80;
     listen [::]:80;
 
-    server_name ${DOMAIN_NAME};
+    server_name ${DOMAIN_NAME} _;
     root ${WEB_ROOT};
     index index.php index.html index.htm;
 
@@ -281,17 +281,16 @@ fi
 # ------------------------------------------------------------------------------
 # 7. CRIAÇÃO DE ARQUIVO DE TESTE PHP
 # ------------------------------------------------------------------------------
-if [ ! -f "${WEB_ROOT}/index.php" ]; then
-    cat <<EOF > "${WEB_ROOT}/index.php"
+cat <<'EOF' > "${WEB_ROOT}/index.php"
 <?php
 // Teste de ambiente preparado para o Gerenciador de Downloads
-echo "<h1>Servidor Otimizado - " . htmlspecialchars("\$_SERVER['HTTP_HOST']") . "</h1>";
+$host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_ADDR'] ?? 'Localhost';
+echo "<h1>Servidor Otimizado - " . htmlspecialchars((string)$host) . "</h1>";
 echo "<p>PHP Version: " . phpversion() . "</p>";
 echo "<p>Upload Max Filesize: " . ini_get('upload_max_filesize') . "</p>";
 echo "<p>Post Max Size: " . ini_get('post_max_size') . "</p>";
 EOF
-    chown www-data:www-data "${WEB_ROOT}/index.php"
-fi
+chown www-data:www-data "${WEB_ROOT}/index.php"
 
 # ------------------------------------------------------------------------------
 # 8. AJUSTE DE FIREWALL LOCAL (UFW)
