@@ -106,9 +106,11 @@ else
     exit 1
 fi
 
+log_info "Instalando dependências de repositório (gnupg, software-properties-common)..."
+DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common ca-certificates lsb-release apt-transport-https gnupg > /dev/null 2>&1
+
 log_info "Adicionando repositório PHP (ppa:ondrej/php)..."
-apt-get install -y software-properties-common ca-certificates lsb-release apt-transport-https > /dev/null 2>&1
-add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
+LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
 apt-get update -y > /dev/null 2>&1
 
 PACKAGES=(
@@ -129,6 +131,29 @@ PACKAGES=(
     "ufw"
 )
 
+# Caso o repositório PPA falhe ou a versão nativa do Ubuntu seja utilizada, fallback para o pacote genérico php-fpm
+if ! apt-cache show "php${PHP_VER}-fpm" > /dev/null 2>&1; then
+    log_warning "Pacote php${PHP_VER}-fpm não encontrado no repositório. Tentando instalar versão padrão do sistema (php-fpm)..."
+    PHP_VER=""
+    PACKAGES=(
+        "nginx"
+        "php-fpm"
+        "php-cli"
+        "php-common"
+        "php-curl"
+        "php-gd"
+        "php-mbstring"
+        "php-xml"
+        "php-zip"
+        "php-json"
+        "php-intl"
+        "php-bcmath"
+        "unzip"
+        "git"
+        "ufw"
+    )
+fi
+
 for pkg in "${PACKAGES[@]}"; do
     log_info "Instalando pacote: ${pkg}..."
     DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" > /dev/null 2>&1
@@ -144,10 +169,16 @@ done
 # ------------------------------------------------------------------------------
 print_header "CONFIGURAÇÃO DO PHP-FPM"
 
+# Detectar versão real do PHP instalada caso tenha sido instalado php-fpm nativo
+INSTALLED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
+if [ -n "$INSTALLED_PHP_VER" ]; then
+    PHP_VER="$INSTALLED_PHP_VER"
+fi
+
 PHP_INI="/etc/php/${PHP_VER}/fpm/php.ini"
 
 if [ -f "$PHP_INI" ]; then
-    log_info "Aplicando otimizações no ${PHP_INI}..."
+    log_info "Aplicando otimizações no ${PHP_INI} (PHP ${PHP_VER})..."
     
     sed -i "s/upload_max_filesize = .*/upload_max_filesize = ${UPLOAD_MAX}/" "$PHP_INI"
     sed -i "s/post_max_size = .*/post_max_size = ${UPLOAD_MAX}/" "$PHP_INI"
@@ -158,10 +189,10 @@ if [ -f "$PHP_INI" ]; then
     log_success "Parâmetros do PHP-FPM ajustados com sucesso."
     
     log_info "Reiniciando serviço php${PHP_VER}-fpm..."
-    systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1
+    systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1
     log_success "Serviço php${PHP_VER}-fpm reiniciado."
 else
-    log_error "Arquivo de configuração do PHP-FPM não encontrado."
+    log_error "Arquivo de configuração do PHP-FPM (${PHP_INI}) não encontrado."
 fi
 
 # ------------------------------------------------------------------------------
