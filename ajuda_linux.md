@@ -1,5 +1,10 @@
 # 🐧 Cheat Sheet - Administração Linux (Ubuntu Server)
 
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
 ## 🖥️ Informações do Sistema
 
 ### Verificar o sistema operacional e versão detalhada
@@ -329,13 +334,13 @@ sudo usermod -L nome_usuario
 ### Copiar a chave pública para o servidor (Autorizar o acesso)
 Para conseguir se conectar sem senha, você precisa registrar a sua **chave pública** (arquivo `.pub`) dentro do arquivo `authorized_keys` no servidor de destino.
 
-* **Método Automático via Linux / macOS / Git Bash (`ssh-copy-id`):**
+* **Método Automático via ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) / ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) / ![Git Bash](https://img.shields.io/badge/Git_Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white) (`ssh-copy-id`):**
   ```bash
   ssh-copy-id -i ~/.ssh/id_ed25519.pub usuario@ip_do_servidor
   ```
 
-* **Método Automático via Windows $\color{#38bdf8}{\text{PowerShell}}$:**
-  No Windows $\color{#38bdf8}{\text{PowerShell}}$, como o `ssh-copy-id` não está disponível por padrão, você pode ler e enviar a chave pública diretamente em um único comando:
+* **Método Automático via ![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white):**
+  No ![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white), como o `ssh-copy-id` não está disponível por padrão, você pode ler e enviar a chave pública diretamente em um único comando:
   ```powershell
   # Gerar chave no PowerShell (caso ainda não tenha):
   ssh-keygen -t ed25519 -C "seu_email@exemplo.com"
