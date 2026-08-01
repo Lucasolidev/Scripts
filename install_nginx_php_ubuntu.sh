@@ -78,8 +78,26 @@ echo -e "  ${FG_WHITE}Configuração do Servidor Nginx + PHP-FPM para o Gerencia
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: downloads.nuvemativa.com.br): ${NC}")" DOMAIN_NAME
 DOMAIN_NAME=${DOMAIN_NAME:-downloads.nuvemativa.com.br}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Padrão: 8.2): ${NC}")" PHP_VER
-PHP_VER=${PHP_VER:-8.2}
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Padrão: mais recente / latest): ${NC}")" PHP_INPUT
+PHP_INPUT=${PHP_INPUT:-latest}
+
+if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
+    PHP_VER=""
+    PKG_PREFIX="php-"
+    LOG_PHP_MSG="Mais recente do repositório"
+else
+    # Extrai apenas números e ponto caso o usuário digite php8.2 ou 8.2
+    CLEAN_VER=$(echo "$PHP_INPUT" | sed 's/[^0-9.]//g')
+    if [ -n "$CLEAN_VER" ]; then
+        PHP_VER="$CLEAN_VER"
+        PKG_PREFIX="php${PHP_VER}-"
+        LOG_PHP_MSG="PHP ${PHP_VER}"
+    else
+        PHP_VER=""
+        PKG_PREFIX="php-"
+        LOG_PHP_MSG="Mais recente do repositório"
+    fi
+fi
 
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Limite máximo de Upload/Download em MB/GB (Padrão: 2G): ${NC}")" UPLOAD_MAX
 UPLOAD_MAX=${UPLOAD_MAX:-2G}
@@ -88,7 +106,7 @@ read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Tempo máximo de execução de script
 EXEC_TIME=${EXEC_TIME:-3600}
 
 log_info "Domínio configurado: ${BOLD}${DOMAIN_NAME}${NC}"
-log_info "Versão do PHP: ${BOLD}${PHP_VER}${NC}"
+log_info "Versão do PHP solicitada: ${BOLD}${LOG_PHP_MSG}${NC}"
 log_info "Limite de Upload: ${BOLD}${UPLOAD_MAX}${NC}"
 log_info "Timeout de Execução: ${BOLD}${EXEC_TIME}s${NC}"
 
@@ -115,26 +133,26 @@ apt-get update -y > /dev/null 2>&1
 
 PACKAGES=(
     "nginx"
-    "php${PHP_VER}-fpm"
-    "php${PHP_VER}-cli"
-    "php${PHP_VER}-common"
-    "php${PHP_VER}-curl"
-    "php${PHP_VER}-gd"
-    "php${PHP_VER}-mbstring"
-    "php${PHP_VER}-xml"
-    "php${PHP_VER}-zip"
-    "php${PHP_VER}-json"
-    "php${PHP_VER}-intl"
-    "php${PHP_VER}-bcmath"
+    "${PKG_PREFIX}fpm"
+    "${PKG_PREFIX}cli"
+    "${PKG_PREFIX}common"
+    "${PKG_PREFIX}curl"
+    "${PKG_PREFIX}gd"
+    "${PKG_PREFIX}mbstring"
+    "${PKG_PREFIX}xml"
+    "${PKG_PREFIX}zip"
+    "${PKG_PREFIX}intl"
+    "${PKG_PREFIX}bcmath"
     "unzip"
     "git"
     "ufw"
 )
 
-# Caso o repositório PPA falhe ou a versão nativa do Ubuntu seja utilizada, fallback para o pacote genérico php-fpm
-if ! apt-cache show "php${PHP_VER}-fpm" > /dev/null 2>&1; then
-    log_warning "Pacote php${PHP_VER}-fpm não encontrado no repositório. Tentando instalar versão padrão do sistema (php-fpm)..."
+# Caso a versão específica não seja encontrada no repositório, fallback para a versão mais recente (php-fpm)
+if [ -n "$PHP_VER" ] && ! apt-cache show "${PKG_PREFIX}fpm" > /dev/null 2>&1; then
+    log_warning "Pacote ${PKG_PREFIX}fpm não encontrado no repositório. Tentando instalar versão padrão do sistema (php-fpm)..."
     PHP_VER=""
+    PKG_PREFIX="php-"
     PACKAGES=(
         "nginx"
         "php-fpm"
@@ -145,7 +163,6 @@ if ! apt-cache show "php${PHP_VER}-fpm" > /dev/null 2>&1; then
         "php-mbstring"
         "php-xml"
         "php-zip"
-        "php-json"
         "php-intl"
         "php-bcmath"
         "unzip"
