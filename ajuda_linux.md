@@ -329,21 +329,34 @@ sudo usermod -L nome_usuario
 ### Copiar a chave pública para o servidor (Autorizar o acesso)
 Para conseguir se conectar sem senha, você precisa registrar a sua **chave pública** (arquivo `.pub`) dentro do arquivo `authorized_keys` no servidor de destino.
 
-* **Método Automático (Recomendado via terminal Linux/macOS):**
+* **Método Automático via Linux / macOS / Git Bash (`ssh-copy-id`):**
   ```bash
   ssh-copy-id -i ~/.ssh/id_ed25519.pub usuario@ip_do_servidor
   ```
-* **Método Manual (Caso esteja usando Windows ou fazendo direto no console do servidor):**
-  1. Na sua máquina local, exiba o conteúdo da sua chave pública:
-     ```bash
-     cat ~/.ssh/id_ed25519.pub
-     ```
-  2. Copie todo o conteúdo retornado (a linha inteira).
-  3. No servidor de destino, crie a pasta `.ssh` (se não existir) e adicione a chave no final do arquivo:
-     ```bash
-     mkdir -p ~/.ssh
-     echo "cole_aqui_a_chave_publica_copiada" >> ~/.ssh/authorized_keys
-     ```
+
+* **Método Automático via Windows PowerShell:**
+  No Windows PowerShell, como o `ssh-copy-id` não está disponível por padrão, você pode ler e enviar a chave pública diretamente em um único comando:
+  ```powershell
+  # Gerar chave no PowerShell (caso ainda não tenha):
+  ssh-keygen -t ed25519 -C "seu_email@exemplo.com"
+
+  # Enviar a chave pública diretamente para o servidor Linux:
+  Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh usuario@ip_do_servidor "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+  ```
+
+* **Método Manual Detalhado (Direto no servidor para um usuário específico, ex: administrador):**
+  ```bash
+  # 1. Cria a pasta .ssh do administrador
+  sudo -u administrador mkdir -p /home/administrador/.ssh
+  sudo chmod 700 /home/administrador/.ssh
+
+  # 2. Cria o arquivo authorized_keys com permissão 600
+  sudo -u administrador touch /home/administrador/.ssh/authorized_keys
+  sudo chmod 600 /home/administrador/.ssh/authorized_keys
+
+  # 3. Cole a chave pública do administrador lá dentro
+  sudo nano /home/administrador/.ssh/authorized_keys
+  ```
 
 ### Ajustar permissões rígidas da pasta e chaves SSH no servidor de destino
 ```bash
