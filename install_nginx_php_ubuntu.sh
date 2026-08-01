@@ -141,6 +141,7 @@ PACKAGES=(
     "unzip"
     "git"
     "ufw"
+    "fail2ban"
 )
 
 # Caso a versão específica não seja encontrada no repositório, fallback para a versão mais recente (php-fpm)
@@ -163,6 +164,7 @@ if [ -n "$PHP_VER" ] && ! apt-cache show "${PKG_PREFIX}fpm" > /dev/null 2>&1; th
         "unzip"
         "git"
         "ufw"
+        "fail2ban"
     )
 fi
 
@@ -299,7 +301,35 @@ ufw --force enable > /dev/null 2>&1
 log_success "Firewall UFW configurado e ativado (Portas 80, 443, 22)."
 
 # ------------------------------------------------------------------------------
-# 9. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
+# 9. CONFIGURAÇÃO DO FAIL2BAN (PROTEÇÃO SSH E NGINX)
+# ------------------------------------------------------------------------------
+print_header "CONFIGURAÇÃO DO FAIL2BAN"
+log_info "Criando arquivo de configuração em /etc/fail2ban/jail.local..."
+
+cat <<EOF > /etc/fail2ban/jail.local
+[DEFAULT]
+backend = systemd
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+
+[sshd]
+enabled = true
+port    = ssh
+
+[nginx-http-auth]
+enabled = true
+port    = http,https
+logpath = /var/log/nginx/error.log
+EOF
+
+log_info "Ativando e iniciando o serviço Fail2Ban..."
+systemctl enable --now fail2ban > /dev/null 2>&1
+systemctl restart fail2ban > /dev/null 2>&1
+log_success "Fail2Ban configurado e ativo com regras para SSH e Nginx."
+
+# ------------------------------------------------------------------------------
+# 10. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
 # ------------------------------------------------------------------------------
 print_header "RESUMO DO SISTEMA"
 
@@ -310,6 +340,7 @@ echo -e "  ${BOLD}Diretório Web (Root):${NC}    ${FG_CYAN}${WEB_ROOT}${NC}"
 echo -e "  ${BOLD}Versão do PHP:${NC}           ${FG_CYAN}PHP ${PHP_VER} (FPM)${NC}"
 echo -e "  ${BOLD}Limite Upload/Download:${NC}  ${FG_CYAN}${UPLOAD_MAX}${NC}"
 echo -e "  ${BOLD}Timeout de Execução:${NC}     ${FG_CYAN}${EXEC_TIME} segundos${NC}"
+echo -e "  ${BOLD}Proteção Fail2Ban:${NC}       ${FG_GREEN}Ativo e Protegendo (/etc/fail2ban/jail.local)${NC}"
 echo -e "  ${DIM}────────────────────────────────────────${NC}"
 
 echo -e "\n  ${BOLD}📁 LEMBRETES DE ARQUIVOS DE CONFIGURAÇÃO:${NC}"
@@ -318,6 +349,7 @@ echo -e "  ${FG_YELLOW}• Nginx Geral:${NC}             /etc/nginx/nginx.conf"
 echo -e "  ${FG_YELLOW}• Config PHP-FPM (php.ini):${NC}  /etc/php/${PHP_VER}/fpm/php.ini"
 echo -e "  ${FG_YELLOW}• Pool PHP-FPM (www.conf):${NC}  /etc/php/${PHP_VER}/fpm/pool.d/www.conf"
 echo -e "  ${FG_YELLOW}• Socket do PHP-FPM:${NC}       /run/php/php${PHP_VER}-fpm.sock"
+echo -e "  ${FG_YELLOW}• Config Fail2Ban:${NC}         /etc/fail2ban/jail.local"
 echo -e "  ${DIM}────────────────────────────────────────${NC}"
 
 print_alert_box "PRÓXIMOS PASSOS NO PAINEL DA CLOUDFLARE:"
