@@ -232,9 +232,29 @@ cut -d: -f1 /etc/passwd
 getent group sudo
 ```
 
-### Criar um novo usuário com pasta home
+### 💡 Diferença entre `useradd` vs `adduser`
+
+* **`useradd` (Baixo nível / Binário nativo):** 
+  Comando padrão do Linux. É mais direto e não interativo. Por padrão em distribuições como Ubuntu/Debian, **NÃO cria** o diretório `/home` e **NÃO define** senha a menos que sejam passados os parâmetros corretos (como a flag `-m`).
+
+* **`adduser` (Alto nível / Script amigável - Recomendado no Debian/Ubuntu):**
+  Um script Perl interativo baseado no `useradd`. Ele **cria a pasta home automaticamente**, copia os arquivos esqueleto (`/etc/skel`), pede a senha e preenche as informações do usuário interativamente.
+
 ```bash
-sudo adduser nome_usuario
+# Forma recomendada no Ubuntu/Debian (interativa e com Home automática):
+sudo adduser administrador
+
+# Criar usuário do jeito completo com useradd (baixo nível):
+sudo useradd -m -s /bin/bash administrador
+sudo passwd administrador
+
+# Se for usar useradd, lembre-se da flag -m (Make Home):
+sudo useradd -m -s /bin/bash administrador
+
+# Corrigir usuário criado sem Home (caso tenha usado useradd sem -m):
+sudo mkhomedir_helper administrador
+sudo usermod -d /home/administrador -s /bin/bash administrador
+sudo chown -R administrador:administrador /home/administrador
 ```
 
 ### Adicionar usuário existente ao grupo sudo
