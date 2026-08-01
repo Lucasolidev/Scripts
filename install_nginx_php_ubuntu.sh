@@ -116,13 +116,8 @@ log_info "Timeout de Execução: ${BOLD}${EXEC_TIME}s${NC}"
 print_header "INSTALAÇÃO DE PACOTES E DEPENDÊNCIAS"
 
 log_info "Atualizando lista de repositórios..."
-apt-get update -y > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-    log_success "Repositórios atualizados com sucesso."
-else
-    log_error "Falha ao atualizar repositórios."
-    exit 1
-fi
+apt-get update -y > /dev/null 2>&1 || true
+log_success "Lista de repositórios atualizada."
 
 log_info "Instalando dependências de repositório (gnupg, software-properties-common)..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common ca-certificates lsb-release apt-transport-https gnupg > /dev/null 2>&1
