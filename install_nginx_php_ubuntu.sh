@@ -10,10 +10,13 @@ VERSION="1.0"
 # ==============================================================================
 # visualizar o script antes de executar:
 #
-# curl -s "https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh?v=$(date +%s)"
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh
 #
-# Executar via URL sem cache:
-# bash <(curl -s "https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh?v=$(date +%s)")
+# Executar via URL
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh | bash
 #
 # ==============================================================================
 
