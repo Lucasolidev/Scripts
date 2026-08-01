@@ -298,7 +298,7 @@ ufw --force enable > /dev/null 2>&1
 log_success "Firewall UFW configurado e ativado."
 
 # ------------------------------------------------------------------------------
-# 9. RESUMO DO SISTEMA
+# 9. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
 # ------------------------------------------------------------------------------
 print_header "RESUMO DO SISTEMA"
 
@@ -309,6 +309,14 @@ echo -e "  ${BOLD}Diretório Web (Root):${NC}    ${FG_CYAN}${WEB_ROOT}${NC}"
 echo -e "  ${BOLD}Versão do PHP:${NC}           ${FG_CYAN}PHP ${PHP_VER} (FPM)${NC}"
 echo -e "  ${BOLD}Limite Upload/Download:${NC}  ${FG_CYAN}${UPLOAD_MAX}${NC}"
 echo -e "  ${BOLD}Timeout de Execução:${NC}     ${FG_CYAN}${EXEC_TIME} segundos${NC}"
+echo -e "  ${DIM}────────────────────────────────────────${NC}"
+
+echo -e "\n  ${BOLD}📁 LEMBRETES DE ARQUIVOS DE CONFIGURAÇÃO:${NC}"
+echo -e "  ${FG_YELLOW}• VirtualHost Nginx:${NC}       /etc/nginx/sites-available/${DOMAIN_NAME}"
+echo -e "  ${FG_YELLOW}• Nginx Geral:${NC}             /etc/nginx/nginx.conf"
+echo -e "  ${FG_YELLOW}• Config PHP-FPM (php.ini):${NC}  /etc/php/${PHP_VER}/fpm/php.ini"
+echo -e "  ${FG_YELLOW}• Pool PHP-FPM (www.conf):${NC}  /etc/php/${PHP_VER}/fpm/pool.d/www.conf"
+echo -e "  ${FG_YELLOW}• Socket do PHP-FPM:${NC}       /run/php/php${PHP_VER}-fpm.sock"
 echo -e "  ${DIM}────────────────────────────────────────${NC}"
 
 print_alert_box "PRÓXIMOS PASSOS NO PAINEL DA CLOUDFLARE:"
