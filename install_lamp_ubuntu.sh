@@ -351,6 +351,11 @@ if [ "$CONFIGURE_FAIL2BAN" != "n" ] && [ "$CONFIGURE_FAIL2BAN" != "nao" ]; then
     log_info "Instalando o Fail2Ban..."
     apt install -y fail2ban > /dev/null 2>&1
 
+    log_info "Garantindo existência dos arquivos de log do Apache..."
+    mkdir -p /var/log/apache2
+    touch /var/log/apache2/error.log /var/log/apache2/access.log
+    chown -R www-data:adm /var/log/apache2 > /dev/null 2>&1 || true
+
     log_info "Criando arquivo de configuração em /etc/fail2ban/jail.local..."
     cat <<EOF > /etc/fail2ban/jail.local
 [DEFAULT]
@@ -366,7 +371,7 @@ port    = ssh
 [apache-auth]
 enabled = true
 port    = http,https
-logpath = /var/log/apache2/*error.log
+logpath = /var/log/apache2/error.log
 EOF
 
     log_info "Habilitando e reiniciando o serviço Fail2Ban..."

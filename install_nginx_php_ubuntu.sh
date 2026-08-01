@@ -304,6 +304,11 @@ log_success "Firewall UFW configurado e ativado (Portas 80, 443, 22)."
 # 9. CONFIGURAÇÃO DO FAIL2BAN (PROTEÇÃO SSH E NGINX)
 # ------------------------------------------------------------------------------
 print_header "CONFIGURAÇÃO DO FAIL2BAN"
+log_info "Garantindo existência dos arquivos de log do Nginx..."
+mkdir -p /var/log/nginx
+touch /var/log/nginx/error.log /var/log/nginx/access.log
+chown -R www-data:adm /var/log/nginx > /dev/null 2>&1 || true
+
 log_info "Criando arquivo de configuração em /etc/fail2ban/jail.local..."
 
 cat <<EOF > /etc/fail2ban/jail.local
