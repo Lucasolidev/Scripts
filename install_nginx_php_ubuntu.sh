@@ -288,11 +288,12 @@ chown www-data:www-data "${WEB_ROOT}/index.php"
 # 8. AJUSTE DE FIREWALL LOCAL (UFW)
 # ------------------------------------------------------------------------------
 print_header "CONFIGURAÇÃO DO FIREWALL LOCAL (UFW)"
-log_info "Garantindo acesso apenas via HTTP/SSH..."
+log_info "Garantindo acesso via HTTP (80), HTTPS (443) e SSH (22)..."
 ufw allow 80/tcp > /dev/null 2>&1
+ufw allow 443/tcp > /dev/null 2>&1
 ufw allow 22/tcp > /dev/null 2>&1
 ufw --force enable > /dev/null 2>&1
-log_success "Firewall UFW configurado e ativado."
+log_success "Firewall UFW configurado e ativado (Portas 80, 443, 22)."
 
 # ------------------------------------------------------------------------------
 # 9. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
