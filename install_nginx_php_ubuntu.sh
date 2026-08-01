@@ -78,7 +78,7 @@ echo -e "  ${FG_WHITE}Configuração do Servidor Nginx + PHP-FPM para o Gerencia
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: downloads.nuvemativa.com.br): ${NC}")" DOMAIN_NAME
 DOMAIN_NAME=${DOMAIN_NAME:-downloads.nuvemativa.com.br}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Padrão: mais recente / latest): ${NC}")" PHP_INPUT
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
 PHP_INPUT=${PHP_INPUT:-latest}
 
 if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
