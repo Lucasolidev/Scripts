@@ -240,14 +240,16 @@ sudo mount -t drvfs 'D:\MeusProjetos' /mnt/projetos
 #### 📡 Conectar o MobaXterm via SSH (quando `automount = false`)
 Com a montagem automática desativada, a sessão nativa do MobaXterm não funcionará. Para utilizar o MobaXterm neste modo isolado, conecte via **SSH**:
 
-1. **Instalar e iniciar o servidor SSH no Linux (via PowerShell `wsl`):**
+1. **Instalar, iniciar e habilitar o servidor SSH no Linux:**
    ```bash
    # Instalar o OpenSSH Server
    sudo apt update && sudo apt install -y openssh-server
 
-   # Iniciar o serviço de SSH
-   sudo service ssh start
+   # Iniciar e habilitar o serviço de SSH (para iniciar com o sistema)
+   sudo systemctl start ssh
+   sudo systemctl enable ssh
    ```
+   > 💡 *Para conferir se o serviço está ativo, rode `systemctl status ssh`. Deve exibir em verde: `Active: active (running)`.*
 
 2. **Criar a Conexão SSH no MobaXterm:**
    - No MobaXterm, clique em **Session** -> **SSH**.
@@ -265,9 +267,14 @@ Com a montagem automática desativada, a sessão nativa do MobaXterm não funcio
   `http://localhost:3000` ou `http://localhost:80`
 
 * **Descobrir o IP interno do WSL:**
-  ```bash
-  hostname -I | awk '{print $1}'
-  ```
+  - **Executando dentro do Linux (Bash):**
+    ```bash
+    hostname -I | awk '{print $1}'
+    ```
+  - **Executando pelo PowerShell do Windows:**
+    ```powershell
+    wsl hostname -I
+    ```
 
 ---
 
