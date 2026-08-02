@@ -123,15 +123,29 @@ wsl --export Ubuntu-26.04 "D:\Backups\Ubuntu_Backup.tar"
 wsl --export Ubuntu-26.04 "D:\Backups\Ubuntu_Backup.vhdx" --vhd
 ```
 
-### Descobrir onde o arquivo de disco (`ext4.vhdx`) fica salvo fisicamente no Windows
-Nas versões recentes do WSL2, os discos ficam salvos em `C:\Users\SEU_USUARIO\AppData\Local\wsl\`. Para descobrir o caminho exato de cada distro instalada:
-```powershell
-Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss\*" | Select-Object DistributionName, BasePath
-```
+### Backup Físico Manual (Cópia direta do arquivo `ext4.vhdx`)
+Como cada distribuição do WSL 2 fica armazenada em um único arquivo de disco virtual (`ext4.vhdx`), você pode fazer um "snapshot físico" copiando o arquivo diretamente:
+
+1. **OBRIGATÓRIO:** Desligue o WSL para evitar corrupção de dados durante a cópia:
+   ```powershell
+   wsl --shutdown
+   ```
+2. **Descobrir a pasta onde o `ext4.vhdx` está salvo no Windows:**
+   Execute no PowerShell:
+   ```powershell
+   Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss\*" | Select-Object DistributionName, BasePath
+   ```
+   > 📁 *Nas versões recentes do WSL 2 (Windows 11), o disco fica salvo em `%LOCALAPPDATA%\wsl\{GUID}\ext4.vhdx`.*
+
+3. **Fazer o backup:** Copie o arquivo `ext4.vhdx` da pasta informada no `BasePath` para a sua pasta de backups ou HD externo.
 
 ### Restaurar (Importar) um backup em qualquer pasta do Windows
 ```powershell
+# Importar a partir de um backup .tar
 wsl --import Ubuntu_Dev "D:\WSL\Ubuntu_Dev" "D:\Backups\Ubuntu_Backup.tar" --version 2
+
+# Importar a partir de um disco .vhdx (usando a flag --vhd)
+wsl --import Ubuntu_Dev "D:\WSL\Ubuntu_Dev" "D:\Backups\Ubuntu_Backup.vhdx" --vhd
 ```
 
 ### Excluir / Desinstalar uma distribuição (⚠️ Ação Irreversível)
