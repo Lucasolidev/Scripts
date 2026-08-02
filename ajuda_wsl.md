@@ -208,7 +208,7 @@ memory=4GB
 processors=4
 swap=2GB
 localhostForwarding=true
-vmIdleTimeout=-1
+vmIdleTimeout=600000
 '@ | Out-File -Encoding utf8 "$HOME\.wslconfig"
 
 # Conferir o conteúdo criado:
