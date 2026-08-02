@@ -189,8 +189,8 @@ notepad "$HOME\.wslconfig"
 wsl --shutdown
 ```
 
-### Habilitar o `systemctl` (Systemd) no WSL (`/etc/wsl.conf`)
-Para conseguir rodar serviços com `systemctl start apache2` ou `systemctl start docker` dentro do WSL, edite o arquivo `/etc/wsl.conf` **dentro do Linux**:
+### Habilitar o `systemctl` (Systemd) e Opções do WSL (`/etc/wsl.conf`)
+Para habilitar o `systemctl` e configurar como o Linux interage com o Windows, edite o arquivo `/etc/wsl.conf` **dentro do Linux** (`sudo nano /etc/wsl.conf`):
 
 ```ini
 [boot]
@@ -200,6 +200,62 @@ systemd=true
 options = "metadata,uid=1000,gid=1000,umask=022,fmask=111"
 ```
 *Salve o arquivo e reinicie o WSL no PowerShell com `wsl --shutdown`.*
+
+### 🛡️ Isolar o WSL (Desativar Montagem Automática das Unidades `/mnt/c`)
+Por padrão, todas as unidades do Windows (`C:\`, `D:\`, etc.) são montadas automaticamente em `/mnt/`. Para aumentar a segurança e isolar o Linux do Windows:
+
+1. No arquivo `/etc/wsl.conf` **dentro do Linux** (`sudo nano /etc/wsl.conf`), desative a montagem e impeça que o Linux tente importar variáveis do Windows:
+   ```ini
+   [boot]
+   systemd=true
+
+   [automount]
+   enabled = false
+
+   [interop]
+   enabled = true
+   appendWindowsPath = false
+   ```
+   > ⚠️ **Atenção sobre os efeitos colaterais:**
+   > - **Alertas `Failed to translate 'C:\...'`:** Ocorrem se `appendWindowsPath` continuar `true` sem o `/mnt/c` montado. Definir `appendWindowsPath = false` remove esses avisos.
+   > - **MobaXterm / VS Code:** A integração nativa do MobaXterm e do VS Code depende do `/mnt/c/` para funcionar. Se desativar o `automount`, o MobaXterm precisará conectar via **SSH tradicional** (`sudo service ssh start`).
+
+2. No PowerShell do Windows, reinicie o WSL para aplicar:
+   ```powershell
+   wsl --shutdown
+   ```
+
+#### Mapear Apenas Uma Pasta Específica do Windows
+Com a montagem automática desativada, você pode liberar o acesso a **apenas uma pasta escolhida** (ex: `D:\MeusProjetos`):
+```bash
+# 1. Criar o diretório de destino no Linux
+sudo mkdir -p /mnt/projetos
+
+# 2. Montar apenas a pasta desejada
+sudo mount -t drvfs 'D:\MeusProjetos' /mnt/projetos
+```
+> 💡 *Para montar essa pasta automaticamente ao iniciar o Linux, adicione a linha abaixo no arquivo `/etc/fstab`:*
+> `D:\MeusProjetos  /mnt/projetos  drvfs  defaults  0  0`
+
+#### 📡 Conectar o MobaXterm via SSH (quando `automount = false`)
+Com a montagem automática desativada, a sessão nativa do MobaXterm não funcionará. Para utilizar o MobaXterm neste modo isolado, conecte via **SSH**:
+
+1. **Instalar e iniciar o servidor SSH no Linux (via PowerShell `wsl`):**
+   ```bash
+   # Instalar o OpenSSH Server
+   sudo apt update && sudo apt install -y openssh-server
+
+   # Iniciar o serviço de SSH
+   sudo service ssh start
+   ```
+
+2. **Criar a Conexão SSH no MobaXterm:**
+   - No MobaXterm, clique em **Session** -> **SSH**.
+   - **Remote host:** `localhost` (ou `127.0.0.1`)
+   - **Specify username:** marque a opção e digite seu usuário (ex: `administrador`)
+   - **Port:** `22`
+   - Clique em **OK**.
+
 
 ---
 
@@ -224,3 +280,9 @@ options = "metadata,uid=1000,gid=1000,umask=022,fmask=111"
   ```powershell
   wsl --shutdown
   ```
+
+### Se pegar vírus dentro do WSL, infecta o meu Windows?
+* **Isolamento de Sistema:** O Linux roda dentro de um disco virtual isolado (`.vhdx`). Um vírus de Linux não consegue danificar o Kernel do Windows ou alterar o Registro do Windows.
+* **Atenção aos arquivos compartilhados:** Como os discos do Windows costumam ser montados em `/mnt/c/`, scripts maliciosos rodando no Linux podem alterar arquivos das suas pastas pessoais do Windows caso tenham acesso.
+* **Solução:** Se quiser isolar 100%, desative a montagem automática (`enabled = false` no `/etc/wsl.conf`) conforme demonstrado na seção 6.
+
