@@ -44,7 +44,14 @@ wsl --update
 
 ## 📊 2. Gerenciamento de Distribuições e Status
 
-### Listar distribuições instaladas e versões em execução
+### Exibir versões detalhadas dos componentes (Kernel, WSLg, Windows)
+```powershell
+wsl --version
+# ou
+wsl -v
+```
+
+### Listar distribuições instaladas e estado de execução
 ```powershell
 wsl --list --verbose
 # ou
