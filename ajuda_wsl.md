@@ -170,13 +170,14 @@ O WSL 2 pode consumir muita memória RAM se não for limitado. Crie o arquivo `C
 
 #### Criar o arquivo `.wslconfig` direto pelo PowerShell:
 ```powershell
-# Executar no PowerShell para criar o arquivo com limites de 4GB RAM e 4 CPUs:
+# Executar no PowerShell para criar o arquivo com limites de memória e desativar desligamento automático:
 @'
 [wsl2]
 memory=4GB
 processors=4
 swap=2GB
 localhostForwarding=true
+vmIdleTimeout=-1
 '@ | Out-File -Encoding utf8 "$HOME\.wslconfig"
 
 # Conferir o conteúdo criado:
@@ -188,6 +189,7 @@ notepad "$HOME\.wslconfig"
 # Aplicar as mudanças (OBRIGATÓRIO reiniciar a VM do WSL):
 wsl --shutdown
 ```
+> 💡 *A propriedade `vmIdleTimeout=-1` evita que o WSL 2 desligue a VM automaticamente após 60 segundos de inatividade (ex: quando você está conectado via SSH no MobaXterm).*
 
 ### Habilitar o `systemctl` (Systemd) e Opções do WSL (`/etc/wsl.conf`)
 Para habilitar o `systemctl` e configurar como o Linux interage com o Windows, edite o arquivo `/etc/wsl.conf` **dentro do Linux** (`sudo nano /etc/wsl.conf`):
