@@ -112,11 +112,21 @@ wsl --status
 
 ---
 
-## 💾 4. Backup, Restauração e Exclusão de Distros (`.tar`)
+## 💾 4. Backup, Restauração e Exclusão de Distros (`.tar` e `.vhdx`)
 
 ### Criar backup (Exportar) de uma distro inteira
 ```powershell
-wsl --export Ubuntu "D:\Backups\Ubuntu_Backup.tar"
+# Exportar para arquivo .tar (compactado padrão)
+wsl --export Ubuntu-26.04 "D:\Backups\Ubuntu_Backup.tar"
+
+# Exportar diretamente o disco VHDX (muito mais rápido, sem compactar)
+wsl --export Ubuntu-26.04 "D:\Backups\Ubuntu_Backup.vhdx" --vhd
+```
+
+### Descobrir onde o arquivo de disco (`ext4.vhdx`) fica salvo fisicamente no Windows
+Nas versões recentes do WSL2, os discos ficam salvos em `C:\Users\SEU_USUARIO\AppData\Local\wsl\`. Para descobrir o caminho exato de cada distro instalada:
+```powershell
+Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss\*" | Select-Object DistributionName, BasePath
 ```
 
 ### Restaurar (Importar) um backup em qualquer pasta do Windows
