@@ -220,7 +220,21 @@ notepad "$HOME\.wslconfig"
 # Aplicar as mudanças (OBRIGATÓRIO reiniciar a VM do WSL):
 wsl --shutdown
 ```
-> 💡 *A propriedade `vmIdleTimeout=-1` evita que o WSL 2 desligue a VM automaticamente após 60 segundos de inatividade (ex: quando você está conectado via SSH no MobaXterm).*
+
+### ⏰ Ajustar ou Desativar o Tempo de Desligamento Automático (`vmIdleTimeout`)
+Por padrão, o WSL 2 encerra a máquina virtual automaticamente após **60 segundos (1 minuto)** de inatividade (sem janelas ativas do terminal). 
+
+Para alterar esse comportamento, edite o arquivo `C:\Users\SEU_USUARIO\.wslconfig`:
+
+```ini
+[wsl2]
+# Opção A: Desativar completamente o desligamento automático por inatividade
+vmIdleTimeout=-1
+
+# Opção B: Aumentar o tempo limite (valor em milissegundos. Ex: 600000 = 10 minutos)
+vmIdleTimeout=600000
+```
+> 💡 *Após alterar o arquivo, lembre-se de rodar `wsl --shutdown` no PowerShell para aplicar.*
 
 ### Habilitar o `systemctl` (Systemd) e Opções do WSL (`/etc/wsl.conf`)
 Para habilitar o `systemctl` e configurar como o Linux interage com o Windows, edite o arquivo `/etc/wsl.conf` **dentro do Linux** (`sudo nano /etc/wsl.conf`):
@@ -325,4 +339,12 @@ Com a montagem automática desativada, a sessão nativa do MobaXterm não funcio
 * **Isolamento de Sistema:** O Linux roda dentro de um disco virtual isolado (`.vhdx`). Um vírus de Linux não consegue danificar o Kernel do Windows ou alterar o Registro do Windows.
 * **Atenção aos arquivos compartilhados:** Como os discos do Windows costumam ser montados em `/mnt/c/`, scripts maliciosos rodando no Linux podem alterar arquivos das suas pastas pessoais do Windows caso tenham acesso.
 * **Solução:** Se quiser isolar 100%, desative a montagem automática (`enabled = false` no `/etc/wsl.conf`) conforme demonstrado na seção 6.
+
+### Por que o WSL desliga sozinho após 1 minuto de inatividade?
+* **Motivo:** O WSL 2 vem com o parâmetro `vmIdleTimeout=60000` (60 segundos em milissegundos) ativado por padrão para liberar memória RAM do Windows quando o terminal é fechado.
+* **Solução:** No arquivo `C:\Users\SEU_USUARIO\.wslconfig`, adicione:
+  * `vmIdleTimeout=-1` para **nunca** desligar por inatividade.
+  * `vmIdleTimeout=600000` para aumentar a tolerância para **10 minutos** (ou outro valor em milissegundos).
+* Depois de salvar o arquivo, execute `wsl --shutdown` no PowerShell para aplicar.
+
 
