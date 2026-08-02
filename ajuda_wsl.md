@@ -166,23 +166,28 @@ notepad.exe arquivo.txt
 ## ⚙️ 6. Configurações Avançadas e Limite de Recursos
 
 ### Limitar Memória RAM e CPUs (`.wslconfig`)
-Crie o arquivo `C:\Users\SEU_USUARIO\.wslconfig` no Windows para impedir que o WSL consuma toda a memória RAM do computador:
+O WSL 2 pode consumir muita memória RAM se não for limitado. Crie o arquivo `C:\Users\SEU_USUARIO\.wslconfig` no Windows.
 
-```ini
+#### Criar o arquivo `.wslconfig` direto pelo PowerShell:
+```powershell
+# Executar no PowerShell para criar o arquivo com limites de 4GB RAM e 4 CPUs:
+@'
 [wsl2]
-# Limite máximo de memória RAM
 memory=4GB
-
-# Número de núcleos de CPU
 processors=4
-
-# Tamanho do arquivo de troca (SWAP)
 swap=2GB
-
-# Permitir acesso a serviços rodando no WSL via localhost no Windows
 localhostForwarding=true
+'@ | Out-File -Encoding utf8 "$HOME\.wslconfig"
+
+# Conferir o conteúdo criado:
+Get-Content "$HOME\.wslconfig"
+
+# Abrir no Bloco de Notas caso queira editar manualmente:
+notepad "$HOME\.wslconfig"
+
+# Aplicar as mudanças (OBRIGATÓRIO reiniciar a VM do WSL):
+wsl --shutdown
 ```
-*Após salvar o arquivo, rode `wsl --shutdown` no PowerShell para aplicar.*
 
 ### Habilitar o `systemctl` (Systemd) no WSL (`/etc/wsl.conf`)
 Para conseguir rodar serviços com `systemctl start apache2` ou `systemctl start docker` dentro do WSL, edite o arquivo `/etc/wsl.conf` **dentro do Linux**:
@@ -206,4 +211,16 @@ options = "metadata,uid=1000,gid=1000,umask=022,fmask=111"
 * **Descobrir o IP interno do WSL:**
   ```bash
   hostname -I | awk '{print $1}'
+  ```
+
+---
+
+## ❓ 8. Perguntas Frequentes (FAQ)
+
+### O WSL liga sozinho o container ao iniciar o Windows?
+* **Não por padrão (Início Sob Demanda):** O WSL não consome memória RAM nem CPU assim que o Windows liga. Ele permanece inativo até o momento em que você abre um terminal (Windows Terminal, PowerShell com `wsl`, VS Code) ou quando uma ferramenta inicia.
+* **Exceção (Docker Desktop):** Se o **Docker Desktop** estiver instalado e configurado para *"Start Docker Desktop when you log in"*, ele acordará o WSL 2 automaticamente no login do Windows para disponibilizar os containers Docker.
+* **Como desligar manualmente:** Sempre que quiser liberar toda a memória RAM reservada pelo WSL, abra o PowerShell e execute:
+  ```powershell
+  wsl --shutdown
   ```
