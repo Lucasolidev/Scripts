@@ -15,6 +15,7 @@ Repositório centralizado de scripts de automação, ferramentas de pós-instala
 Acesse os manuais e guias rápidos de consulta para servidores e ferramentas:
 
 * 🐧 **[Guia de Ajuda Linux](ajuda_linux.md)** — Atalhos, manipulação de arquivos, permissões, POSIX ACLs e comandos essenciais do Ubuntu Server.
+* 💻 **[Guia de Ajuda WSL 2](ajuda_wsl.md)** — Instalação, gerenciamento de distros, backups (`.tar`), limites do `.wslconfig` e integração Windows/Linux.
 * 🚀 **[Guia de Ajuda Nginx + PHP-FPM](ajuda_nginx.md)** — Estrutura de diretórios, blocos `server`, Reverse Proxy, PHP-FPM, timeouts e solução de erros (413, 502, 504).
 * 🌐 **[Guia de Ajuda Apache2](ajuda_apache.md)** — Estrutura de diretórios, `a2enmod`, `a2ensite`, suporte a `.htaccess`, VirtualHosts e diagnóstico.
 * 🪟 **[Guia de Ajuda Windows](ajuda_windows.md)** — Comandos essenciais de PowerShell, CMD, redes e administração de sistemas Windows.
