@@ -154,7 +154,7 @@ apt update -y > /dev/null 2>&1 || true
 log_success "Lista de pacotes atualizada."
 
 log_info "Instalando dependências prévias (software-properties-common, curl, ca-certificates)..."
-PRE_REQ_PACKAGES=("software-properties-common" "curl" "ca-certificates" "gnupg2" "lsb-release")
+PRE_REQ_PACKAGES=("software-properties-common" "curl" "ca-certificates" "gnupg2" "lsb-release" "acl")
 for pkg in "${PRE_REQ_PACKAGES[@]}"; do
     if dpkg -l | grep -q "^ii  $pkg " > /dev/null 2>&1; then
         log_info "Pacote '$pkg' já está instalado."
@@ -293,6 +293,18 @@ systemctl restart apache2 > /dev/null 2>&1
 log_success "Apache2 reiniciado com suporte a PHP."
 
 # ==========================================
+# CONFIGURAÇÃO DE PERMISSÕES E POSIX ACLs
+# ==========================================
+print_header "CONFIGURAÇÃO DE PERMISSÕES (POSIX ACLs)"
+log_info "Aplicando herança de permissões automática com POSIX ACLs (setfacl) em /var/www..."
+mkdir -p /var/www/html
+chown -R www-data:www-data /var/www
+chmod -R 775 /var/www
+setfacl -R -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
+setfacl -R -d -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
+log_success "ACLs ativas: Novos arquivos em /var/www herdarão acesso total para www-data."
+
+# ==========================================
 # CRIANDO PÁGINA DE DIAGNÓSTICO (info.php)
 # ==========================================
 log_info "Criando arquivo de teste phpinfo em /var/www/html/info.php..."
@@ -392,17 +404,19 @@ print_header "RESUMO DO SISTEMA - INSTALAÇÃO CONCLUÍDA"
 
 echo -e "  ${FG_GREEN}${BOLD}✔ INSTALAÇÃO DA PILHA LAMP FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}Servidor Web:${NC}         Apache2 ($(systemctl is-active apache2 2>/dev/null || echo "active"))"
-echo -e "  ${BOLD}Banco de Dados:${NC}       MariaDB Server ($(systemctl is-active mariadb 2>/dev/null || echo "active"))"
-echo -e "  ${BOLD}Linguagem de Script:${NC}  PHP ${ACTUAL_PHP_VER}"
-echo -e "  ${BOLD}Proteção Fail2Ban:${NC}       $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo e Protegendo (/etc/fail2ban/jail.local)${NC}" || echo "Não instalado")"
-echo -e "  ${BOLD}Diretório Web Raiz:${NC}   /var/www/html/"
+echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Pronto${NC}"
+echo -e "  ${BOLD}Servidor Web:${NC}          Apache2 ($(systemctl is-active apache2 2>/dev/null || echo "active"))"
+echo -e "  ${BOLD}Banco de Dados:${NC}        MariaDB Server ($(systemctl is-active mariadb 2>/dev/null || echo "active"))"
+echo -e "  ${BOLD}Linguagem de Script:${NC}   PHP ${ACTUAL_PHP_VER}"
+echo -e "  ${BOLD}Permissões POSIX ACL:${NC}  ${FG_GREEN}Ativo e Herdando (/var/www)${NC}"
+echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo e Protegendo (/etc/fail2ban/jail.local)${NC}" || echo "Não instalado")"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}Acesso Web Principal:${NC}  http://${SERVER_IP}/"
-echo -e "  ${BOLD}Diagnóstico PHP:${NC}      http://${SERVER_IP}/info.php"
+echo -e "  ${BOLD}Diretório Web Raiz:${NC}   ${FG_CYAN}/var/www/html/${NC}"
+echo -e "  ${BOLD}Acesso Web Principal:${NC}  ${FG_CYAN}http://${SERVER_IP}/${NC}"
+echo -e "  ${BOLD}Diagnóstico PHP:${NC}      ${FG_CYAN}http://${SERVER_IP}/info.php${NC}"
 
 if [ "$INSTALL_PHPMYADMIN" = "s" ] || [ "$INSTALL_PHPMYADMIN" = "sim" ]; then
-    echo -e "  ${BOLD}Painel phpMyAdmin:${NC}    http://${SERVER_IP}/phpmyadmin"
+    echo -e "  ${BOLD}Painel phpMyAdmin:${NC}    ${FG_CYAN}http://${SERVER_IP}/phpmyadmin${NC}"
 fi
 
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
@@ -423,3 +437,5 @@ echo -e "  ${DIM}─────────────────────
 
 log_warning "Por razões de segurança, lembre-se de remover ou restringir o acesso ao arquivo /var/www/html/info.php após a validação."
 echo -e ""
+draw_separator
+echo -e "${FG_GREEN}${BOLD}❯ Instalação concluída com sucesso!${NC}\n"

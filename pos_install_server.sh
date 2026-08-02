@@ -9,7 +9,7 @@ VERSION="1.0"
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (exige Root/Sudo).
 # 2. Atualiza os espelhos do APT e aplica patches de segurança do sistema.
-# 3. Instala pacotes vitais (QEMU Guest Agent, Open VM Tools, ncdu, fastfetch).
+# 3. Instala pacotes vitais (curl, QEMU Guest Agent, Open VM Tools, ncdu, fastfetch).
 # 4. Endurece o SSH: Desabilita por padrão o Root Login (PermitRootLogin no).
 # 5. Oferece criação opcional de usuário 'administrador' integrado ao grupo 'sudo'.
 # 6. Audita a existência do usuário 'geset' antes de aplicar amarras no Sudoers.
@@ -178,7 +178,7 @@ fi
 print_header "INSTALAÇÃO DE UTILITÁRIOS"
 print_alert_box "Pacotes obrigatórios (qemu-guest-agent, open-vm-tools, etc) serão instalados agora."
 
-PACOTES=(qemu-guest-agent open-vm-tools ncdu fastfetch)
+PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch)
 for pacote in "${PACOTES[@]}"; do
   log_info "Instalando o pacote: $pacote..."
   if apt install -y "$pacote" > /dev/null 2>&1; then

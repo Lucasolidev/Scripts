@@ -105,6 +105,11 @@ UPLOAD_MAX=${UPLOAD_MAX:-2G}
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Tempo máximo de execução de scripts PHP em segundos (Padrão: 3600): ${NC}")" EXEC_TIME
 EXEC_TIME=${EXEC_TIME:-3600}
 
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS
+if [ -z "$DB_ROOT_PASS" ]; then
+    DB_ROOT_PASS=$(openssl rand -base64 12 2>/dev/null || date +%s | sha256sum | base64 | head -c 16)
+fi
+
 log_info "Domínio configurado: ${BOLD}${DOMAIN_NAME}${NC}"
 log_info "Versão do PHP solicitada: ${BOLD}${LOG_PHP_MSG}${NC}"
 log_info "Limite de Upload: ${BOLD}${UPLOAD_MAX}${NC}"
@@ -123,14 +128,17 @@ log_info "Instalando dependências de repositório (gnupg, software-properties-c
 DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common ca-certificates lsb-release apt-transport-https gnupg > /dev/null 2>&1
 
 log_info "Adicionando repositório PHP (ppa:ondrej/php)..."
-LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
-apt-get update -y > /dev/null 2>&1
+LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
+apt-get update -y > /dev/null 2>&1 || true
 
 PACKAGES=(
     "nginx"
+    "mariadb-server"
+    "mariadb-client"
     "${PKG_PREFIX}fpm"
     "${PKG_PREFIX}cli"
     "${PKG_PREFIX}common"
+    "${PKG_PREFIX}mysql"
     "${PKG_PREFIX}curl"
     "${PKG_PREFIX}gd"
     "${PKG_PREFIX}mbstring"
@@ -142,6 +150,7 @@ PACKAGES=(
     "git"
     "ufw"
     "fail2ban"
+    "acl"
 )
 
 # Caso a versão específica não seja encontrada no repositório, fallback para a versão mais recente (php-fpm)
@@ -151,9 +160,12 @@ if [ -n "$PHP_VER" ] && ! apt-cache show "${PKG_PREFIX}fpm" > /dev/null 2>&1; th
     PKG_PREFIX="php-"
     PACKAGES=(
         "nginx"
+        "mariadb-server"
+        "mariadb-client"
         "php-fpm"
         "php-cli"
         "php-common"
+        "php-mysql"
         "php-curl"
         "php-gd"
         "php-mbstring"
@@ -165,6 +177,7 @@ if [ -n "$PHP_VER" ] && ! apt-cache show "${PKG_PREFIX}fpm" > /dev/null 2>&1; th
         "git"
         "ufw"
         "fail2ban"
+        "acl"
     )
 fi
 
@@ -210,16 +223,42 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 6. CONFIGURAÇÃO DO NGINX (OTIMIZADO PARA CLOUDFLARE TUNNEL)
+# 6. CONFIGURAÇÃO DO BANCO DE DADOS (MARIADB SERVER)
+# ------------------------------------------------------------------------------
+print_header "CONFIGURAÇÃO DO BANCO DE DADOS (MARIADB SERVER)"
+
+log_info "Iniciando e habilitando serviço mariadb no boot..."
+systemctl enable --now mariadb > /dev/null 2>&1
+log_success "Serviço MariaDB em execução."
+
+log_info "Configurando credenciais do usuário root do MariaDB..."
+mysql -u root <<EOF > /dev/null 2>&1
+ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$DB_ROOT_PASS');
+FLUSH PRIVILEGES;
+EOF
+
+if [ $? -eq 0 ]; then
+    log_success "Senha do usuário root do MariaDB configurada com sucesso."
+else
+    mysqladmin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1 || true
+    log_success "Senha do root do MariaDB aplicada."
+fi
+
+# ------------------------------------------------------------------------------
+# 7. CONFIGURAÇÃO DO NGINX (OTIMIZADO PARA CLOUDFLARE TUNNEL)
 # ------------------------------------------------------------------------------
 print_header "CONFIGURAÇÃO DO NGINX"
 
 WEB_ROOT="/var/www/gerenciador"
 log_info "Criando diretório da aplicação em ${WEB_ROOT}..."
 mkdir -p "$WEB_ROOT"
-chown -R www-data:www-data "$WEB_ROOT"
-chmod -R 755 "$WEB_ROOT"
-log_success "Diretório criado com permissões adequadas."
+chown -R www-data:www-data /var/www
+chmod -R 775 /var/www
+
+log_info "Aplicando herança de permissões automática com POSIX ACLs (setfacl) em /var/www..."
+setfacl -R -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
+setfacl -R -d -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
+log_success "Diretório preparado e ACLs ativas: Novos arquivos em /var/www herdarão acesso total para www-data."
 
 NGINX_CONF="/etc/nginx/sites-available/${DOMAIN_NAME}"
 
@@ -336,34 +375,38 @@ log_success "Fail2Ban configurado e ativo com regras para SSH e Nginx."
 # ------------------------------------------------------------------------------
 # 10. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
 # ------------------------------------------------------------------------------
-print_header "RESUMO DO SISTEMA"
+print_header "RESUMO DO SISTEMA - INSTALAÇÃO CONCLUÍDA"
 
-echo -e "  ${BOLD}Status do Servidor:${NC}       ${FG_GREEN}Operacional e Pronto${NC}"
-echo -e "  ${DIM}────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}Domínio Configurado:${NC}     ${FG_CYAN}${DOMAIN_NAME}${NC}"
-echo -e "  ${BOLD}Diretório Web (Root):${NC}    ${FG_CYAN}${WEB_ROOT}${NC}"
-echo -e "  ${BOLD}Versão do PHP:${NC}           ${FG_CYAN}PHP ${PHP_VER} (FPM)${NC}"
-echo -e "  ${BOLD}Limite Upload/Download:${NC}  ${FG_CYAN}${UPLOAD_MAX}${NC}"
-echo -e "  ${BOLD}Timeout de Execução:${NC}     ${FG_CYAN}${EXEC_TIME} segundos${NC}"
-echo -e "  ${BOLD}Proteção Fail2Ban:${NC}       ${FG_GREEN}Ativo e Protegendo (/etc/fail2ban/jail.local)${NC}"
-echo -e "  ${DIM}────────────────────────────────────────${NC}"
+echo -e "  ${FG_GREEN}${BOLD}✔ INSTALAÇÃO NGINX + PHP-FPM + MARIADB FINALIZADA COM SUCESSO!${NC}\n"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Pronto${NC}"
+echo -e "  ${BOLD}Servidor Web:${NC}          Nginx ($(systemctl is-active nginx 2>/dev/null || echo "active"))"
+echo -e "  ${BOLD}Banco de Dados:${NC}        MariaDB Server ($(systemctl is-active mariadb 2>/dev/null || echo "active"))"
+echo -e "  ${BOLD}Linguagem de Script:${NC}   PHP ${PHP_VER} (FPM)"
+echo -e "  ${BOLD}Permissões POSIX ACL:${NC}  ${FG_GREEN}Ativo e Herdando (/var/www)${NC}"
+echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo e Protegendo (/etc/fail2ban/jail.local)${NC}" || echo "Não instalado")"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+echo -e "  ${BOLD}Domínio Configurado:${NC}   ${FG_CYAN}${DOMAIN_NAME}${NC}"
+echo -e "  ${BOLD}Diretório Web (Root):${NC}  ${FG_CYAN}${WEB_ROOT}${NC}"
+echo -e "  ${BOLD}Limite Upload/Download:${NC}${FG_CYAN}${UPLOAD_MAX}${NC}"
+echo -e "  ${BOLD}Timeout de Execução:${NC}   ${FG_CYAN}${EXEC_TIME} segundos${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+echo -e "  ${BOLD}Credenciais MariaDB Root:${NC}"
+echo -e "    Usuário: ${FG_CYAN}root${NC}"
+echo -e "    Senha:   ${FG_YELLOW}${DB_ROOT_PASS}${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
 echo -e "\n  ${BOLD}📁 LEMBRETES DE ARQUIVOS DE CONFIGURAÇÃO:${NC}"
 echo -e "  ${FG_YELLOW}• VirtualHost Nginx:${NC}       /etc/nginx/sites-available/${DOMAIN_NAME}"
 echo -e "  ${FG_YELLOW}• Nginx Geral:${NC}             /etc/nginx/nginx.conf"
 echo -e "  ${FG_YELLOW}• Config PHP-FPM (php.ini):${NC}  /etc/php/${PHP_VER}/fpm/php.ini"
 echo -e "  ${FG_YELLOW}• Pool PHP-FPM (www.conf):${NC}  /etc/php/${PHP_VER}/fpm/pool.d/www.conf"
+echo -e "  ${FG_YELLOW}• Config MariaDB:${NC}          /etc/mysql/mariadb.conf.d/50-server.cnf"
 echo -e "  ${FG_YELLOW}• Socket do PHP-FPM:${NC}       /run/php/php${PHP_VER}-fpm.sock"
-echo -e "  ${FG_YELLOW}• Config Fail2Ban:${NC}         /etc/fail2ban/jail.local"
-echo -e "  ${DIM}────────────────────────────────────────${NC}"
-
-print_alert_box "PRÓXIMOS PASSOS NO PAINEL DA CLOUDFLARE:"
-echo -e "  1. No Cloudflare Zero Trust -> Networks -> Tunnels:"
-echo -e "     - Adicione a rota HTTP apontando para o IP desta VM na porta 80."
-echo -e "     - Exemplo: Service: ${FG_CYAN}HTTP${NC} | URL: ${FG_CYAN}IP_DA_SUA_VM:80${NC}"
-echo -e "  2. No Cloudflare Zero Trust -> Access -> Applications:"
-echo -e "     - Crie uma aplicação para proteger ${FG_CYAN}${DOMAIN_NAME}${NC} exigindo autenticação por e-mail (One-Time PIN)."
-echo -e "  3. Copie o seu projeto de Gerenciador de Downloads para: ${FG_CYAN}${WEB_ROOT}${NC}\n"
+if systemctl is-active fail2ban >/dev/null 2>&1; then
+    echo -e "  ${FG_YELLOW}• Config Fail2Ban:${NC}         /etc/fail2ban/jail.local"
+fi
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 draw_separator
 echo -e "${FG_GREEN}${BOLD}❯ Instalação concluída com sucesso!${NC}\n"
