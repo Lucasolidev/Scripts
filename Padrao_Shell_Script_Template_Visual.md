@@ -44,8 +44,8 @@
 > 4. **Instalação Silenciosa e Limpa**:
 >    Quando houver instalação de pacotes via `apt` ou outro gerenciador, execute de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.
 > 
-> 5. **Configuração de Teclado e Locales (UTF-8 + US-Intl + ABNT2 com Alt+Space)**:
->    Quando houver configuração de locales e teclado, utilize o bloco padrão com `XKBOPTIONS="grp:alt_space_toggle"` para alternância de layout com **Alt+Space**:
+> 5. **Configuração de Teclado e Locales (UTF-8 + US-Intl + ABNT2 com Alt+Shift)**:
+>    Quando houver configuração de locales e teclado, utilize o bloco padrão com `XKBOPTIONS="grp:alt_shift_toggle"` para alternância de layout com **Alt+Shift**:
 >    ```bash
 >    log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
 >    sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
@@ -58,13 +58,13 @@
 >    XKBMODEL="pc105"
 >    XKBLAYOUT="us,br"
 >    XKBVARIANT="intl,"
->    XKBOPTIONS="grp:alt_space_toggle"
+>    XKBOPTIONS="grp:alt_shift_toggle"
 >    BACKSPACE="guess"
 >    EOF
 >
 >    udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 >    setupcon --force > /dev/null 2>&1 || true
->    log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Space)."
+>    log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Shift)."
 >    ```
 > 
 > 6. **Resultado Final Estruturado (Resumo da Instalação)**:
@@ -74,7 +74,7 @@
 >    KEYBOARD_STATUS="Não configurado"
 >    if [ -f /etc/default/keyboard ]; then
 >      if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
->        KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Space)"
+>        KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Shift)"
 >      else
 >        LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
 >        KEYBOARD_STATUS="${LAYOUT:-Padrao}"

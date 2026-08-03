@@ -133,7 +133,7 @@ sudo cat <<EOF | sudo tee /etc/default/keyboard > /dev/null
 XKBMODEL="pc105"
 XKBLAYOUT="us,br"
 XKBVARIANT="intl,"
-XKBOPTIONS="grp:alt_space_toggle"
+XKBOPTIONS="grp:alt_shift_toggle"
 BACKSPACE="guess"
 EOF
 
@@ -142,7 +142,7 @@ sudo setupcon --force > /dev/null 2>&1 || true
 if command -v gsettings >/dev/null 2>&1; then
     gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us+intl'), ('xkb', 'br')]" 2>/dev/null || true
 fi
-log_success "Teclado configurado: US-International + ABNT2 (Alterna com Alt+Space)."
+log_success "Teclado configurado: US-International + ABNT2 (Alterna com Alt+Shift)."
 
 # ==============================================================================
 # 3. INSTALAÇÃO DE SERVIÇOS E FERRAMENTAS BASE (SSH E HTOP)
@@ -350,7 +350,7 @@ print_header "RESUMO DA INSTALAÇÃO"
 KEYBOARD_STATUS="Não configurado"
 if [ -f /etc/default/keyboard ]; then
   if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
-    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Space)"
+    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Shift)"
   else
     LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
     KEYBOARD_STATUS="${LAYOUT:-Padrao}"

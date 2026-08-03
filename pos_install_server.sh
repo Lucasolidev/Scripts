@@ -134,10 +134,7 @@ print_header "COLETA DE PARÂMETROS"
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/n): ${NC}")" EXEC_UPDATE
 
 # Sugestão de Melhoria 1: SSH por padrão desabilitado.
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja configurar o SSH? (s/n): ${NC}")" EXEC_SSH
-if [[ "$EXEC_SSH" =~ ^[Ss]$ ]]; then
-  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja desabilitar o login de ROOT via SSH? (s/n): ${NC}")" DESABILITAR_ROOT
-fi
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/n): ${NC}")" PERMITIR_ROOT_SSH
 
 # Pergunta sobre criação de usuários padrão
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/n): ${NC}")" CRIAR_ADMIN
@@ -218,34 +215,29 @@ cat <<EOF > /etc/default/keyboard
 XKBMODEL="pc105"
 XKBLAYOUT="us,br"
 XKBVARIANT="intl,"
-XKBOPTIONS="grp:alt_space_toggle"
+XKBOPTIONS="grp:alt_shift_toggle"
 BACKSPACE="guess"
 EOF
 
 udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 setupcon --force > /dev/null 2>&1 || true
-log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Space)."
+log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Shift)."
 
 # ==============================================================================
-# 3. CONFIGURAÇÃO DO SSH (Aumento de segurança padrão)
+# 3. CONFIGURAÇÃO DO SSH (Segurança do Login de Root)
 # ==============================================================================
-if [[ "$EXEC_SSH" =~ ^[Ss]$ ]]; then
-  print_header "CONFIGURAÇÃO DO SSH"
-  # Modificado: Se o usuário não disser Explicitamente "Sim", o script blinda a config para "no"
-  if [[ "$DESABILITAR_ROOT" =~ ^[Nn]$ ]]; then
-    log_warning "Alerta de Segurança: Configurando PermitRootLogin para 'yes' no SSH..."
-    sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
-    echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
-  else
-    log_success "Segurança Aplicada: Desabilitando explicitamente o login de Root via SSH (Padrão)."
-    sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
-    echo "PermitRootLogin no" >> /etc/ssh/sshd_config
-  fi
-  systemctl restart sshd
-  log_info "Serviço SSH reiniciado."
+print_header "CONFIGURAÇÃO DO SSH"
+if [[ "$PERMITIR_ROOT_SSH" =~ ^[Ss]$ ]]; then
+  log_warning "Alerta de Segurança: Configurando PermitRootLogin para 'yes' no SSH..."
+  sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
+  echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 else
-  log_info "Configuração do SSH pulada."
+  log_success "Segurança Aplicada: Desabilitando o login de Root via SSH (PermitRootLogin no)."
+  sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
+  echo "PermitRootLogin no" >> /etc/ssh/sshd_config
 fi
+systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+log_info "Serviço SSH reiniciado."
 
 # ==============================================================================
 # VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
@@ -363,7 +355,7 @@ print_header "RESUMO DA INSTALAÇÃO"
 KEYBOARD_STATUS="Não configurado"
 if [ -f /etc/default/keyboard ]; then
   if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
-    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Space)"
+    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Shift)"
   else
     LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
     KEYBOARD_STATUS="${LAYOUT:-Padrao}"
@@ -377,7 +369,7 @@ echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
 echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
-echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null && echo -e "${FG_GREEN}Root Login Desabilitado${NC}" || echo -e "${FG_YELLOW}Root Login Permitido${NC}")"
+echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado${NC}")"
 if command -v ufw >/dev/null 2>&1; then
   echo -e "  ${BOLD}Firewall UFW:${NC}          $(ufw status 2>/dev/null | grep -q "active" && echo -e "${FG_GREEN}Ativo${NC}" || echo -e "${FG_YELLOW}Regras prontas (Inativo)${NC}")"
 fi
