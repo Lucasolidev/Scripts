@@ -4,39 +4,47 @@
 ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat&logo=php&logoColor=white)
+![MariaDB](https://img.shields.io/badge/MariaDB-003545?style=flat&logo=mariadb&logoColor=white)
 ![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
 
-## 📁 Estrutura de Arquivos e Diretórios Chave
-
-| Caminho | Descrição |
-| :--- | :--- |
-| `/etc/apache2/apache2.conf` | Arquivo principal de configuração global do Apache. |
-| `/etc/apache2/ports.conf` | Define as portas em que o Apache escuta (ex: 80, 443). |
-| `/etc/apache2/sites-available/` | Guarda todos os arquivos de VirtualHost criados. |
-| `/etc/apache2/sites-enabled/` | Links simbólicos dos VirtualHosts atualmente ativos no sistema. |
-| `/etc/apache2/mods-available/` | Módulos do Apache disponíveis para instalação/ativação. |
-| `/etc/apache2/mods-enabled/` | Módulos atualmente ativos (`mod_rewrite`, `ssl`, `headers`, etc). |
-| `/var/www/html/` | Diretório padrão de arquivos do servidor web (Document Root). |
-| `/var/log/apache2/error.log` | Log de erros principais do Apache. |
-| `/var/log/apache2/access.log` | Log de acessos e requisições HTTP. |
+Guia de referência rápida para administração do servidor web **Apache2** em ambientes Debian/Ubuntu.
 
 ---
 
-## 🛠️ Comandos de Gerenciamento do Serviço
+## 📁 Estrutura de Arquivos e Diretórios Chave
 
-### Testar a sintaxe dos arquivos de configuração (Sempre execute antes de reiniciar)
+| Caminho / Arquivo | Descrição |
+| :--- | :--- |
+| `/etc/apache2/` | Diretório raiz de todas as configurações do Apache. |
+| `/etc/apache2/apache2.conf` | Arquivo principal de configuração global do servidor. |
+| `/etc/apache2/ports.conf` | Define as portas onde o Apache escuta (ex: `Listen 80`, `Listen 443`). |
+| `/etc/apache2/sites-available/` | Guarda os arquivos de VirtualHost criados (`.conf`). |
+| `/etc/apache2/sites-enabled/` | Links simbólicos dos sites que estão **ATIVOS** no servidor. |
+| `/etc/apache2/conf-available/` | Configurações globais opcionais (ex: `phpmyadmin.conf`, `security.conf`). |
+| `/etc/apache2/conf-enabled/` | Links simbólicos de configurações globais ativas. |
+| `/etc/apache2/mods-available/` | Módulos do Apache disponíveis (`rewrite`, `ssl`, `headers`, `proxy`). |
+| `/etc/apache2/mods-enabled/` | Módulos atualmente ativos e carregados no servidor. |
+| `/var/www/html/` | Diretório raiz padrão de documentos públicos (DocumentRoot). |
+| `/var/log/apache2/error.log` | Log principal de erros do Apache e depuração do PHP. |
+| `/var/log/apache2/access.log` | Log de acessos e requisições HTTP recebidas. |
+
+---
+
+## 🛠️ Comandos Principais de Gerenciamento do Serviço
+
+### Testar a sintaxe dos arquivos de configuração (CRÍTICO - Sempre execute antes de reiniciar)
 ```bash
 sudo apache2ctl configtest
 # Ou de forma simplificada:
 sudo apache2ctl -t
 ```
 
-### Reiniciar o Apache2 (Aplica alterações de porta ou módulos)
+### Reiniciar o Apache2 (Aplica alterações completas de porta ou módulos)
 ```bash
 sudo systemctl restart apache2
 ```
 
-### Recarregar o Apache2 sem queda (Graceful Reload — Recomendado para mudanças de VirtualHost)
+### Recarregar o Apache2 sem derrubar conexões ativas (Graceful Reload — Recomendado)
 ```bash
 sudo systemctl reload apache2
 ```
@@ -107,6 +115,32 @@ sudo systemctl reload apache2
 </VirtualHost>
 ```
 
+### 📄 Modelo Completo de VirtualHost HTTPS com SSL (`/etc/apache2/sites-available/meu_site-ssl.conf`)
+```apache
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+    ServerName meu_dominio.com.br
+    ServerAlias www.meu_dominio.com.br
+    ServerAdmin admin@meu_dominio.com.br
+
+    DocumentRoot /var/www/meu_site
+
+    <Directory /var/www/meu_site>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/meu_dominio.com.br/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/meu_dominio.com.br/privkey.pem
+
+    ErrorLog ${APACHE_LOG_DIR}/meu_site_ssl_error.log
+    CustomLog ${APACHE_LOG_DIR}/meu_site_ssl_access.log combined
+</VirtualHost>
+</IfModule>
+```
+
 ---
 
 ## 🔌 Gerenciamento de Módulos (`a2enmod` / `a2dismod`)
@@ -137,20 +171,33 @@ sudo systemctl restart apache2
 
 ---
 
-## 🔒 Permissões de Arquivos & Segurança Básica
+## 🔒 Permissões de Arquivos & POSIX ACLs de Herança Automática
 
-### Ajustar o proprietário e grupo correto para o diretório Web
+### 1. Ajustar o proprietário Unix e permissões padrão
 ```bash
 sudo chown -R www-data:www-data /var/www/meu_site
-```
-
-### Permissões recomendadas (755 para pastas e 644 para arquivos)
-```bash
 sudo find /var/www/meu_site -type d -exec chmod 755 {} \;
 sudo find /var/www/meu_site -type f -exec chmod 644 {} \;
 ```
 
-### Esconder a versão do Apache nos cabeçalhos (Hardening de Segurança)
+### 2. Aplicar POSIX ACLs com Herança Automática (Enterprise)
+> 💡 *Qualquer novo arquivo ou pasta criado dentro de `/var/www/` (mesmo por `root` ou `git`) herdará automaticamente permissão total de acesso para o `www-data`!*
+
+```bash
+# Garantir que o utilitário de ACL está instalado
+sudo apt-get install -y acl
+
+# Permissão nos arquivos existentes
+sudo setfacl -R -m u:www-data:rwx,g:www-data:rwx /var/www/
+
+# Regra DEFAULT (Herança Automática para futuros arquivos e pastas)
+sudo setfacl -R -d -m u:www-data:rwx,g:www-data:rwx /var/www/
+
+# Verificar as ACLs ativas em um diretório
+getfacl /var/www/html
+```
+
+### 3. Esconder a versão do Apache nos cabeçalhos (Hardening de Segurança)
 Edite o arquivo `/etc/apache2/conf-available/security.conf` ou adicione no final do `/etc/apache2/apache2.conf`:
 ```apache
 ServerTokens Prod
@@ -163,23 +210,30 @@ sudo systemctl reload apache2
 
 ---
 
-## 🔍 Monitoramento e Análise de Logs
+## 🔍 Diagnóstico e Resolução de Problemas (Troubleshooting)
 
-### Acompanhar logs de erro em tempo real
+### Acompanhar logs de erro e acessos em tempo real
 ```bash
+# Log de erros
 sudo tail -f /var/log/apache2/error.log
-```
 
-### Acompanhar requisições e acessos HTTP em tempo real
-```bash
+# Log de acessos HTTP
 sudo tail -f /var/log/apache2/access.log
-```
 
-### Filtrar acessos por IP ou código de erro HTTP (ex: erro 500)
-```bash
+# Filtrar acessos por IP ou código de erro HTTP (ex: erro 500)
 sudo cat /var/log/apache2/access.log | grep " 500 "
 sudo cat /var/log/apache2/access.log | grep "192.168.1.50"
 ```
+
+### Verificar se a porta 80 ou 443 está aberta e escutando
+```bash
+sudo ss -tulpn | grep -E '80|443|apache'
+```
+
+### Principais Erros e Soluções:
+* **`403 Forbidden`**: Verifique se o diretório tem permissão de leitura (`chmod 755` ou `Require all granted` no VirtualHost) ou se falta um arquivo `index.html` / `index.php`.
+* **`500 Internal Server Error`**: Geralmente causado por sintaxe inválida dentro do arquivo `.htaccess` ou erro no script PHP. Consulte o log `/var/log/apache2/error.log`.
+* **`Port 80 in use`**: Outro serviço (como Nginx ou Lighttpd) está ocupando a porta 80. Use `sudo ss -tulpn | grep :80` para descobrir o processo ocupante.
 
 ---
 
