@@ -4,19 +4,19 @@
 # ------------------------------------------------
 VERSION="1.0"
 # ==============================================================================
-# INSTALADOR NGINX + PHP-FPM (OTIMIZADO PARA CLOUDFLARE TUNNEL & DOWNLOADS)
+# INSTALADOR STACK LEMP (NGINX + MARIADB + PHP-FPM) - UBUNTU
 # ==============================================================================
-# Execução recomendada via repositório: lucasolidev install_nginx_php_ubuntu.sh
+# Execução recomendada via repositório: lucasolidev install_lemp_ubuntu.sh
 # ==============================================================================
 # visualizar o script antes de executar:
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
 #
 # Executar via URL
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh | bash
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
+# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh | bash
 #
 # ==============================================================================
 
@@ -73,10 +73,10 @@ fi
 # ------------------------------------------------------------------------------
 print_header "COLETA DE PARÂMETROS"
 
-echo -e "  ${FG_WHITE}Configuração do Servidor Nginx + PHP-FPM para o Gerenciador de Downloads${NC}\n"
+echo -e "  ${FG_WHITE}Configuração do Servidor LEMP (Nginx + MariaDB + PHP-FPM)${NC}\n"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: downloads.nuvemativa.com.br): ${NC}")" DOMAIN_NAME
-DOMAIN_NAME=${DOMAIN_NAME:-downloads.nuvemativa.com.br}
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: meudominio.com.br): ${NC}")" DOMAIN_NAME
+DOMAIN_NAME=${DOMAIN_NAME:-meudominio.com.br}
 
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
 PHP_INPUT=${PHP_INPUT:-latest}
@@ -99,11 +99,11 @@ else
     fi
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Limite máximo de Upload/Download em MB/GB (Padrão: 2G): ${NC}")" UPLOAD_MAX
-UPLOAD_MAX=${UPLOAD_MAX:-2G}
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Limite máximo de Upload/Download em MB/GB (Padrão: 128M | 0 para ilimitado): ${NC}")" UPLOAD_MAX
+UPLOAD_MAX=${UPLOAD_MAX:-128M}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Tempo máximo de execução de scripts PHP em segundos (Padrão: 3600): ${NC}")" EXEC_TIME
-EXEC_TIME=${EXEC_TIME:-3600}
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Tempo máximo de execução de scripts PHP em segundos (Padrão: 300): ${NC}")" EXEC_TIME
+EXEC_TIME=${EXEC_TIME:-300}
 
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS
 if [ -z "$DB_ROOT_PASS" ]; then
@@ -245,11 +245,11 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 7. CONFIGURAÇÃO DO NGINX (OTIMIZADO PARA CLOUDFLARE TUNNEL)
+# 7. CONFIGURAÇÃO DO NGINX (LEMP STACK)
 # ------------------------------------------------------------------------------
 print_header "CONFIGURAÇÃO DO NGINX"
 
-WEB_ROOT="/var/www/gerenciador"
+WEB_ROOT="/var/www/${DOMAIN_NAME}"
 log_info "Criando diretório da aplicação em ${WEB_ROOT}..."
 mkdir -p "$WEB_ROOT"
 chown -R www-data:www-data /var/www
@@ -259,6 +259,20 @@ log_info "Aplicando herança de permissões automática com POSIX ACLs (setfacl)
 setfacl -R -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
 setfacl -R -d -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
 log_success "Diretório preparado e ACLs ativas: Novos arquivos em /var/www herdarão acesso total para www-data."
+
+log_info "Configurando ajustes globais do Nginx (tuning de conexões e suporte a WebSockets)..."
+cat <<EOF > /etc/nginx/conf.d/tuning.conf
+# Aumenta o limite de descriptores de arquivo para evitar avisos de ulimit
+worker_rlimit_nofile 65535;
+EOF
+
+cat <<EOF > /etc/nginx/conf.d/websocket.conf
+# Mapeamento dinâmico para upgrade de WebSockets sem quebrar Keep-Alive HTTP
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+EOF
 
 NGINX_CONF="/etc/nginx/sites-available/${DOMAIN_NAME}"
 
@@ -272,19 +286,42 @@ server {
     root ${WEB_ROOT};
     index index.php index.html index.htm;
 
-    # Otimização de uploads/downloads para Cloudflare Tunnel
+    # Otimização de uploads e timeouts do site
     client_max_body_size ${UPLOAD_MAX};
     client_body_timeout ${EXEC_TIME}s;
+    send_timeout ${EXEC_TIME}s;
     fastcgi_read_timeout ${EXEC_TIME}s;
     fastcgi_send_timeout ${EXEC_TIME}s;
 
-    # Otimizações de desempenho de arquivos estáticos
+    # Cabeçalhos Globais de Segurança (OWASP Best Practices)
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Roteamento padrão (compatível com WordPress, Laravel, etc)
     location / {
         try_files \$uri \$uri/ /index.php?\$args;
     }
 
-    # Bloquear visualização de diretórios e arquivos ocultos
+    # Otimização de cache para arquivos estáticos (CSS, JS, Imagens, Fontes)
+    location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)\$ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    }
+
+    # Bloquear visualização de diretórios e arquivos ocultos (.git, .env, etc)
     location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Bloquear acesso direto a arquivos de configuração e logs sensíveis
+    location ~* \.(env|git|log|sh|sql|bak|swp|yml|yaml)\$ {
         deny all;
         access_log off;
         log_not_found off;
