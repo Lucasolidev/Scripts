@@ -39,7 +39,7 @@
 >    ```
 > 
 > 3. **Interatividade e Coleta de Parâmetros**:
->    Todas as perguntas (`read -p`) devem ser agrupadas no início em um bloco chamado `"COLETA DE PARÂMETROS"`. Utilize o padrão `  ${FG_YELLOW}${ARROW} Pergunta? (s/n): ${NC}` nas perguntas do `read`.
+>    Todas as perguntas (`read -p`) devem ser agrupadas no início em um bloco chamado `"COLETA DE PARÂMETROS"`. Utilize o padrão `  ${FG_YELLOW}${ARROW} Pergunta? (s/N): ${NC}` nas perguntas do `read` (onde `(s/N)` indica que o padrão ao apertar ENTER é Não).
 > 
 > 4. **Instalação Silenciosa e Limpa**:
 >    Quando houver instalação de pacotes via `apt` ou outro gerenciador, execute de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.

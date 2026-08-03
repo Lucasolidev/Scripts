@@ -131,17 +131,17 @@ echo -e "${FG_CYAN}${BOLD}======================================================
 # ==============================================================================
 print_header "COLETA DE PARÂMETROS"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/n): ${NC}")" EXEC_UPDATE
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE
 
 # Sugestão de Melhoria 1: SSH por padrão desabilitado.
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/n): ${NC}")" PERMITIR_ROOT_SSH
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/N): ${NC}")" PERMITIR_ROOT_SSH
 
 # Pergunta sobre criação de usuários padrão
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/n): ${NC}")" CRIAR_ADMIN
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset'? (s/n): ${NC}")" CRIAR_GESET
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset'? (s/N): ${NC}")" CRIAR_GESET
 
 # Alteração: Escolha dinâmica de Grupo Customizado para restrição via Visudo
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/n): ${NC}")" CRIAR_USUARIO
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO
 
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   # Escolha do nome do grupo customizado
@@ -157,7 +157,7 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   done
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja configurar regras de Firewall (UFW)? (s/n): ${NC}")" EXEC_UFW
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja configurar regras de Firewall (UFW)? (s/N): ${NC}")" EXEC_UFW
 
 draw_separator
 log_info "Configurações coletadas. Iniciando os procedimentos..."
