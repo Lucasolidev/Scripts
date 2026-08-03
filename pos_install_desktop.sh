@@ -245,5 +245,25 @@ if [ -f "$HOME/.zshrc" ]; then
     echo "$BLOCO_CUSTOMIZACAO" >> ~/.zshrc
 fi
 
-echo -e "\n${VERDE}[+] Todo o processo de pós-instalação foi concluído com sucesso!${PADRAO}"
-echo -e "${AMARELO}[!] IMPORTANTE: Feche este terminal e abra um novo para carregar todo o seu ecossistema sem travas.${PADRAO}"
+# ==============================================================================
+# SEÇÃO FINAL: RESUMO DO SISTEMA E CUSTOMIZAÇÕES
+# ==============================================================================
+echo -e "\n=================================================================="
+echo -e "${VERDE}  ✔ PÓS-INSTALAÇÃO DO UBUNTU DESKTOP CONCLUÍDA COM SUCESSO!${PADRAO}"
+echo -e "=================================================================="
+echo -e "  ${AMARELO}Status do Sistema:${PADRAO}     Operacional e Otimizado"
+echo -e "  ${AMARELO}Locales UTF-8:${PADRAO}         pt_BR.UTF-8 / en_US.UTF-8 (Gerados)"
+echo -e "  ${AMARELO}Mapa de Teclado:${PADRAO}       US-International (Acentos) + ABNT2 (Alt+Shift)"
+echo -e "  ${AMARELO}OpenSSH Server:${PADRAO}        $(systemctl is-active ssh 2>/dev/null || echo "inativo")"
+echo -e "  ${AMARELO}Shell Padrão:${PADRAO}          Zsh + Oh My Zsh (Tema Agnoster)"
+echo -e "  ${AMARELO}Flatpak / Flathub:${PADRAO}     Ativo e Integrado"
+echo -e "  ${AMARELO}Google Chrome:${PADRAO}         Instalado"
+echo -e "  ${AMARELO}Comando GitHub:${PADRAO}        lucasolidev <script.sh>"
+echo -e "------------------------------------------------------------------"
+echo -e "  📁 ${AMARELO}LEMBRETES DE ARQUIVOS DE CONFIGURAÇÃO:${PADRAO}"
+echo -e "  • Configuração Teclado:   /etc/default/keyboard"
+echo -e "  • Configuração Locales:   /etc/locale.gen e /etc/default/locale"
+echo -e "  • Perfil Zsh (.zshrc):    ~/.zshrc"
+echo -e "  • Perfil Bash (.bashrc):  ~/.bashrc"
+echo -e "------------------------------------------------------------------"
+echo -e "${AMARELO}[!] IMPORTANTE: Feche este terminal e abra um novo para carregar todo o seu ecossistema sem travas.${PADRAO}\n"

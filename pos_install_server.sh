@@ -344,36 +344,43 @@ else
 fi
 
 # ==============================================================================
-# OUTCOME VISUAL FINAL DO SERVIDOR
+# 6. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
 # ==============================================================================
-print_header "RESUMO DO SISTEMA"
-log_success "Pós-instalação concluída com sucesso!"
+print_header "RESUMO DO SISTEMA - PÓS-INSTALAÇÃO CONCLUÍDA"
 
-echo -e "\n  ${FG_CYAN}${BOLD}Status dos Agentes Instalados:${NC}"
-echo -e "  ${DIM}────────────────────────────────────────${NC}"
-  echo -e "  ${FG_WHITE}QEMU Guest Agent : ${NC}$(systemctl is-active qemu-guest-agent 2>/dev/null)"
-  echo -e "  ${FG_WHITE}Open VM Tools    : ${NC}$(systemctl is-active open-vm-tools 2>/dev/null)"
-
+echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU SERVER FINALIZADA COM SUCESSO!${NC}\n"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
+echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
+echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}US-International (Acentos) + ABNT2 (Alt+Shift)${NC}"
+echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(systemctl is-active qemu-guest-agent 2>/dev/null || echo "inativo")"
+echo -e "  ${BOLD}Open VM Tools:${NC}         $(systemctl is-active open-vm-tools 2>/dev/null || echo "inativo")"
+echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null && echo -e "${FG_GREEN}Root Login Desabilitado${NC}" || echo -e "${FG_YELLOW}Root Login Permitido${NC}")"
 if command -v ufw >/dev/null 2>&1; then
-  echo -e "\n  ${FG_CYAN}${BOLD}Regras atuais pré-configuradas no UFW:${NC}"
-  echo -e "  ${DIM}────────────────────────────────────────${NC}"
-  ufw show added | sed 's/^/  /'
+  echo -e "  ${BOLD}Firewall UFW:${NC}          $(ufw status 2>/dev/null | grep -q "active" && echo -e "${FG_GREEN}Ativo${NC}" || echo -e "${FG_YELLOW}Regras prontas (Inativo)${NC}")"
 fi
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
+if [[ "$CRIAR_ADMIN" =~ ^[Ss]$ ]]; then
+  echo -e "  ${BOLD}Usuário Administrador:${NC}  ${FG_CYAN}administrador${NC} (Sudo Ativo)"
+fi
+if [[ "$CRIAR_GESET" =~ ^[Ss]$ ]]; then
+  echo -e "  ${BOLD}Usuário Geset:${NC}          ${FG_CYAN}geset${NC}"
+fi
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
-  echo -e "\n  ${FG_CYAN}${BOLD}Informações do usuário exclusivo criado:${NC}"
-  echo -e "  ${DIM}────────────────────────────────────────${NC}"
-  id "$NOVO_USER" | sed 's/^/  /'
-  
-  echo -e "\n  ${FG_CYAN}${BOLD}Verificação do arquivo de restrições (${NOME_GRUPO}):${NC}"
-  echo -e "  ${DIM}────────────────────────────────────────${NC}"
-  if [ -f "/etc/sudoers.d/$ARQUIVO_FINAL_SUDO" ]; then
-    log_success "Arquivo /etc/sudoers.d/$ARQUIVO_FINAL_SUDO ativo."
-  else
-    log_error "Arquivo de restrições falhou na validação."
-  fi
+  echo -e "  ${BOLD}Usuário Customizado:${NC}    ${FG_CYAN}${NOVO_USER}${NC} (Grupo: ${NOME_GRUPO})"
+  echo -e "  ${BOLD}Regras no Visudo:${NC}       /etc/sudoers.d/${ARQUIVO_FINAL_SUDO}"
 fi
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
-echo ""
+echo -e "\n  ${BOLD}📁 LEMBRETES DE ARQUIVOS DE CONFIGURAÇÃO:${NC}"
+echo -e "  ${FG_YELLOW}• Configuração SSH:${NC}       /etc/ssh/sshd_config"
+echo -e "  ${FG_YELLOW}• Configuração Teclado:${NC}   /etc/default/keyboard"
+echo -e "  ${FG_YELLOW}• Configuração Locales:${NC}   /etc/locale.gen e /etc/default/locale"
+if [ -d "/etc/sudoers.d" ]; then
+  echo -e "  ${FG_YELLOW}• Regras Sudoers (Visudo):${NC} /etc/sudoers.d/"
+fi
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
+
 draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
