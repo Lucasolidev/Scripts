@@ -41,8 +41,32 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 # ==============================================================================
 echo -e "\n${VERDE}[1/7] Atualizando repositórios e instalando dependências base...${PADRAO}"
 sudo apt-get update
-sudo apt-get install -y nala curl git unzip ncdu
+sudo apt-get install -y nala curl git unzip ncdu locales
 sudo nala upgrade -y
+
+# ==============================================================================
+# SEÇÃO DE LOCALES (UTF-8) E TECLADO (US-INTL + ABNT2)
+# ==============================================================================
+echo -e "\n${VERDE}[Locales & Teclado] Configurando suporte a UTF-8 e layouts US-Intl + ABNT2...${PADRAO}"
+sudo sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
+sudo sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+sudo locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
+sudo update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
+
+sudo cat <<EOF | sudo tee /etc/default/keyboard > /dev/null
+XKBMODEL="pc105"
+XKBLAYOUT="us,br"
+XKBVARIANT="intl,"
+XKBOPTIONS="grp:alt_shift_toggle"
+BACKSPACE="guess"
+EOF
+
+sudo setupcon --force 2>/dev/null || true
+
+# Se houver interface gráfica GNOME, ajusta as fontes de entrada no ambiente de trabalho
+if command -v gsettings >/dev/null 2>&1; then
+    gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us+intl'), ('xkb', 'br')]" 2>/dev/null || true
+fi
 
 # ==============================================================================
 # SEÇÃO 2: SERVIÇOS E MONITOREAMENTO NATIVO (SSH E HTOP)

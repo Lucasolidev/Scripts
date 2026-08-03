@@ -178,7 +178,7 @@ fi
 print_header "INSTALAÇÃO DE UTILITÁRIOS"
 print_alert_box "Pacotes obrigatórios (qemu-guest-agent, open-vm-tools, etc) serão instalados agora."
 
-PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch)
+PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales)
 for pacote in "${PACOTES[@]}"; do
   log_info "Instalando o pacote: $pacote..."
   if apt install -y "$pacote" > /dev/null 2>&1; then
@@ -190,6 +190,31 @@ for pacote in "${PACOTES[@]}"; do
     log_warning "Não foi possível instalar o pacote: $pacote (pode não estar disponível)."
   fi
 done
+
+# ==============================================================================
+# CONFIGURAÇÃO DE LOCALES (UTF-8) E TECLADO (US-INTL + ABNT2)
+# ==============================================================================
+print_header "CONFIGURAÇÃO DE LOCALES (UTF-8) E TECLADO"
+
+log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
+sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
+sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
+update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
+log_success "Locales UTF-8 gerados com sucesso (Evita acentuação quebrada no Nano/Terminal)."
+
+log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
+cat <<EOF > /etc/default/keyboard
+XKBMODEL="pc105"
+XKBLAYOUT="us,br"
+XKBVARIANT="intl,"
+XKBOPTIONS="grp:alt_shift_toggle"
+BACKSPACE="guess"
+EOF
+
+udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
+setupcon --force > /dev/null 2>&1 || true
+log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Shift)."
 
 # ==============================================================================
 # 3. CONFIGURAÇÃO DO SSH (Aumento de segurança padrão)
