@@ -69,7 +69,9 @@
 > 
 > 6. **Resultado Final Estruturado (Resumo da Instalação)**:
 >    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
->    Para detecção dinâmica do status do teclado no resumo, utilize:
+>    **Obrigatório**: É fundamental incluir a linha de **Pacotes/Programas Instalados** detalhando os softwares adicionados ao sistema durante a execução (armazenando na array `PACOTES_INSTALADOS` e formatando com `LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")`).
+>    
+>    Exemplo de bloco de resumo:
 >    ```bash
 >    KEYBOARD_STATUS="Não configurado"
 >    if [ -f /etc/default/keyboard ]; then
@@ -80,8 +82,17 @@
 >        KEYBOARD_STATUS="${LAYOUT:-Padrao}"
 >      fi
 >    fi
+>    LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
+>
+>    echo -e "  ${FG_GREEN}${BOLD}✔ PROCESSO FINALIZADO COM SUCESSO!${NC}\n"
+>    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+>    echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional${NC}"
+>    echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-Nenhum}${NC}"
+>    echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
+>    echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
+>    echo -e "  ${BOLD}Serviço Principal:${NC}     $(get_service_status nome_do_servico)"
+>    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 >    ```
->    Utilize a função `get_service_status` para listar o status limpo de serviços (`Ativo`/`Inativo`, evitando saídas duplicadas do `systemctl`). O painel deve listar de forma organizada, alinhada e tabulada todo o status final das ações realizadas com sucesso, separando os blocos com linhas discretas `${DIM}────────────────────────────────────────────────────────────────${NC}`.
 > 
 > 7. **Cabeçalho de Metadados e Comentários**:
 >    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual que está sendo criado nas URLs de exemplo:

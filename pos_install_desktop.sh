@@ -360,6 +360,7 @@ fi
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU DESKTOP FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional e Otimizado${NC}"
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}nala, curl, git, unzip, ncdu, locales, openssh-server, htop, fastfetch, flatpak, Google Chrome, Vim, Zsh, Hack Nerd Font${NC}"
 echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}OpenSSH Server:${NC}        $(get_service_status ssh)"

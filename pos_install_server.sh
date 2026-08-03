@@ -186,10 +186,12 @@ print_header "INSTALAÇÃO DE UTILITÁRIOS"
 print_alert_box "Pacotes obrigatórios (qemu-guest-agent, open-vm-tools, etc) serão instalados agora."
 
 PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales)
+PACOTES_INSTALADOS=()
 for pacote in "${PACOTES[@]}"; do
   log_info "Instalando o pacote: $pacote..."
   if apt install -y "$pacote" > /dev/null 2>&1; then
     log_success "Pacote $pacote instalado com sucesso."
+    PACOTES_INSTALADOS+=("$pacote")
     if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" ]]; then
       systemctl enable --now "$pacote" > /dev/null 2>&1
     fi
@@ -367,9 +369,12 @@ if [ -f /etc/default/keyboard ]; then
   fi
 fi
 
+LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
+
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU SERVER FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales}${NC}"
 echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
