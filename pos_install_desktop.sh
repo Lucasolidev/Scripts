@@ -3,7 +3,6 @@
 # Version: 1.0
 # ------------------------------------------------
 VERSION="1.0"
-
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU DESKTOP 26.04
 # ==============================================================================
@@ -23,88 +22,181 @@ VERSION="1.0"
 
 export DEBIAN_FRONTEND=noninteractive
 
-VERDE='\033[0;32m'
-AMARELO='\033[1;33m'
-PADRAO='\033[0m'
+# ==========================================
+# PALETA DE CORES (ANSI ESCAPE CODES)
+# ==========================================
+NC='\033[0m'              # Reset (Sem Cor)
+BOLD='\033[1m'
+DIM='\033[2m'
+UNDERLINE='\033[4m'
 
-echo "=================================================================="
-echo "  Iniciando Instalação Automatizada - Ubuntu 26.04"
-echo "=================================================================="
+# Cores de Fonte (Foreground)
+FG_BLACK='\033[30m'
+FG_RED='\033[31m'
+FG_GREEN='\033[32m'
+FG_YELLOW='\033[33m'
+FG_BLUE='\033[34m'
+FG_MAGENTA='\033[35m'
+FG_CYAN='\033[36m'
+FG_WHITE='\033[37m'
+
+# Símbolos Customizados
+ARROW="❯"
+
+# ==========================================
+# FUNÇÕES DE HIGHLIGHT E LOGGING
+# ==========================================
+
+draw_separator() {
+    echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
+}
+
+print_header() {
+    local title="$1"
+    echo -e ""
+    echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
+    draw_separator
+}
+
+get_service_status() {
+    local service="$1"
+    if systemctl is-active --quiet "$service" 2>/dev/null; then
+        echo -e "${FG_GREEN}Ativo${NC}"
+    else
+        echo -e "${FG_YELLOW}Inativo${NC}"
+    fi
+}
+
+log_info() {
+    echo -e "  ${FG_CYAN}[i]${NC}  ${BOLD}INFO:${NC}      $1"
+}
+
+log_success() {
+    echo -e "  ${FG_GREEN}[+]${NC}  ${FG_GREEN}${BOLD}SUCESSO:${NC}   $1"
+}
+
+log_warning() {
+    echo -e "  ${FG_YELLOW}[!]${NC}  ${FG_YELLOW}${BOLD}ATENÇÃO:${NC}   $1"
+}
+
+log_error() {
+    echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"
+}
+
+print_alert_box() {
+    local msg="$1"
+    echo -e ""
+    echo -e "  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}"
+    echo -e ""
+}
+
+# ==============================================================================
+# INÍCIO DO SCRIPT
+# ==============================================================================
+
+clear
+
+echo -e "\n${FG_CYAN}${BOLD}================================================================${NC}"
+echo -e "${FG_CYAN}${BOLD}       SYSTEM MANAGER - PÓS-INSTALAÇÃO DO UBUNTU DESKTOP        ${NC}"
+echo -e "${FG_CYAN}${BOLD}================================================================${NC}"
 
 # Valida o sudo logo no início da execução para evitar travas
-echo -e "${AMARELO}[!] Solicitando credenciais de administrador...${PADRAO}"
+log_warning "Solicitando credenciais de administrador..."
 sudo -v
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
 # ==============================================================================
-# SEÇÃO 1: ATUALIZAÇÃO DO SISTEMA E GERENCIADOR NALA
+# 1. ATUALIZAÇÃO DO SISTEMA E DEPENDÊNCIAS BASE
 # ==============================================================================
-echo -e "\n${VERDE}[1/7] Atualizando repositórios e instalando dependências base...${PADRAO}"
-sudo apt-get update
-sudo apt-get install -y nala curl git unzip ncdu locales
-sudo nala upgrade -y
+print_header "ATUALIZAÇÃO DO SISTEMA E GERENCIADOR NALA"
+
+log_info "Atualizando repositórios e instalando dependências base..."
+sudo apt-get update > /dev/null 2>&1
+sudo apt-get install -y nala curl git unzip ncdu locales > /dev/null 2>&1
+sudo nala upgrade -y > /dev/null 2>&1
+log_success "Repositórios atualizados e pacotes base instalados."
 
 # ==============================================================================
-# SEÇÃO DE LOCALES (UTF-8) E TECLADO (US-INTL + ABNT2)
+# 2. CONFIGURAÇÃO DE LOCALES (UTF-8) E TECLADO
 # ==============================================================================
-echo -e "\n${VERDE}[Locales & Teclado] Configurando suporte a UTF-8 e layouts US-Intl + ABNT2...${PADRAO}"
+print_header "CONFIGURAÇÃO DE LOCALES (UTF-8) E TECLADO"
+
+log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
 sudo sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
 sudo sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 sudo locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
 sudo update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
+log_success "Locales UTF-8 gerados com sucesso."
 
+log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
 sudo cat <<EOF | sudo tee /etc/default/keyboard > /dev/null
 XKBMODEL="pc105"
 XKBLAYOUT="us,br"
 XKBVARIANT="intl,"
-XKBOPTIONS="grp:alt_shift_toggle"
+XKBOPTIONS="grp:alt_space_toggle"
 BACKSPACE="guess"
 EOF
 
-sudo setupcon --force 2>/dev/null || true
+sudo setupcon --force > /dev/null 2>&1 || true
 
-# Se houver interface gráfica GNOME, ajusta as fontes de entrada no ambiente de trabalho
 if command -v gsettings >/dev/null 2>&1; then
     gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us+intl'), ('xkb', 'br')]" 2>/dev/null || true
 fi
+log_success "Teclado configurado: US-International + ABNT2 (Alterna com Alt+Space)."
 
 # ==============================================================================
-# SEÇÃO 2: SERVIÇOS E MONITOREAMENTO NATIVO (SSH E HTOP)
+# 3. INSTALAÇÃO DE SERVIÇOS E FERRAMENTAS BASE (SSH E HTOP)
 # ==============================================================================
-echo -e "\n${VERDE}[2/7] Instalando OpenSSH Server e HTOP...${PADRAO}"
-sudo nala install -y openssh-server htop
-sudo systemctl enable --now ssh
+print_header "SERVIÇOS E MONITORAMENTO (SSH E HTOP)"
+
+log_info "Instalando OpenSSH Server e HTOP..."
+sudo nala install -y openssh-server htop > /dev/null 2>&1
+sudo systemctl enable --now ssh > /dev/null 2>&1
+log_success "OpenSSH Server e HTOP instalados e ativos."
 
 # ==============================================================================
-# SEÇÃO 3: INFO DO SISTEMA (FASTFETCH)
+# 4. INFORMAÇÕES DO SISTEMA (FASTFETCH)
 # ==============================================================================
-echo -e "\n${VERDE}[3/7] Instalando Fastfetch (Sucessor do Neofetch)...${PADRAO}"
-sudo nala install -y fastfetch
+print_header "INFORMAÇÕES DO SISTEMA (FASTFETCH)"
+
+log_info "Instalando Fastfetch..."
+sudo nala install -y fastfetch > /dev/null 2>&1
+log_success "Fastfetch instalado com sucesso."
 
 # ==============================================================================
-# SEÇÃO 4: ECOSSISTEMA FLATPAK E GOOGLE CHROME
+# 5. ECOSSISTEMA FLATPAK E GOOGLE CHROME
 # ==============================================================================
-echo -e "\n${VERDE}[4/7] Configurando Flatpak e instalando Google Chrome...${PADRAO}"
-sudo nala install -y flatpak gnome-software-plugin-flatpak
-sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-sudo flatpak install -y flathub com.google.Chrome
+print_header "ECOSSISTEMA FLATPAK E GOOGLE CHROME"
+
+log_info "Configurando Flatpak e repositório Flathub..."
+sudo nala install -y flatpak gnome-software-plugin-flatpak > /dev/null 2>&1
+sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo > /dev/null 2>&1
+
+log_info "Instalando Google Chrome via Flatpak..."
+sudo flatpak install -y flathub com.google.Chrome > /dev/null 2>&1
+log_success "Flatpak e Google Chrome configurados com sucesso."
 
 # ==============================================================================
-# SEÇÃO 5: FONTE NERD FONT E POWERLINE (Para o Agnoster)
+# 6. FONTE NERD FONT E POWERLINE
 # ==============================================================================
-echo -e "\n${VERDE}[5/7] Baixando e instalando Hack Nerd Font...${PADRAO}"
+print_header "INSTALAÇÃO DE FONTE NERD FONT"
+
+log_info "Baixando e instalando Hack Nerd Font..."
 mkdir -p ~/.local/share/fonts
 curl -fLo ~/.local/share/fonts/HackNerdFont-Regular.ttf \
-    https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf
-fc-cache -fv
+    https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf > /dev/null 2>&1
+fc-cache -fv > /dev/null 2>&1
+log_success "Hack Nerd Font instalada com sucesso."
 
 # ==============================================================================
-# SEÇÃO 6: EDITOR VIM E PERSONALIZAÇÃO DE PLUGINS
+# 7. EDITOR VIM E PERSONALIZAÇÃO DE PLUGINS
 # ==============================================================================
-echo -e "\n${VERDE}[6/7] Configurando e personalizando o editor Vim...${PADRAO}"
-sudo nala install -y vim python3-pip
+print_header "CONFIGURAÇÃO DO EDITOR VIM"
+
+log_info "Instalando Vim, Python3-pip e Vim-Plug..."
+sudo nala install -y vim python3-pip > /dev/null 2>&1
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
-    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim > /dev/null 2>&1
 
 cat << 'EOF' > ~/.vimrc
 " Seção de Plugins (vim-plug) """""""""""""""""""""""""""""""""""""""""""""""""
@@ -170,32 +262,35 @@ let g:airline#extensions#tabline#enabled = 1
 let g:airline_powerline_fonts = 1
 EOF
 
-# Instalação limpa e não-interativa dos plugins do Vim
-vim -u NONE -N -e -s -c "source ~/.vimrc" -c "PlugInstall" -c "qa!"
+log_info "Instalando plugins do Vim..."
+vim -u NONE -N -e -s -c "source ~/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1
+log_success "Editor Vim e plugins configurados com sucesso."
 
 # ==============================================================================
-# SEÇÃO 7: CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH (Agnoster)
+# 8. CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH
 # ==============================================================================
-echo -e "\n${VERDE}[7/7] Instalando e estruturando o Zsh (Tema Agnoster)...${PADRAO}"
-sudo nala install -y zsh fonts-powerline
+print_header "CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH"
+
+log_info "Instalando Zsh e fontes Powerline..."
+sudo nala install -y zsh fonts-powerline > /dev/null 2>&1
 
 if [ "$SHELL" != "/bin/zsh" ]; then
-    sudo chsh -s /bin/zsh $USER
+    sudo chsh -s /bin/zsh $USER > /dev/null 2>&1
 fi
 
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    log_info "Instalando Oh My Zsh..."
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended > /dev/null 2>&1
 fi
 
 ZSH_CUSTOM="$HOME/.oh-my-zsh/custom"
 mkdir -p "$ZSH_CUSTOM/plugins"
-[ ! -d "$ZSH_CUSTOM/themes/powerlevel10k" ] && git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$ZSH_CUSTOM/themes/powerlevel10k"
-[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
-[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
-[ ! -d "$ZSH_CUSTOM/plugins/zsh-completions" ] && git clone https://github.com/zsh-users/zsh-completions "$ZSH_CUSTOM/plugins/zsh-completions"
-[ ! -d "$ZSH_CUSTOM/plugins/history-search-multi-word" ] && git clone https://github.com/zdharma-continuum/history-search-multi-word.git "$ZSH_CUSTOM/plugins/history-search-multi-word"
+[ ! -d "$ZSH_CUSTOM/themes/powerlevel10k" ] && git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$ZSH_CUSTOM/themes/powerlevel10k" > /dev/null 2>&1
+[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" > /dev/null 2>&1
+[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" > /dev/null 2>&1
+[ ! -d "$ZSH_CUSTOM/plugins/zsh-completions" ] && git clone https://github.com/zsh-users/zsh-completions "$ZSH_CUSTOM/plugins/zsh-completions" > /dev/null 2>&1
+[ ! -d "$ZSH_CUSTOM/plugins/history-search-multi-word" ] && git clone https://github.com/zdharma-continuum/history-search-multi-word.git "$ZSH_CUSTOM/plugins/history-search-multi-word" > /dev/null 2>&1
 
-# Reescreve o .zshrc garantindo a lista limpa de plugins pedida
 cat << 'EOF' > ~/.zshrc
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="agnoster"
@@ -215,13 +310,15 @@ plugins=(
 source $ZSH/oh-my-zsh.sh
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 EOF
+log_success "Zsh e Oh My Zsh (Tema Agnoster) configurados com sucesso."
 
 # ==============================================================================
-# SEÇÃO FINAL: ALIASES UNIVERSAIS E FUNÇÃO DINDÂMICA DO GITHUB
+# 9. ALIASES UNIVERSAIS E FUNÇÕES DO GITHUB
 # ==============================================================================
-echo -e "\n${VERDE}[*] Injetando aliases e a função do GitHub (Bash/Zsh)...${PADRAO}"
+print_header "INJEÇÃO DE ALIASES E CUSTOMIZAÇÕES DO SHELL"
 
-local BLOCO_CUSTOMIZACAO="
+log_info "Configurando aliases e atalhos customizados..."
+BLOCO_CUSTOMIZACAO="
 # === BLOCO DE CUSTOMIZACAO DO SCRIPT ===
 alias neofetch=\"fastfetch\"
 
@@ -236,7 +333,6 @@ alias lucasolidev=\"load-script\"
 # === FIM DO BLOCO DO SCRIPT ===
 "
 
-# Injeta de forma limpa nos arquivos de perfil
 sed -i '/# === BLOCO DE CUSTOMIZACAO DO SCRIPT ===/,/# === FIM DO BLOCO DO SCRIPT ===/d' ~/.bashrc
 echo "$BLOCO_CUSTOMIZACAO" >> ~/.bashrc
 
@@ -244,20 +340,36 @@ if [ -f "$HOME/.zshrc" ]; then
     sed -i '/# === BLOCO DE CUSTOMIZACAO DO SCRIPT ===/,/# === FIM DO BLOCO DO SCRIPT ===/d' ~/.zshrc
     echo "$BLOCO_CUSTOMIZACAO" >> ~/.zshrc
 fi
+log_success "Aliases e função lucasolidev injetados no .bashrc e .zshrc."
 
 # ==============================================================================
-# SEÇÃO FINAL: RESUMO DO SISTEMA E CUSTOMIZAÇÕES
+# 10. RESUMO DA INSTALAÇÃO
 # ==============================================================================
-echo -e "\n=================================================================="
-echo -e "${VERDE}  ✔ PÓS-INSTALAÇÃO DO UBUNTU DESKTOP CONCLUÍDA COM SUCESSO!${PADRAO}"
-echo -e "=================================================================="
-echo -e "  ${AMARELO}Status do Sistema:${PADRAO}     Operacional e Otimizado"
-echo -e "  ${AMARELO}Locales UTF-8:${PADRAO}         pt_BR.UTF-8 / en_US.UTF-8 (Gerados)"
-echo -e "  ${AMARELO}Mapa de Teclado:${PADRAO}       US-International (Acentos) + ABNT2 (Alt+Shift)"
-echo -e "  ${AMARELO}OpenSSH Server:${PADRAO}        $(systemctl is-active ssh 2>/dev/null || echo "inativo")"
-echo -e "  ${AMARELO}Shell Padrão:${PADRAO}          Zsh + Oh My Zsh (Tema Agnoster)"
-echo -e "  ${AMARELO}Flatpak / Flathub:${PADRAO}     Ativo e Integrado"
-echo -e "  ${AMARELO}Google Chrome:${PADRAO}         Instalado"
-echo -e "  ${AMARELO}Comando GitHub:${PADRAO}        lucasolidev <script.sh>"
-echo -e "------------------------------------------------------------------"
-echo -e "${AMARELO}[!] IMPORTANTE: Feche este terminal e abra um novo para carregar todo o seu ecossistema sem travas.${PADRAO}\n"
+print_header "RESUMO DA INSTALAÇÃO"
+
+KEYBOARD_STATUS="Não configurado"
+if [ -f /etc/default/keyboard ]; then
+  if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
+    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Space)"
+  else
+    LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+    KEYBOARD_STATUS="${LAYOUT:-Padrao}"
+  fi
+fi
+
+echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU DESKTOP FINALIZADA COM SUCESSO!${NC}\n"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional e Otimizado${NC}"
+echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
+echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
+echo -e "  ${BOLD}OpenSSH Server:${NC}        $(get_service_status ssh)"
+echo -e "  ${BOLD}Shell Padrão:${NC}          ${FG_CYAN}Zsh + Oh My Zsh (Tema Agnoster)${NC}"
+echo -e "  ${BOLD}Flatpak / Flathub:${NC}     ${FG_GREEN}Ativo e Integrado${NC}"
+echo -e "  ${BOLD}Google Chrome:${NC}         ${FG_GREEN}Instalado${NC}"
+echo -e "  ${BOLD}Comando GitHub:${NC}        ${FG_CYAN}lucasolidev <script.sh>${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
+
+print_alert_box "IMPORTANTE: Feche este terminal e abra um novo para carregar todo o seu ecossistema sem travas."
+
+draw_separator
+echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"

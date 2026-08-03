@@ -74,9 +74,17 @@ draw_separator() {
 print_header() {
     local title="$1"
     echo -e ""
-    echo -e "${FG_CYAN}${BOLD}=== SYSTEM MANAGER ===${NC}"
     echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
     draw_separator
+}
+
+get_service_status() {
+    local service="$1"
+    if systemctl is-active --quiet "$service" 2>/dev/null; then
+        echo -e "${FG_GREEN}Ativo${NC}"
+    else
+        echo -e "${FG_YELLOW}Inativo${NC}"
+    fi
 }
 
 log_info() {
@@ -114,7 +122,9 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-print_header "INICIANDO PÓS-INSTALAÇÃO DO SERVIDOR"
+echo -e "\n${FG_CYAN}${BOLD}================================================================${NC}"
+echo -e "${FG_CYAN}${BOLD}       SYSTEM MANAGER - PÓS-INSTALAÇÃO DO UBUNTU SERVER         ${NC}"
+echo -e "${FG_CYAN}${BOLD}================================================================${NC}"
 
 # ==============================================================================
 # BLOCO DE INTERATIVIDADE E COLETAS DE PARÂMETROS
@@ -208,13 +218,13 @@ cat <<EOF > /etc/default/keyboard
 XKBMODEL="pc105"
 XKBLAYOUT="us,br"
 XKBVARIANT="intl,"
-XKBOPTIONS="grp:alt_shift_toggle"
+XKBOPTIONS="grp:alt_space_toggle"
 BACKSPACE="guess"
 EOF
 
 udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 setupcon --force > /dev/null 2>&1 || true
-log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Shift)."
+log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Space)."
 
 # ==============================================================================
 # 3. CONFIGURAÇÃO DO SSH (Aumento de segurança padrão)
@@ -332,10 +342,12 @@ fi
 if [[ "$EXEC_UFW" =~ ^[Ss]$ ]]; then
   print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
   if command -v ufw >/dev/null 2>&1; then
-    log_info "Configurando regras básicas no UFW..."
+    log_info "Configurando regras de firewall no UFW..."
+    log_info "Liberando porta 22/tcp (SSH)..."
     ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
+    log_info "Liberando porta 10050/tcp (Zabbix Agent)..."
     ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
-    log_success "Regras do UFW configuradas."
+    log_success "Regras do UFW configuradas com sucesso (Portas liberadas: 22/tcp [SSH] e 10050/tcp [Zabbix Agent])."
   else
     log_warning "UFW não encontrado. Instalação e parametrização pulada."
   fi
@@ -344,17 +356,27 @@ else
 fi
 
 # ==============================================================================
-# 6. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
+# 6. RESUMO DA INSTALAÇÃO
 # ==============================================================================
-print_header "RESUMO DO SISTEMA - PÓS-INSTALAÇÃO CONCLUÍDA"
+print_header "RESUMO DA INSTALAÇÃO"
+
+KEYBOARD_STATUS="Não configurado"
+if [ -f /etc/default/keyboard ]; then
+  if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
+    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Space)"
+  else
+    LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+    KEYBOARD_STATUS="${LAYOUT:-Padrao}"
+  fi
+fi
 
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU SERVER FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
 echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
-echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}US-International (Acentos) + ABNT2 (Alt+Shift)${NC}"
-echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(systemctl is-active qemu-guest-agent 2>/dev/null || echo "inativo")"
-echo -e "  ${BOLD}Open VM Tools:${NC}         $(systemctl is-active open-vm-tools 2>/dev/null || echo "inativo")"
+echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
+echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
+echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null && echo -e "${FG_GREEN}Root Login Desabilitado${NC}" || echo -e "${FG_YELLOW}Root Login Permitido${NC}")"
 if command -v ufw >/dev/null 2>&1; then
   echo -e "  ${BOLD}Firewall UFW:${NC}          $(ufw status 2>/dev/null | grep -q "active" && echo -e "${FG_GREEN}Ativo${NC}" || echo -e "${FG_YELLOW}Regras prontas (Inativo)${NC}")"
@@ -375,3 +397,4 @@ echo -e "  ${DIM}─────────────────────
 
 draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
+

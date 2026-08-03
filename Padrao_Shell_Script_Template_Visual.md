@@ -17,9 +17,16 @@
 >    print_header() {
 >        local title="$1"
 >        echo -e ""
->        echo -e "${FG_CYAN}${BOLD}=== SYSTEM MANAGER ===${NC}"
 >        echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
 >        draw_separator
+>    }
+>    get_service_status() {
+>        local service="$1"
+>        if systemctl is-active --quiet "$service" 2>/dev/null; then
+>            echo -e "${FG_GREEN}Ativo${NC}"
+>        else
+>            echo -e "${FG_YELLOW}Inativo${NC}"
+>        fi
 >    }
 >    log_info()    { echo -e "  ${FG_CYAN}[i]${NC}  ${BOLD}INFO:${NC}      $1"; }
 >    log_success() { echo -e "  ${FG_GREEN}[+]${NC}  ${FG_GREEN}${BOLD}SUCESSO:${NC}   $1"; }
@@ -37,10 +44,46 @@
 > 4. **Instalação Silenciosa e Limpa**:
 >    Quando houver instalação de pacotes via `apt` ou outro gerenciador, execute de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.
 > 
-> 5. **Resultado Final Estruturado (Resumo do Sistema)**:
->    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DO SISTEMA - [PROCESSO] CONCLUÍDO"`. O painel deve listar de forma organizada, alinhada e tabulada todo o status final das ações realizadas com sucesso (ex: serviços iniciados, pacotes instalados, configurações de segurança aplicadas, usuários ou permissões), separando os blocos com linhas discretas `${DIM}────────────────────────────────────────────────────────────────${NC}`.
+> 5. **Configuração de Teclado e Locales (UTF-8 + US-Intl + ABNT2 com Alt+Space)**:
+>    Quando houver configuração de locales e teclado, utilize o bloco padrão com `XKBOPTIONS="grp:alt_space_toggle"` para alternância de layout com **Alt+Space**:
+>    ```bash
+>    log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
+>    sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
+>    sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+>    locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
+>    update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
+>
+>    log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
+>    cat <<EOF > /etc/default/keyboard
+>    XKBMODEL="pc105"
+>    XKBLAYOUT="us,br"
+>    XKBVARIANT="intl,"
+>    XKBOPTIONS="grp:alt_space_toggle"
+>    BACKSPACE="guess"
+>    EOF
+>
+>    udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
+>    setupcon --force > /dev/null 2>&1 || true
+>    log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Space)."
+>    ```
 > 
-> 6. **Cabeçalho de Metadados e Comentários**:
+> 6. **Resultado Final Estruturado (Resumo da Instalação)**:
+>    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
+>    Para detecção dinâmica do status do teclado no resumo, utilize:
+>    ```bash
+>    KEYBOARD_STATUS="Não configurado"
+>    if [ -f /etc/default/keyboard ]; then
+>      if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
+>        KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Space)"
+>      else
+>        LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+>        KEYBOARD_STATUS="${LAYOUT:-Padrao}"
+>      fi
+>    fi
+>    ```
+>    Utilize a função `get_service_status` para listar o status limpo de serviços (`Ativo`/`Inativo`, evitando saídas duplicadas do `systemctl`). O painel deve listar de forma organizada, alinhada e tabulada todo o status final das ações realizadas com sucesso, separando os blocos com linhas discretas `${DIM}────────────────────────────────────────────────────────────────${NC}`.
+> 
+> 7. **Cabeçalho de Metadados e Comentários**:
 >    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual que está sendo criado nas URLs de exemplo:
 >    ```bash
 >    #!/bin/bash
