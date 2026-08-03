@@ -37,4 +37,15 @@
 > 
 > 4. **Tratamento de Erros e Saidas Limpas**:
 >    Evite que comandos nativos inundem a tela com mensagens inuteis. Jogue o output desnecessario para fora usando `| Out-Null` ou usando `-ErrorAction SilentlyContinue`. Se a operacao for critica, agrupe-a em um bloco `try { ... } catch { ... }` onde o catch utilize o `Write-Host` na cor vermelha para detalhar `$_.Exception.Message`.
+> 
+> 5. **Painel de Resumo Final (Resultado Estruturado)**:
+>    No final de todo script PowerShell, apresente obrigatoriamente um painel de encerramento detalhado em cor `Cyan` e `Green` utilizando `Write-Host`. O resumo deve listar de forma organizada tudo o que foi executado com sucesso (ex: servicos iniciados, pacotes/recursos configurados, permissoes ou regras aplicadas), dando visibilidade imediata ao operador. Ex:
+>    ```powershell
+>    Write-Host "==========================================================" -ForegroundColor Cyan
+>    Write-Host "  ✔ RESUMO DA EXECUCAO - PROCESSO CONCLUIDO COM EXITO" -ForegroundColor Green
+>    Write-Host "==========================================================" -ForegroundColor Cyan
+>    Write-Host "  - Servico XYZ:           Ativo e Executando" -ForegroundColor White
+>    Write-Host "  - Configuracao ABC:      Aplicada" -ForegroundColor White
+>    Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+>    ```
 > "

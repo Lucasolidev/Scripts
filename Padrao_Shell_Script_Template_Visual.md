@@ -37,8 +37,8 @@
 > 4. **Instalação Silenciosa e Limpa**:
 >    Quando houver instalação de pacotes via `apt` ou outro gerenciador, execute de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.
 > 
-> 5. **Resultado Final Estruturado**:
->    No final do script, utilize a função `print_header "RESUMO DO SISTEMA"` e exiba informações importantes tabuladas de forma minimalista, separadas por linhas discretas com `${DIM}────────────────────────────────────────${NC}`.
+> 5. **Resultado Final Estruturado (Resumo do Sistema)**:
+>    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DO SISTEMA - [PROCESSO] CONCLUÍDO"`. O painel deve listar de forma organizada, alinhada e tabulada todo o status final das ações realizadas com sucesso (ex: serviços iniciados, pacotes instalados, configurações de segurança aplicadas, usuários ou permissões), separando os blocos com linhas discretas `${DIM}────────────────────────────────────────────────────────────────${NC}`.
 > 
 > 6. **Cabeçalho de Metadados e Comentários**:
 >    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual que está sendo criado nas URLs de exemplo:
