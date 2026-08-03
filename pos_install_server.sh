@@ -362,7 +362,7 @@ print_header "RESUMO DA INSTALAÇÃO"
 KEYBOARD_STATUS="Não configurado"
 if [ -f /etc/default/keyboard ]; then
   if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
-    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Shift)"
+    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alterna com Alt+Shift)"
   else
     LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
     KEYBOARD_STATUS="${LAYOUT:-Padrao}"
@@ -377,6 +377,7 @@ echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecid
 echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales}${NC}"
 echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
+echo -e "  ${BOLD}Layout Ativo (Inicial):${NC}${FG_GREEN}US-International (us:intl)${NC}"
 echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
 echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado${NC}")"

@@ -76,7 +76,7 @@
 >    KEYBOARD_STATUS="Não configurado"
 >    if [ -f /etc/default/keyboard ]; then
 >      if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
->        KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alt+Shift)"
+>        KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alterna com Alt+Shift)"
 >      else
 >        LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
 >        KEYBOARD_STATUS="${LAYOUT:-Padrao}"
@@ -90,6 +90,7 @@
 >    echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-Nenhum}${NC}"
 >    echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
 >    echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
+>    echo -e "  ${BOLD}Layout Ativo (Inicial):${NC}${FG_GREEN}US-International (us:intl)${NC}"
 >    echo -e "  ${BOLD}Serviço Principal:${NC}     $(get_service_status nome_do_servico)"
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 >    ```
