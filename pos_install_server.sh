@@ -371,15 +371,6 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   echo -e "  ${BOLD}Usuário Customizado:${NC}    ${FG_CYAN}${NOVO_USER}${NC} (Grupo: ${NOME_GRUPO})"
   echo -e "  ${BOLD}Regras no Visudo:${NC}       /etc/sudoers.d/${ARQUIVO_FINAL_SUDO}"
 fi
-echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-
-echo -e "\n  ${BOLD}📁 LEMBRETES DE ARQUIVOS DE CONFIGURAÇÃO:${NC}"
-echo -e "  ${FG_YELLOW}• Configuração SSH:${NC}       /etc/ssh/sshd_config"
-echo -e "  ${FG_YELLOW}• Configuração Teclado:${NC}   /etc/default/keyboard"
-echo -e "  ${FG_YELLOW}• Configuração Locales:${NC}   /etc/locale.gen e /etc/default/locale"
-if [ -d "/etc/sudoers.d" ]; then
-  echo -e "  ${FG_YELLOW}• Regras Sudoers (Visudo):${NC} /etc/sudoers.d/"
-fi
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 draw_separator
