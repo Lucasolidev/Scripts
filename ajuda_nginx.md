@@ -1,120 +1,111 @@
-# 🚀 Cheat Sheet - Administração Nginx + PHP-FPM (Ubuntu Server)
+# 🟢 Cheat Sheet - Administração Nginx (Ubuntu / Debian)
 
 ![Nginx](https://img.shields.io/badge/Nginx-009639?style=flat&logo=nginx&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat&logo=php&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-5FA04E?style=flat&logo=nodedotjs&logoColor=white)
-![Cloudflare](https://img.shields.io/badge/Cloudflare-F38020?style=flat&logo=cloudflare&logoColor=white)
 ![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
 
-Guia de referência rápida para administração do servidor web de alta performance **Nginx** com **PHP-FPM** e **Reverse Proxy** em ambientes Debian/Ubuntu.
+## 📁 Estrutura de Arquivos e Diretórios Chave
 
----
-
-## 📁 Diretórios de Configuração e Arquivos Importantes
-
-| Caminho / Arquivo | Descrição |
+| Caminho | Descrição |
 | :--- | :--- |
-| `/etc/nginx/` | Diretório raiz de todas as configurações do Nginx. |
-| `/etc/nginx/nginx.conf` | Configuração global (worker processes, gzip, buffer, logs). |
-| `/etc/nginx/sites-available/` | Guarda os arquivos de VirtualHost/Blocos `server` criados. |
-| `/etc/nginx/sites-enabled/` | Guarda os links simbólicos dos sites que estão **ATIVOS**. |
-| `/etc/nginx/snippets/` | Trechos de configuração reutilizáveis (ex: `fastcgi-php.conf`). |
-| `/etc/php/X.Y/fpm/php.ini` | Configuração principal do interpretador PHP-FPM. |
-| `/etc/php/X.Y/fpm/pool.d/www.conf` | Configuração de processos, usuários e sockets do PHP-FPM. |
-| `/run/php/phpX.Y-fpm.sock` | Socket UNIX de comunicação do PHP-FPM com o Nginx. |
-| `/var/www/` | Diretório raiz padrão das aplicações web (`/var/www/gerenciador`). |
-| `/var/log/nginx/access.log` | Log de acessos HTTP recebidos. |
-| `/var/log/nginx/error.log` | Log de erros do servidor Nginx. |
+| `/etc/nginx/nginx.conf` | Arquivo principal de configuração global do Nginx. |
+| `/etc/nginx/sites-available/` | Guarda os arquivos de configuração de Server Block (VirtualHosts). |
+| `/etc/nginx/sites-enabled/` | Links simbólicos dos Server Blocks atualmente ativos no sistema. |
+| `/etc/nginx/snippets/` | Snippets reutilizáveis de configuração (ex: `fastcgi-php.conf`). |
+| `/var/www/html/` | Diretório padrão de arquivos do servidor web (Document Root). |
+| `/var/log/nginx/error.log` | Log principal de erros do Nginx. |
+| `/var/log/nginx/access.log` | Log principal de acessos e requisições HTTP do Nginx. |
+| `/run/php/php8.3-fpm.sock` | Socket Unix do PHP-FPM utilizado na comunicação com o Nginx. |
 
 ---
 
-## ⚡ Comandos Principais de Gerenciamento dos Serviços
+## 🛠️ Comandos de Gerenciamento do Serviço
 
-### Gerenciar o serviço do Nginx
+### Testar a sintaxe dos arquivos de configuração (MANDATÓRIO antes de reiniciar)
 ```bash
-# Verificar status do Nginx
-sudo systemctl status nginx
+sudo nginx -t
+```
 
-# Iniciar, parar ou reiniciar o Nginx
+### Recarregar o Nginx sem derrubar conexões ativas (Reload — Mais seguro)
+```bash
+sudo systemctl reload nginx
+# Ou o atalho nativo do Nginx:
+sudo nginx -s reload
+```
+
+### Reiniciar o serviço Nginx
+```bash
+sudo systemctl restart nginx
+```
+
+### Verificar o status de execução do serviço
+```bash
+sudo systemctl status nginx
+```
+
+### Iniciar / Parar o serviço
+```bash
 sudo systemctl start nginx
 sudo systemctl stop nginx
-sudo systemctl restart nginx
-
-# Recarregar configurações sem queda de conexões (Graceful Reload)
-sudo systemctl reload nginx
 ```
 
-### Testar a sintaxe dos arquivos do Nginx (OBRIGATÓRIO)
-> 💡 *NUNCA reinicie o Nginx sem antes validar a sintaxe com `nginx -t`. Se houver um ponto e vírgula `;` faltando, o Nginx avisará aqui antes de derrubar o site!*
+### Habilitar / Desabilitar a inicialização automática no boot
 ```bash
-sudo nginx -t
-```
-
-### Gerenciar o serviço do PHP-FPM
-```bash
-# Substitua 8.3 ou 8.5 pela versão instalada
-sudo systemctl status php8.3-fpm
-sudo systemctl restart php8.3-fpm
-sudo systemctl reload php8.3-fpm
+sudo systemctl enable nginx
+sudo systemctl disable nginx
 ```
 
 ---
 
-## 🔧 Ativar e Desativar Sites no Nginx
+## 🌐 Gerenciamento de Server Blocks (VirtualHosts)
 
-No Nginx, um site é ativado criando um link simbólico da pasta `sites-available` para a pasta `sites-enabled`:
-
+### Habilitar um site (Criando o link simbólico em `sites-enabled`)
 ```bash
-# Ativar um site (Criar link simbólico)
-sudo ln -sf /etc/nginx/sites-available/dl.nuvemativa.com.br /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/meu_site /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
 
-# Remover o site padrão de demonstração
+### Desabilitar o site padrão inicial do Nginx
+```bash
 sudo rm -f /etc/nginx/sites-enabled/default
-
-# Validar sintaxe e aplicar
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
----
-
-## 🌐 Exemplo Prático 1: VirtualHost PHP-FPM (Otimizado para Uploads Grandes & Cloudflare)
-
-Crie o arquivo em `/etc/nginx/sites-available/dl.nuvemativa.com.br`:
+### 📄 Modelo Completo: Server Block Nginx + PHP-FPM + Cloudflare Tunnel
+Comunicação via Socket PHP-FPM e limites de upload/download configurados (`/etc/nginx/sites-available/meu_site`):
 
 ```nginx
 server {
     listen 80;
     listen [::]:80;
 
-    server_name dl.nuvemativa.com.br _;
-    root /var/www/gerenciador;
+    server_name meu_dominio.com.br www.meu_dominio.com.br _;
+    root /var/www/meu_site;
     index index.php index.html index.htm;
 
-    # Otimizações de limite de Upload e Timeouts longos
+    # Otimização de uploads e tempos de execução (ideal para Cloudflare Tunnel)
     client_max_body_size 2G;
     client_body_timeout 3600s;
     fastcgi_read_timeout 3600s;
     fastcgi_send_timeout 3600s;
 
-    # Encaminhamento de protocolo HTTPS do Cloudflare Tunnel
-    proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
-
-    # Roteamento de arquivos estáticos e URLs amigáveis
+    # Roteamento padrão para a aplicação
     location / {
         try_files $uri $uri/ /index.php?$args;
     }
 
-    # Bloquear arquivos ocultos (.env, .git, .htaccess)
+    # Bloquear acesso a arquivos ocultos (ex: .git, .env, .htaccess)
     location ~ /\. {
         deny all;
         access_log off;
         log_not_found off;
     }
 
-    # Processamento de arquivos PHP via FastCGI (Socket UNIX)
+    # Processamento de arquivos PHP via FastCGI (Ajuste a versão do PHP-FPM se necessário)
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php8.3-fpm.sock;
@@ -124,83 +115,104 @@ server {
 }
 ```
 
----
-
-## 🔄 Exemplo Prático 2: Reverse Proxy para Aplicações Node.js / Express / PM2
-
-Crie o arquivo em `/etc/nginx/sites-available/app-node.conf`:
-
+### 📄 Modelo: Proxy Reverso para Aplicações Node.js / Python / Docker
 ```nginx
 server {
     listen 80;
-    server_name app.nuvemativa.com.br;
-
-    client_max_body_size 500M;
+    server_name api.meu_dominio.com.br;
 
     location / {
-        # Endereço da aplicação Node.js / PM2 rodando localmente
         proxy_pass http://127.0.0.1:3000;
-        
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-
-        # Repassar o IP real do visitante e protocolo HTTPS do Cloudflare
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
     }
 }
 ```
 
 ---
 
-## 🔐 Permissões de Arquivos & POSIX ACLs de Herança Automática
+## ⚡ Otimizações & Ajustes no `/etc/nginx/nginx.conf`
 
-Para evitar erros de permissão de escrita e upload pelo usuário do Nginx (`www-data`):
-
-### 1. Definir o proprietário Unix inicial
-```bash
-sudo chown -R www-data:www-data /var/www/
-sudo chmod -R 775 /var/www/
+### 1. Aumentar limite global de Upload no Nginx
+Adicione dentro do bloco `http { ... }`:
+```nginx
+http {
+    client_max_body_size 500M;
+    ...
+}
 ```
 
-### 2. Aplicar POSIX ACLs com Herança Automática (Enterprise)
-> 💡 *Qualquer novo arquivo ou pasta criado dentro de `/var/www/` (mesmo por `root`, via SFTP ou por `git clone`) herdará automaticamente permissão total de leitura, escrita e execução para o `www-data`!*
-
-```bash
-# Garantir que o utilitário de ACL está instalado
-sudo apt-get install -y acl
-
-# Permissão nos arquivos existentes
-sudo setfacl -R -m u:www-data:rwx,g:www-data:rwx /var/www/
-
-# Regra DEFAULT (Herança Automática para futuros arquivos e pastas)
-sudo setfacl -R -d -m u:www-data:rwx,g:www-data:rwx /var/www/
+### 2. Esconder a versão do Nginx nos cabeçalhos HTTP (Segurança)
+No arquivo `/etc/nginx/nginx.conf`, descomente ou adicione dentro do bloco `http`:
+```nginx
+server_tokens off;
 ```
 
-### 3. Consultar as regras ACL ativas
-```bash
-getfacl /var/www/
+### 3. Ativar a compressão Gzip para acelerar o carregamento do site
+Dentro do bloco `http` do `/etc/nginx/nginx.conf`:
+```nginx
+gzip on;
+gzip_disable "msie6";
+gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 ```
 
 ---
 
-## 🔍 Diagnóstico e Resolução de Problemas (Troubleshooting)
+## 🔒 Permissões de Arquivos & Propriedade
 
-### Acompanhar logs de erros em tempo real
+### Ajustar permissões e proprietário do diretório da aplicação
 ```bash
-# Log de erros do Nginx
-sudo tail -f /var/log/nginx/error.log
-
-# Log de erros do PHP-FPM
-sudo tail -f /var/log/php8.3-fpm.log
+sudo chown -R www-data:www-data /var/www/meu_site
+sudo find /var/www/meu_site -type d -exec chmod 755 {} \;
+sudo find /var/www/meu_site -type f -exec chmod 644 {} \;
 ```
 
-### Principais Erros e Como Resolver:
-* **`413 Request Entity Too Large`**: O arquivo enviado é maior do que o configurado no Nginx. Adicione `client_max_body_size 2G;` dentro do bloco `server {}` no VirtualHost e rode `sudo systemctl reload nginx`.
-* **`502 Bad Gateway`**: O Nginx não conseguiu se comunicar com o PHP-FPM ou com o Node.js. Verifique se o serviço está ativo com `systemctl status php8.3-fpm` ou se o socket em `/run/php/php8.3-fpm.sock` existe.
-* **`504 Gateway Timeout`**: O script PHP ou a requisição demorou mais tempo para responder do que o limite permitido. Aumente `fastcgi_read_timeout 3600s;` no Nginx e `max_execution_time = 3600` no `php.ini`.
-* **`403 Forbidden`**: Verifique as permissões de leitura no diretório raiz do site e se a opção `index` está configurada corretamente no VirtualHost.
+---
+
+## 🔍 Monitoramento e Resolução de Problemas (Troubleshooting)
+
+### Acompanhar o log de erros do Nginx em tempo real
+```bash
+sudo tail -f /var/log/nginx/error.log
+```
+
+### Acompanhar requisições e acessos em tempo real
+```bash
+sudo tail -f /var/log/nginx/access.log
+```
+
+### Diagnosticar o Erro `502 Bad Gateway`
+O erro 502 no Nginx geralmente significa que a aplicação backend ou o **PHP-FPM está desligado** ou que o caminho do socket está incorreto:
+```bash
+# 1. Verifique se o PHP-FPM está rodando:
+sudo systemctl status php8.3-fpm
+
+# 2. Verifique se o arquivo do socket existe:
+ls -la /run/php/php*.sock
+```
+
+---
+
+## 🔐 Certificado SSL Gratuito com Let's Encrypt (Certbot)
+
+### 1. Instalar o Certbot para Nginx
+```bash
+sudo apt update
+sudo apt install -y certbot python3-certbot-nginx
+```
+
+### 2. Gerar e configurar o certificado SSL automaticamente no Server Block
+```bash
+sudo certbot --nginx -d meu_dominio.com.br -d www.meu_dominio.com.br
+```
+
+### 3. Testar a renovação automática
+```bash
+sudo certbot renew --dry-run
+```
