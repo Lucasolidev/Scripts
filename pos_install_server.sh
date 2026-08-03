@@ -227,14 +227,19 @@ log_success "Teclado configurado: US-International (para acentos em teclado amer
 # 3. CONFIGURAÇÃO DO SSH (Segurança do Login de Root)
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO SSH"
+VALOR_SSH="no"
 if [[ "$PERMITIR_ROOT_SSH" =~ ^[Ss]$ ]]; then
+  VALOR_SSH="yes"
   log_warning "Alerta de Segurança: Configurando PermitRootLogin para 'yes' no SSH..."
-  sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
-  echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
 else
+  VALOR_SSH="no"
   log_success "Segurança Aplicada: Desabilitando o login de Root via SSH (PermitRootLogin no)."
-  sed -i '/^#\?PermitRootLogin/d' /etc/ssh/sshd_config
-  echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+fi
+
+if grep -qE "^#?PermitRootLogin" /etc/ssh/sshd_config; then
+  sed -i "s/^#\?PermitRootLogin.*/PermitRootLogin $VALOR_SSH/" /etc/ssh/sshd_config
+else
+  echo "PermitRootLogin $VALOR_SSH" >> /etc/ssh/sshd_config
 fi
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 log_info "Serviço SSH reiniciado."
