@@ -4,22 +4,10 @@
 # ------------------------------------------------
 VERSION="1.0"
 # ==============================================================================
-# Execução recomendada via repositório: lucasolidev agendar_reinicio.sh
-# ==============================================================================
-# Baixar o script:
+# Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh
-# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh
-#
-# Visualizar o script antes de executar:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh
-#
-# Executar via URL diretamente (exige sudo):
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh | sudo bash
-# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh)
-# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/agendar_reinicio.sh | sudo bash
-#
+# chmod +x agendar_reinicio.sh
+# sudo ./agendar_reinicio.sh
 # ==============================================================================
 
 # Solicita a hora no formato HH:MM

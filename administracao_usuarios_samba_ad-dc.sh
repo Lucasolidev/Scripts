@@ -21,21 +21,10 @@ VERSION="1.0"
 # Domain Controller (AD DC). Se o seu servidor for apenas um servidor de arquivos 
 # comum (Standalone Server), o script não vai funcionar porque os comandos 
 # 'samba-tool user' não existem nesse modo.
-# ==============================================================================
-# Baixar o script:
+# Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
-# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
-#
-# Visualizar o script antes de executar:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
-#
-# Executar via URL diretamente (exige sudo):
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh | sudo bash
-# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh)
-# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh | sudo bash
-#
+# chmod +x administracao_usuarios_samba_ad-dc.sh
+# sudo ./administracao_usuarios_samba_ad-dc.sh
 # ==============================================================================
 
 # --- Configurações ESPECÍFICAS (ALTERAR ANTES DE USAR) ---

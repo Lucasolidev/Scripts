@@ -29,25 +29,33 @@ Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e ut
 ### 1. Pós-Instalação do Ubuntu Server (`pos_install_server.sh`)
 Prepara um novo servidor Ubuntu Server aplicando atualizações, instalando utilitários essenciais (`curl`, `ncdu`, `fastfetch`, `qemu-guest-agent`, `htop`, `tmux`, `dnsutils`, `net-tools`), fuso horário `America/Sao_Paulo` (NTP), hardening no SSH, proteção Fail2Ban, atualizações automáticas e gerenciamento de usuários/grupos restritos com Visudo:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh | sudo bash
+wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
+chmod +x pos_install_server.sh
+sudo ./pos_install_server.sh
 ```
 
 ### 2. Pós-Instalação do Ubuntu Desktop (`pos_install_desktop.sh`)
 Prepara uma nova estação Ubuntu Desktop com o gerenciador `nala`, ferramentas dev/diagnóstico (`btop`, `build-essential`, `jq`, `tldr`, `htop`), Flatpak/Flathub, Google Chrome, Hack Nerd Font, Vim com temas/plugins e Zsh com Oh My Zsh (tema Agnoster) e Firewall UFW ativado:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh | sudo bash
+wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
+chmod +x pos_install_desktop.sh
+sudo ./pos_install_desktop.sh
 ```
 
 ### 3. Instalador Nginx + PHP-FPM + MariaDB (`install_nginx_php_ubuntu.sh`)
 Instala e otimiza a pilha Nginx com suporte a PHP-FPM (uploads de até 2GB, timeouts longos de 3600s), MariaDB Server, herança de permissões automática com POSIX ACLs e firewall Fail2Ban/UFW:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh | sudo bash
+wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_nginx_php_ubuntu.sh
+chmod +x install_nginx_php_ubuntu.sh
+sudo ./install_nginx_php_ubuntu.sh
 ```
 
 ### 4. Instalador LAMP - Apache2 + MariaDB + PHP (`install_lamp_ubuntu.sh`)
 Instala e otimiza a pilha LAMP (Apache2 com mod_rewrite, MariaDB Server, PHP, suporte a phpMyAdmin opcional, POSIX ACLs e Fail2Ban):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh | sudo bash
+wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
+chmod +x install_lamp_ubuntu.sh
+sudo ./install_lamp_ubuntu.sh
 ```
 
 ---

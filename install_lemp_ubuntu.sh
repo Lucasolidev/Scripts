@@ -6,22 +6,10 @@ VERSION="1.0"
 # ==============================================================================
 # INSTALADOR STACK LEMP (NGINX + MARIADB + PHP-FPM) - UBUNTU
 # ==============================================================================
-# Execução recomendada via repositório: lucasolidev install_lemp_ubuntu.sh
-# ==============================================================================
-# Baixar o script:
+# Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
-# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
-#
-# Visualizar o script antes de executar:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
-#
-# Executar via URL diretamente (exige sudo):
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh | sudo bash
-# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh)
-# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh | sudo bash
-#
+# chmod +x install_lemp_ubuntu.sh
+# sudo ./install_lemp_ubuntu.sh
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -79,10 +67,10 @@ print_header "COLETA DE PARÂMETROS"
 
 echo -e "  ${FG_WHITE}Configuração do Servidor LEMP (Nginx + MariaDB + PHP-FPM)${NC}\n"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: meudominio.com.br): ${NC}")" DOMAIN_NAME </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: meudominio.com.br): ${NC}")" DOMAIN_NAME
 DOMAIN_NAME=${DOMAIN_NAME:-meudominio.com.br}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
 PHP_INPUT=${PHP_INPUT:-latest}
 
 if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
@@ -103,13 +91,13 @@ else
     fi
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Limite máximo de Upload/Download em MB/GB (Padrão: 128M | 0 para ilimitado): ${NC}")" UPLOAD_MAX </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Limite máximo de Upload/Download em MB/GB (Padrão: 128M | 0 para ilimitado): ${NC}")" UPLOAD_MAX
 UPLOAD_MAX=${UPLOAD_MAX:-128M}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Tempo máximo de execução de scripts PHP em segundos (Padrão: 300): ${NC}")" EXEC_TIME </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Tempo máximo de execução de scripts PHP em segundos (Padrão: 300): ${NC}")" EXEC_TIME
 EXEC_TIME=${EXEC_TIME:-300}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS
 if [ -z "$DB_ROOT_PASS" ]; then
     DB_ROOT_PASS=$(openssl rand -base64 12 2>/dev/null || date +%s | sha256sum | base64 | head -c 16)
 fi

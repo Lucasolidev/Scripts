@@ -17,20 +17,10 @@ VERSION="1.0"
 # 8. Opcionalmente configura regras no firewall UFW para tráfego web.
 # 9. Cria uma página de diagnóstico phpinfo em /var/www/html/info.php.
 # ==============================================================================
-# Baixar o script:
+# Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
-# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
-#
-# Visualizar o script antes de executar:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
-#
-# Executar via URL diretamente (exige sudo):
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh | sudo bash
-# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh)
-# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh | sudo bash
-#
+# chmod +x install_lamp_ubuntu.sh
+# sudo ./install_lamp_ubuntu.sh
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive
@@ -110,14 +100,14 @@ print_header "INSTALADOR AUTOMÁTICO LAMP - UBUNTU (APACHE, MARIADB, PHP 8.3)"
 print_header "COLETA DE PARÂMETROS"
 
 echo -e "  ${FG_CYAN}[i]${NC} Defina a senha para o usuário root do MariaDB."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS
 
 if [ -z "$DB_ROOT_PASS" ]; then
     DB_ROOT_PASS=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
     log_info "Senha aleatória gerada para o MariaDB Root: ${FG_GREEN}${DB_ROOT_PASS}${NC}"
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
 PHP_INPUT=${PHP_INPUT:-latest}
 
 if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
@@ -137,13 +127,13 @@ else
     fi
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar o phpMyAdmin? (s/N): ${NC}")" INSTALL_PHPMYADMIN </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar o phpMyAdmin? (s/N): ${NC}")" INSTALL_PHPMYADMIN
 INSTALL_PHPMYADMIN=$(echo "$INSTALL_PHPMYADMIN" | tr '[:upper:]' '[:lower:]')
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Fail2Ban (SSH/Apache)? (S/n): ${NC}")" CONFIGURE_FAIL2BAN </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Fail2Ban (SSH/Apache)? (S/n): ${NC}")" CONFIGURE_FAIL2BAN
 CONFIGURE_FAIL2BAN=$(echo "$CONFIGURE_FAIL2BAN" | tr '[:upper:]' '[:lower:]')
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja liberar portas HTTP (80), HTTPS (443) e SSH (22) no UFW Firewall? (S/n): ${NC}")" CONFIGURE_UFW </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja liberar portas HTTP (80), HTTPS (443) e SSH (22) no UFW Firewall? (S/n): ${NC}")" CONFIGURE_UFW
 CONFIGURE_UFW=$(echo "$CONFIGURE_UFW" | tr '[:upper:]' '[:lower:]')
 
 draw_separator

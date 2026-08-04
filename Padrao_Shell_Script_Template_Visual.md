@@ -122,22 +122,10 @@
 >    # ==============================================================================
 >    # [TITULO DO SCRIPT AQUI]
 >    # ==============================================================================
->    # Execução recomendada via repositório: lucasolidev NOME_DO_SCRIPT_AQUI.sh
->    # ==============================================================================
->    # Baixar o script:
+>    # Execução recomendada (download e execução local):
 >    # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
->    # curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
->    #
->    # Visualizar o script antes de executar:
->    # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
->    # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
->    #
->    # Executar via URL diretamente (exige sudo):
->    # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh | sudo bash
->    # sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh)
->    # sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh)
->    # curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh | sudo bash
->    #
+>    # chmod +x NOME_DO_SCRIPT_AQUI.sh
+>    # sudo ./NOME_DO_SCRIPT_AQUI.sh
 >    # ==============================================================================
 >    ```
 > 

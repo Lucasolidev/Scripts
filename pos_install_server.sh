@@ -18,20 +18,10 @@ VERSION="1.1"
 # 9. Permite criar grupos customizados (TI, DEV, etc.) parametrizando o Visudo dinamicamente.
 # 10. Insere regras de borda nativas no Firewall UFW (SSH e Zabbix Agent).
 # ==============================================================================
-# Baixar o script:
+# Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
-# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
-#
-# Visualizar o script antes de executar:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
-#
-# Executar via URL diretamente (exige sudo):
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh | sudo bash
-# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh)
-# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh | sudo bash
-#
+# chmod +x pos_install_server.sh
+# sudo ./pos_install_server.sh
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive
@@ -132,25 +122,25 @@ exec > >(tee -a "$LOG_TMP") 2>&1
 
 print_header "COLETA DE PARÂMETROS"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE </dev/tty
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/N): ${NC}")" PERMITIR_ROOT_SSH </dev/tty
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN </dev/tty
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset'? (s/N): ${NC}")" CRIAR_GESET </dev/tty
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/N): ${NC}")" PERMITIR_ROOT_SSH
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset'? (s/N): ${NC}")" CRIAR_GESET
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO
 
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
-  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do GRUPO que deseja criar (ex: TI, DEV, SUPORTE): ${NC}")" NOME_GRUPO </dev/tty
+  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do GRUPO que deseja criar (ex: TI, DEV, SUPORTE): ${NC}")" NOME_GRUPO
   while [ -z "$NOME_GRUPO" ]; do
-    read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do grupo não pode ser vazio. Digite novamente: ${NC}")" NOME_GRUPO </dev/tty
+    read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do grupo não pode ser vazio. Digite novamente: ${NC}")" NOME_GRUPO
   done
 
-  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do novo usuário para o grupo ${BOLD}$NOME_GRUPO${NC}${FG_YELLOW}: ${NC}")" NOVO_USER </dev/tty
+  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do novo usuário para o grupo ${BOLD}$NOME_GRUPO${NC}${FG_YELLOW}: ${NC}")" NOVO_USER
   while [ -z "$NOVO_USER" ]; do
-    read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do usuário não pode ser vazio. Digite novamente: ${NC}")" NOVO_USER </dev/tty
+    read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do usuário não pode ser vazio. Digite novamente: ${NC}")" NOVO_USER
   done
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja configurar regras de Firewall (UFW)? (s/N): ${NC}")" EXEC_UFW </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja configurar regras de Firewall (UFW)? (s/N): ${NC}")" EXEC_UFW
 
 draw_separator
 log_info "Configurações coletadas. Iniciando os procedimentos..."
