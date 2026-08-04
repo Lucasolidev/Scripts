@@ -100,6 +100,13 @@ echo -e "\n${FG_CYAN}${BOLD}====================================================
 echo -e "${FG_CYAN}${BOLD}       SYSTEM MANAGER - PÓS-INSTALAÇÃO DO UBUNTU DESKTOP        ${NC}"
 echo -e "${FG_CYAN}${BOLD}================================================================${NC}"
 
+LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+LOG_FILENAME="pos_install_desktop_${LOG_TIMESTAMP}.log"
+LOG_TMP="/tmp/${LOG_FILENAME}"
+
+# Redireciona a saída do script para o terminal e grava no log simultaneamente
+exec > >(tee -a "$LOG_TMP") 2>&1
+
 # Valida o sudo logo no início da execução para evitar travas
 log_warning "Solicitando credenciais de administrador..."
 sudo -v
@@ -392,7 +399,25 @@ echo -e "  ${BOLD}Shell Padrão:${NC}          ${FG_CYAN}Zsh + Oh My Zsh (Tema A
 echo -e "  ${BOLD}Flatpak / Flathub:${NC}     ${FG_GREEN}Ativo e Integrado${NC}"
 echo -e "  ${BOLD}Google Chrome:${NC}         ${FG_GREEN}Instalado${NC}"
 echo -e "  ${BOLD}Comando GitHub:${NC}        ${FG_CYAN}lucasolidev <script.sh>${NC}"
+echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
+
+# ==============================================================================
+# 12. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# ==============================================================================
+print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
+
+# Salva cópias no diretório /root
+sudo cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
+sudo cp "$LOG_TMP" "/root/pos_install_desktop_latest.log" 2>/dev/null || true
+log_success "Log salvo em: /root/${LOG_FILENAME}"
+
+# Salva também na pasta HOME do usuário
+cp "$LOG_TMP" "$HOME/${LOG_FILENAME}" 2>/dev/null || true
+cp "$LOG_TMP" "$HOME/pos_install_desktop_latest.log" 2>/dev/null || true
+log_success "Log salvo na sua Home ($HOME): $HOME/${LOG_FILENAME}"
+
+rm -f "$LOG_TMP" 2>/dev/null || true
 
 print_alert_box "IMPORTANTE: Feche este terminal e abra um novo para carregar todo o seu ecossistema sem travas."
 

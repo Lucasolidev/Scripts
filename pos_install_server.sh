@@ -119,6 +119,13 @@ echo -e "${FG_CYAN}${BOLD}======================================================
 # ==============================================================================
 # BLOCO DE INTERATIVIDADE E COLETAS DE PARÂMETROS
 # ==============================================================================
+LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+LOG_FILENAME="pos_install_server_${LOG_TIMESTAMP}.log"
+LOG_TMP="/tmp/${LOG_FILENAME}"
+
+# Redireciona a saída do script para o terminal e grava no log simultaneamente
+exec > >(tee -a "$LOG_TMP") 2>&1
+
 print_header "COLETA DE PARÂMETROS"
 
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE
@@ -418,7 +425,32 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   echo -e "  ${BOLD}Usuário Customizado:${NC}    ${FG_CYAN}${NOVO_USER}${NC} (Grupo: ${NOME_GRUPO})"
   echo -e "  ${BOLD}Regras no Visudo:${NC}       /etc/sudoers.d/${ARQUIVO_FINAL_SUDO}"
 fi
+echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
+
+# ==============================================================================
+# 10. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# ==============================================================================
+print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
+
+# Salva cópias no diretório /root
+cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
+cp "$LOG_TMP" "/root/pos_install_server_latest.log" 2>/dev/null || true
+log_success "Log salvo em: /root/${LOG_FILENAME}"
+log_success "Atalho do último log: /root/pos_install_server_latest.log"
+
+# Se executado via sudo, salva também na pasta home do usuário real
+if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+  REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+  if [ -d "$REAL_USER_HOME" ]; then
+    cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
+    cp "$LOG_TMP" "${REAL_USER_HOME}/pos_install_server_latest.log" 2>/dev/null || true
+    chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/pos_install_server_latest.log" 2>/dev/null || true
+    log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
+  fi
+fi
+
+rm -f "$LOG_TMP" 2>/dev/null || true
 
 draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"

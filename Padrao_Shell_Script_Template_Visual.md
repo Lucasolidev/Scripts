@@ -76,7 +76,11 @@
 >    - **Firewall UFW**: Ativar regras de proteção de borda.
 >    - **Limpeza do Sistema**: Executar `apt autoremove -y` e `apt autoclean -y` ao final das instalações.
 > 
-> 7. **Resultado Final Estruturado (Resumo da Instalação)**:
+> 7. **Registro e Captura de Logs Automática**:
+>    No início da execução, inicialize a captura do console usando `exec > >(tee -a "$LOG_TMP") 2>&1`.
+>    No final do script, salve automaticamente cópias timestamped e um atalho `latest.log` no diretório `/root` e na Home do usuário real que executou o comando via Sudo.
+> 
+> 8. **Resultado Final Estruturado (Resumo da Instalação)**:
 >    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
 >    **Obrigatório**: É fundamental incluir a linha de **Pacotes/Programas Instalados** detalhando os softwares adicionados ao sistema durante a execução (armazenando na array `PACOTES_INSTALADOS` e formatando com `LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")`).
 >    
@@ -102,6 +106,7 @@
 >    echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
 >    echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo (NTP Ativo)${NC}"
 >    echo -e "  ${BOLD}Serviço Principal:${NC}     $(get_service_status nome_do_servico)"
+>    echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 >    ```
 > 
