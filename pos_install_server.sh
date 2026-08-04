@@ -234,7 +234,11 @@ for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
     else
       echo "alias ll='ls -alFh'" >> "$bashrc"
     fi
-    grep -q "alias rm=" "$bashrc" || echo "alias rm='rm -i'" >> "$bashrc"
+    if grep -q "alias rm=" "$bashrc"; then
+      sed -i "s/alias rm=.*/alias rm='rm -I'/" "$bashrc"
+    else
+      echo "alias rm='rm -I'" >> "$bashrc"
+    fi
     grep -q "alias cp=" "$bashrc" || echo "alias cp='cp -i'" >> "$bashrc"
     grep -q "alias mv=" "$bashrc" || echo "alias mv='mv -i'" >> "$bashrc"
     grep -q "alias df=" "$bashrc" || echo "alias df='df -h'" >> "$bashrc"

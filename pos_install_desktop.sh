@@ -166,7 +166,11 @@ for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
     else
       echo "alias ll='ls -alFh'" | sudo tee -a "$bashrc" > /dev/null
     fi
-    grep -q "alias rm=" "$bashrc" || echo "alias rm='rm -i'" | sudo tee -a "$bashrc" > /dev/null
+    if grep -q "alias rm=" "$bashrc"; then
+      sudo sed -i "s/alias rm=.*/alias rm='rm -I'/" "$bashrc"
+    else
+      echo "alias rm='rm -I'" | sudo tee -a "$bashrc" > /dev/null
+    fi
     grep -q "alias cp=" "$bashrc" || echo "alias cp='cp -i'" | sudo tee -a "$bashrc" > /dev/null
     grep -q "alias mv=" "$bashrc" || echo "alias mv='mv -i'" | sudo tee -a "$bashrc" > /dev/null
     grep -q "alias df=" "$bashrc" || echo "alias df='df -h'" | sudo tee -a "$bashrc" > /dev/null
