@@ -44,14 +44,17 @@
 > 4. **Instalação Silenciosa e Limpa**:
 >    Quando houver instalação de pacotes via `apt` ou outro gerenciador, execute de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.
 > 
-> 5. **Configuração de Teclado e Locales (UTF-8 + US-Intl + ABNT2 com Alt+Shift)**:
->    Quando houver configuração de locales e teclado, utilize o bloco padrão com `XKBOPTIONS="grp:alt_shift_toggle"` para alternância de layout com **Alt+Shift**:
+> 5. **Configuração de Teclado, Locales e Fuso Horário (America/Sao_Paulo)**:
+>    Quando houver configuração de locales, teclado e fuso horário, utilize o bloco padrão:
 >    ```bash
 >    log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
 >    sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
 >    sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 >    locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
 >    update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
+>
+>    log_info "Ajustando fuso horário (America/Sao_Paulo)..."
+>    timedatectl set-timezone America/Sao_Paulo > /dev/null 2>&1 || true
 >
 >    log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
 >    cat <<EOF > /etc/default/keyboard
@@ -64,10 +67,16 @@
 >
 >    udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 >    setupcon --force > /dev/null 2>&1 || true
->    log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Shift)."
+>    log_success "Teclado e fuso horário ajustados com sucesso."
 >    ```
 > 
-> 6. **Resultado Final Estruturado (Resumo da Instalação)**:
+> 6. **Hardening de Segurança e Manutenção**:
+>    - **SSH Hardening**: Ajustar `PermitEmptyPasswords no`, `ClientAliveInterval 300` e `ClientAliveCountMax 2`.
+>    - **Fail2Ban**: Instalar e ativar proteção contra força bruta no SSH quando for ambiente Server.
+>    - **Firewall UFW**: Ativar regras de proteção de borda.
+>    - **Limpeza do Sistema**: Executar `apt autoremove -y` e `apt autoclean -y` ao final das instalações.
+> 
+> 7. **Resultado Final Estruturado (Resumo da Instalação)**:
 >    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
 >    **Obrigatório**: É fundamental incluir a linha de **Pacotes/Programas Instalados** detalhando os softwares adicionados ao sistema durante a execução (armazenando na array `PACOTES_INSTALADOS` e formatando com `LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")`).
 >    
@@ -88,7 +97,7 @@
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 >    echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional${NC}"
 >    echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-Nenhum}${NC}"
->    echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
+>    echo -e "  ${BOLD}Locales & Fuso Horário:${NC}${FG_GREEN}pt_BR.UTF-8 / America/Sao_Paulo${NC}"
 >    echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 >    echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
 >    echo -e "  ${BOLD}Serviço Principal:${NC}     $(get_service_status nome_do_servico)"

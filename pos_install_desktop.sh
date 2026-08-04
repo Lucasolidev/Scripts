@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.0
+# Version: 1.1
 # ------------------------------------------------
-VERSION="1.0"
+VERSION="1.1"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU DESKTOP 26.04
 # ==============================================================================
@@ -112,14 +112,14 @@ print_header "ATUALIZAÇÃO DO SISTEMA E GERENCIADOR NALA"
 
 log_info "Atualizando repositórios e instalando dependências base..."
 sudo apt-get update > /dev/null 2>&1
-sudo apt-get install -y nala curl git unzip ncdu locales > /dev/null 2>&1
+sudo apt-get install -y nala curl git unzip ncdu locales btop build-essential jq tldr ufw > /dev/null 2>&1
 sudo nala upgrade -y > /dev/null 2>&1
-log_success "Repositórios atualizados e pacotes base instalados."
+log_success "Repositórios atualizados e pacotes dev/base instalados (btop, build-essential, jq, tldr)."
 
 # ==============================================================================
-# 2. CONFIGURAÇÃO DE LOCALES (UTF-8) E TECLADO
+# 2. CONFIGURAÇÃO DE LOCALES (UTF-8), TECLADO E FUSO HORÁRIO
 # ==============================================================================
-print_header "CONFIGURAÇÃO DE LOCALES (UTF-8) E TECLADO"
+print_header "CONFIGURAÇÃO DE LOCALES (UTF-8), TECLADO E FUSO HORÁRIO"
 
 log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
 sudo sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
@@ -127,6 +127,10 @@ sudo sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 sudo locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
 sudo update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
 log_success "Locales UTF-8 gerados com sucesso."
+
+log_info "Ajustando fuso horário (America/Sao_Paulo)..."
+sudo timedatectl set-timezone America/Sao_Paulo > /dev/null 2>&1 || true
+log_success "Fuso horário ajustado para America/Sao_Paulo."
 
 log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
 sudo cat <<EOF | sudo tee /etc/default/keyboard > /dev/null
@@ -145,7 +149,18 @@ fi
 log_success "Teclado configurado: US-International + ABNT2 (Alterna com Alt+Shift)."
 
 # ==============================================================================
-# 3. INSTALAÇÃO DE SERVIÇOS E FERRAMENTAS BASE (SSH E HTOP)
+# 3. FIREWALL DE PROTEÇÃO DO DESKTOP (UFW)
+# ==============================================================================
+print_header "FIREWALL DE PROTEÇÃO (UFW)"
+
+log_info "Ativando Firewall UFW (Bloqueio de conexões de entrada)..."
+sudo ufw default deny incoming > /dev/null 2>&1
+sudo ufw default allow outgoing > /dev/null 2>&1
+sudo ufw enable > /dev/null 2>&1
+log_success "Firewall UFW ativado (Proteção de rede local/Wi-Fi ativa)."
+
+# ==============================================================================
+# 4. SERVIÇOS E MONITORAMENTO (SSH E HTOP)
 # ==============================================================================
 print_header "SERVIÇOS E MONITORAMENTO (SSH E HTOP)"
 
@@ -155,7 +170,7 @@ sudo systemctl enable --now ssh > /dev/null 2>&1
 log_success "OpenSSH Server e HTOP instalados e ativos."
 
 # ==============================================================================
-# 4. INFORMAÇÕES DO SISTEMA (FASTFETCH)
+# 5. INFORMAÇÕES DO SISTEMA (FASTFETCH)
 # ==============================================================================
 print_header "INFORMAÇÕES DO SISTEMA (FASTFETCH)"
 
@@ -164,7 +179,7 @@ sudo nala install -y fastfetch > /dev/null 2>&1
 log_success "Fastfetch instalado com sucesso."
 
 # ==============================================================================
-# 5. ECOSSISTEMA FLATPAK E GOOGLE CHROME
+# 6. ECOSSISTEMA FLATPAK E GOOGLE CHROME
 # ==============================================================================
 print_header "ECOSSISTEMA FLATPAK E GOOGLE CHROME"
 
@@ -177,7 +192,7 @@ sudo flatpak install -y flathub com.google.Chrome > /dev/null 2>&1
 log_success "Flatpak e Google Chrome configurados com sucesso."
 
 # ==============================================================================
-# 6. FONTE NERD FONT E POWERLINE
+# 7. FONTE NERD FONT E POWERLINE
 # ==============================================================================
 print_header "INSTALAÇÃO DE FONTE NERD FONT"
 
@@ -189,7 +204,7 @@ fc-cache -fv > /dev/null 2>&1
 log_success "Hack Nerd Font instalada com sucesso."
 
 # ==============================================================================
-# 7. EDITOR VIM E PERSONALIZAÇÃO DE PLUGINS
+# 8. EDITOR VIM E PERSONALIZAÇÃO DE PLUGINS
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO EDITOR VIM"
 
@@ -267,7 +282,7 @@ vim -u NONE -N -e -s -c "source ~/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 
 log_success "Editor Vim e plugins configurados com sucesso."
 
 # ==============================================================================
-# 8. CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH
+# 9. CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH"
 
@@ -313,7 +328,7 @@ EOF
 log_success "Zsh e Oh My Zsh (Tema Agnoster) configurados com sucesso."
 
 # ==============================================================================
-# 9. ALIASES UNIVERSAIS E FUNÇÕES DO GITHUB
+# 10. ALIASES UNIVERSAIS E FUNÇÕES DO GITHUB
 # ==============================================================================
 print_header "INJEÇÃO DE ALIASES E CUSTOMIZAÇÕES DO SHELL"
 
@@ -342,8 +357,14 @@ if [ -f "$HOME/.zshrc" ]; then
 fi
 log_success "Aliases e função lucasolidev injetados no .bashrc e .zshrc."
 
+# Limpeza final de pacotes e cache temporário
+log_info "Executando limpeza de pacotes desnecessários e cache do APT..."
+sudo apt-get autoremove -y > /dev/null 2>&1
+sudo apt-get autoclean -y > /dev/null 2>&1
+log_success "Limpeza do sistema concluída."
+
 # ==============================================================================
-# 10. RESUMO DA INSTALAÇÃO
+# 11. RESUMO DA INSTALAÇÃO
 # ==============================================================================
 print_header "RESUMO DA INSTALAÇÃO"
 
@@ -360,10 +381,11 @@ fi
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU DESKTOP FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional e Otimizado${NC}"
-echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}nala, curl, git, unzip, ncdu, locales, openssh-server, htop, fastfetch, flatpak, Google Chrome, Vim, Zsh, Hack Nerd Font${NC}"
-echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}nala, curl, git, unzip, ncdu, locales, btop, build-essential, jq, tldr, openssh-server, htop, fastfetch, flatpak, Google Chrome, Vim, Zsh, Hack Nerd Font${NC}"
+echo -e "  ${BOLD}Locales & Fuso Horário:${NC}${FG_GREEN}pt_BR.UTF-8 / America/Sao_Paulo${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
+echo -e "  ${BOLD}Firewall UFW:${NC}          $(sudo ufw status 2>/dev/null | grep -q "active" && echo -e "${FG_GREEN}Ativo (Bloqueio de Entrada)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
 echo -e "  ${BOLD}OpenSSH Server:${NC}        $(get_service_status ssh)"
 echo -e "  ${BOLD}Shell Padrão:${NC}          ${FG_CYAN}Zsh + Oh My Zsh (Tema Agnoster)${NC}"
 echo -e "  ${BOLD}Flatpak / Flathub:${NC}     ${FG_GREEN}Ativo e Integrado${NC}"

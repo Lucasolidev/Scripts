@@ -1,20 +1,22 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.0
+# Version: 1.1
 # ------------------------------------------------
-VERSION="1.0"
+VERSION="1.1"
 # ==============================================================================
-# SCRIPT DE PÓS-INSTALAÇÃO - UBUNTU SERVER
+# SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (exige Root/Sudo).
 # 2. Atualiza os espelhos do APT e aplica patches de segurança do sistema.
-# 3. Instala pacotes vitais (curl, QEMU Guest Agent, Open VM Tools, ncdu, fastfetch).
-# 4. Endurece o SSH: Desabilita por padrão o Root Login (PermitRootLogin no).
-# 5. Oferece criação opcional de usuário 'administrador' integrado ao grupo 'sudo'.
-# 6. Audita a existência do usuário 'geset' antes de aplicar amarras no Sudoers.
-# 7. Permite criar grupos customizados (TI, DEV, etc.) parametrizando o Visudo dinamicamente.
-# 8. Insere regras de borda nativas no Firewall UFW (SSH e Zabbix Agent) sem ativá-lo.
+# 3. Instala pacotes vitais (curl, QEMU Guest Agent, Open VM Tools, ncdu, fastfetch, htop, tmux, fail2ban, etc).
+# 4. Ajusta o fuso horário (America/Sao_Paulo) e sincronização de horário via NTP (systemd-timesyncd).
+# 5. Endurece o SSH (Hardening): Desabilita login de Root (opcional), senhas em branco e define timeout de sessão ociosa.
+# 6. Configura a jaula do Fail2Ban para proteção contra ataques de força bruta no SSH.
+# 7. Ativa atualizações automáticas de segurança (unattended-upgrades).
+# 8. Oferece criação opcional de usuário 'administrador' (sudo) e 'geset'.
+# 9. Permite criar grupos customizados (TI, DEV, etc.) parametrizando o Visudo dinamicamente.
+# 10. Insere regras de borda nativas no Firewall UFW (SSH e Zabbix Agent).
 # ==============================================================================
 # visualizar o script antes de executar:
 #
@@ -25,8 +27,6 @@ VERSION="1.0"
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
 # bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh)
 # curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh | bash
-#
-# ==============================================================================
 #
 # ==============================================================================
 
@@ -49,16 +49,6 @@ FG_BLUE='\033[34m'
 FG_MAGENTA='\033[35m'
 FG_CYAN='\033[36m'
 FG_WHITE='\033[37m'
-
-# Cores de Fundo (Background)
-BG_BLACK='\033[40m'
-BG_RED='\033[41m'
-BG_GREEN='\033[42m'
-BG_YELLOW='\033[43m'
-BG_BLUE='\033[44m'
-BG_MAGENTA='\033[45m'
-BG_CYAN='\033[46m'
-BG_WHITE='\033[47m'
 
 # Símbolos Customizados
 ARROW="❯"
@@ -132,25 +122,17 @@ echo -e "${FG_CYAN}${BOLD}======================================================
 print_header "COLETA DE PARÂMETROS"
 
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE
-
-# Sugestão de Melhoria 1: SSH por padrão desabilitado.
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/N): ${NC}")" PERMITIR_ROOT_SSH
-
-# Pergunta sobre criação de usuários padrão
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset'? (s/N): ${NC}")" CRIAR_GESET
-
-# Alteração: Escolha dinâmica de Grupo Customizado para restrição via Visudo
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO
 
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
-  # Escolha do nome do grupo customizado
   read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do GRUPO que deseja criar (ex: TI, DEV, SUPORTE): ${NC}")" NOME_GRUPO
   while [ -z "$NOME_GRUPO" ]; do
     read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do grupo não pode ser vazio. Digite novamente: ${NC}")" NOME_GRUPO
   done
 
-  # Coleta do nome do usuário exclusivo deste grupo
   read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do novo usuário para o grupo ${BOLD}$NOME_GRUPO${NC}${FG_YELLOW}: ${NC}")" NOVO_USER
   while [ -z "$NOVO_USER" ]; do
     read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do usuário não pode ser vazio. Digite novamente: ${NC}")" NOVO_USER
@@ -180,19 +162,19 @@ else
 fi
 
 # ==============================================================================
-# 2. INSTALAÇÃO DE PACOTES E UTILLITÁRIOS
+# 2. INSTALAÇÃO DE PACOTES E UTILITÁRIOS
 # ==============================================================================
 print_header "INSTALAÇÃO DE UTILITÁRIOS"
-print_alert_box "Pacotes obrigatórios (qemu-guest-agent, open-vm-tools, etc) serão instalados agora."
+print_alert_box "Pacotes do sistema (qemu-guest-agent, open-vm-tools, fail2ban, htop, tmux, etc) serão instalados agora."
 
-PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales)
+PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales htop tmux fail2ban dnsutils net-tools unattended-upgrades)
 PACOTES_INSTALADOS=()
 for pacote in "${PACOTES[@]}"; do
   log_info "Instalando o pacote: $pacote..."
   if apt install -y "$pacote" > /dev/null 2>&1; then
     log_success "Pacote $pacote instalado com sucesso."
     PACOTES_INSTALADOS+=("$pacote")
-    if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" ]]; then
+    if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" || "$pacote" == "fail2ban" ]]; then
       systemctl enable --now "$pacote" > /dev/null 2>&1
     fi
   else
@@ -201,16 +183,21 @@ for pacote in "${PACOTES[@]}"; do
 done
 
 # ==============================================================================
-# CONFIGURAÇÃO DE LOCALES (UTF-8) E TECLADO (US-INTL + ABNT2)
+# 3. CONFIGURAÇÃO DE LOCALES (UTF-8), TECLADO E FUSO HORÁRIO (NTP)
 # ==============================================================================
-print_header "CONFIGURAÇÃO DE LOCALES (UTF-8) E TECLADO"
+print_header "LOCALES (UTF-8), TECLADO E FUSO HORÁRIO"
 
 log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
 sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
 sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
 update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
-log_success "Locales UTF-8 gerados com sucesso (Evita acentuação quebrada no Nano/Terminal)."
+log_success "Locales UTF-8 gerados com sucesso."
+
+log_info "Configurando fuso horário (America/Sao_Paulo) e sincronização NTP..."
+timedatectl set-timezone America/Sao_Paulo > /dev/null 2>&1 || true
+systemctl enable --now systemd-timesyncd > /dev/null 2>&1 || true
+log_success "Fuso horário ajustado para America/Sao_Paulo (NTP Ativo)."
 
 log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
 cat <<EOF > /etc/default/keyboard
@@ -226,9 +213,10 @@ setupcon --force > /dev/null 2>&1 || true
 log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Shift)."
 
 # ==============================================================================
-# 3. CONFIGURAÇÃO DO SSH (Segurança do Login de Root)
+# 4. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
 # ==============================================================================
-print_header "CONFIGURAÇÃO DO SSH"
+print_header "CONFIGURAÇÃO DO SSH (HARDENING)"
+
 VALOR_SSH="no"
 if [[ "$PERMITIR_ROOT_SSH" =~ ^[Ss]$ ]]; then
   VALOR_SSH="yes"
@@ -243,11 +231,48 @@ if grep -qE "^#?PermitRootLogin" /etc/ssh/sshd_config; then
 else
   echo "PermitRootLogin $VALOR_SSH" >> /etc/ssh/sshd_config
 fi
+
+# Hardening Adicional de SSH (Desabilita senhas vazias e aplica timeout de ociosidade)
+sed -i '/^#\?PermitEmptyPasswords/d' /etc/ssh/sshd_config
+echo "PermitEmptyPasswords no" >> /etc/ssh/sshd_config
+
+sed -i '/^#\?ClientAliveInterval/d' /etc/ssh/sshd_config
+echo "ClientAliveInterval 300" >> /etc/ssh/sshd_config
+
+sed -i '/^#\?ClientAliveCountMax/d' /etc/ssh/sshd_config
+echo "ClientAliveCountMax 2" >> /etc/ssh/sshd_config
+
 systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-log_info "Serviço SSH reiniciado."
+log_success "Hardening no SSH concluído (Sem senhas em branco e timeout de ociosidade de 10 min)."
 
 # ==============================================================================
-# VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
+# 5. SEGURANÇA ADICIONAL (FAIL2BAN & UNATTENDED-UPGRADES)
+# ==============================================================================
+print_header "PROTEÇÃO FAIL2BAN E ATUALIZAÇÕES AUTOMÁTICAS"
+
+if command -v fail2ban-client >/dev/null 2>&1; then
+  log_info "Configurando jaula do Fail2Ban para proteção do SSH..."
+  cat <<EOF > /etc/fail2ban/jail.local
+[sshd]
+enabled = true
+port = ssh
+maxretry = 5
+findtime = 600
+bantime = 3600
+EOF
+  systemctl restart fail2ban > /dev/null 2>&1
+  log_success "Fail2Ban ativado (Bloqueia IPs após 5 tentativas incorretas no SSH)."
+fi
+
+if [ -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
+  log_info "Garantindo atualizações automáticas de segurança ativas..."
+  sed -i 's/APT::Periodic::Update-Package-Lists "0";/APT::Periodic::Update-Package-Lists "1";/' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || true
+  sed -i 's/APT::Periodic::Unattended-Upgrade "0";/APT::Periodic::Unattended-Upgrade "1";/' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || true
+  log_success "Atualizações de segurança automáticas (unattended-upgrades) validadas."
+fi
+
+# ==============================================================================
+# 6. VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
 # ==============================================================================
 print_header "GERENCIAMENTO DE USUÁRIOS PADRÃO"
 log_info "Verificando usuários padrão (administrador e geset)..."
@@ -279,12 +304,11 @@ else
 fi
 
 # ==============================================================================
-# 4. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
+# 7. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
 # ==============================================================================
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   print_header "GRUPO CUSTOMIZADO E VISUDO"
   
-  # Higieniza a string transformando o nome do grupo em letras maiúsculas para o padrão Unix
   NOME_GRUPO=$(echo "$NOME_GRUPO" | tr '[:lower:]' '[:upper:]')
 
   log_info "Criando/Verificando o grupo customizado '$NOME_GRUPO'..."
@@ -299,11 +323,9 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
     passwd "$NOVO_USER"
   fi
 
-  # Garante que o usuário pertença ao grupo customizado
   usermod -aG "$NOME_GRUPO" "$NOVO_USER"
   log_success "Usuário '$NOVO_USER' configurado e adicionado ao grupo $NOME_GRUPO."
 
-  # Sugestão de Melhoria 2: Validação se o usuário 'geset' existe para evitar erros de sintaxe no Sudoers
   log_info "Auditando existência do usuário 'geset' para regras do Sudoers..."
   if id "geset" &>/dev/null; then
     REGRA_GESET=", !/usr/bin/passwd geset"
@@ -316,13 +338,11 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   log_info "Aplicando restrições de segurança dinâmicas para o grupo $NOME_GRUPO no visudo..."
   SUDOERS_TMP=$(mktemp)
   
-  # Criação do payload customizado baseado na string capturada no início do script
   cat << EOF > "$SUDOERS_TMP"
 # Grupo $NOME_GRUPO com restricao de alterar senha do root e geset (se aplicavel) e leitura de shadow
 %$NOME_GRUPO ALL=(ALL:ALL) ALL, !/usr/bin/passwd root${REGRA_GESET}, !/usr/bin/passwd "", !/usr/sbin/visudo, !/usr/sbin/usermod, !/usr/bin/gpasswd, !/usr/bin/su, !/usr/bin/sudo -i, !/usr/bin/sudo -s, !/usr/bin/sudo /bin/bash, !/usr/bin/sudo /bin/sh, !/usr/bin/sudoedit /etc/sudoers*, !/usr/bin/sudoedit /etc/shadow, !/usr/bin/nano /etc/shadow, !/usr/bin/vi /etc/shadow, !/usr/bin/nano /etc/sudoers*, !/usr/bin/vi /etc/sudoers*, !/usr/bin/cat /etc/shadow, !/usr/bin/head /etc/shadow, !/usr/bin/tail /etc/shadow, !/usr/bin/grep * /etc/shadow, !/usr/bin/less /etc/shadow, !/usr/bin/awk * /etc/shadow, !/usr/bin/cp /etc/shadow *, !/usr/bin/chmod * *shadow*, !/usr/bin/chown * *shadow*, !/usr/bin/cat *shadow*
 EOF
 
-  # Nome do arquivo de saída baseado no grupo gerado (ex: /etc/sudoers.d/grupo_ti)
   ARQUIVO_FINAL_SUDO=$(echo "grupo_${NOME_GRUPO}" | tr '[:upper:]' '[:lower:]')
 
   if visudo -cf "$SUDOERS_TMP" > /dev/null 2>&1; then
@@ -336,7 +356,7 @@ EOF
 fi
 
 # ==============================================================================
-# 5. CONFIGURAR REGRAS DE FIREWALL (UFW)
+# 8. CONFIGURAR REGRAS DE FIREWALL (UFW)
 # ==============================================================================
 if [[ "$EXEC_UFW" =~ ^[Ss]$ ]]; then
   print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
@@ -355,7 +375,7 @@ else
 fi
 
 # ==============================================================================
-# 6. RESUMO DA INSTALAÇÃO
+# 9. RESUMO DA INSTALAÇÃO
 # ==============================================================================
 print_header "RESUMO DA INSTALAÇÃO"
 
@@ -374,13 +394,14 @@ LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU SERVER FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
-echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales}${NC}"
-echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades}${NC}"
+echo -e "  ${BOLD}Locales & Fuso Horário:${NC}${FG_GREEN}pt_BR.UTF-8 / America/Sao_Paulo (NTP Ativo)${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
 echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
 echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
-echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado${NC}")"
+echo -e "  ${BOLD}Fail2Ban (Brute-Force):${NC}$(get_service_status fail2ban)"
+echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
 if command -v ufw >/dev/null 2>&1; then
   echo -e "  ${BOLD}Firewall UFW:${NC}          $(ufw status 2>/dev/null | grep -q "active" && echo -e "${FG_GREEN}Ativo${NC}" || echo -e "${FG_YELLOW}Regras prontas (Inativo)${NC}")"
 fi
@@ -400,4 +421,3 @@ echo -e "  ${DIM}─────────────────────
 
 draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
-
