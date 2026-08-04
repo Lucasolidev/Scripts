@@ -17,8 +17,7 @@ VERSION="1.1"
 # 8. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset'.
 # 9. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
 # 10. Configura e ativa obrigatoriamente o Firewall UFW com regras de permissão para SSH (22/tcp) e Zabbix Agent (10050/tcp).
-# 11. Exibe o Resumo da Instalação com auditoria de status, pacotes, serviços e grava logs em /root e na Home.
-# 12. Executa a instalação do Zabbix Agent (opcional) a partir do GitHub ao final do procedimento.
+# 11. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 # Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
@@ -504,20 +503,6 @@ if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
     chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/pos_install_server_latest.log" 2>/dev/null || true
     log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
   fi
-fi
-
-# ==============================================================================
-# 12. INSTALAÇÃO DO ZABBIX AGENT (SCRIPT EXTERNO DO GITHUB)
-# ==============================================================================
-print_header "INSTALAÇÃO DO ZABBIX AGENT"
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Zabbix Agent agora? (s/N): ${NC}")" INSTALL_ZABBIX_AGENT
-
-if [[ "$INSTALL_ZABBIX_AGENT" =~ ^[Ss]$ ]]; then
-  log_info "Executando instalador oficial do Zabbix Agent 7.0 a partir do GitHub..."
-  bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
-  log_success "Procedimento do Zabbix Agent concluído."
-else
-  log_skipped "Instalação do Zabbix Agent pulada."
 fi
 
 rm -f "$LOG_TMP" 2>/dev/null || true
