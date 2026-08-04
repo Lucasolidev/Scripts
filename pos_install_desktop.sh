@@ -75,6 +75,10 @@ log_error() {
     echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"
 }
 
+log_skipped() {
+    echo -e "  ${FG_RED}[-]${NC}  ${FG_RED}${BOLD}PULADO:${NC}    $1"
+}
+
 print_alert_box() {
     local msg="$1"
     echo -e ""

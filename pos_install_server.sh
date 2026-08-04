@@ -87,6 +87,10 @@ log_error() {
     echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"
 }
 
+log_skipped() {
+    echo -e "  ${FG_RED}[-]${NC}  ${FG_RED}${BOLD}PULADO:${NC}    $1"
+}
+
 print_alert_box() {
     local msg="$1"
     echo -e ""
@@ -159,7 +163,7 @@ if [[ "$EXEC_UPDATE" =~ ^[Ss]$ ]]; then
   apt upgrade -y
   log_success "Sistema atualizado."
 else
-  log_info "Atualização do sistema pulada."
+  log_skipped "Atualização do sistema pulada."
 fi
 
 # ==============================================================================
@@ -319,7 +323,7 @@ if [[ "$CRIAR_ADMIN" =~ ^[Ss]$ ]]; then
     log_success "Usuário 'administrador' já existe."
   fi
 else
-  log_info "Criação do usuário 'administrador' pulada."
+  log_skipped "Criação do usuário 'administrador' pulada."
 fi
 
 if [[ "$CRIAR_GESET" =~ ^[Ss]$ ]]; then
@@ -332,7 +336,7 @@ if [[ "$CRIAR_GESET" =~ ^[Ss]$ ]]; then
     log_success "Usuário 'geset' já existe."
   fi
 else
-  log_info "Criação do usuário 'geset' pulada."
+  log_skipped "Criação do usuário 'geset' pulada."
 fi
 
 # ==============================================================================
@@ -403,7 +407,7 @@ if [[ "$EXEC_UFW" =~ ^[Ss]$ ]]; then
     log_warning "UFW não encontrado. Instalação e parametrização pulada."
   fi
 else
-  log_info "Configuração de Firewall (UFW) pulada."
+  log_skipped "Configuração de Firewall (UFW) pulada."
 fi
 
 # ==============================================================================
