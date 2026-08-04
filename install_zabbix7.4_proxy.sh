@@ -31,7 +31,7 @@ VERMELHO="\033[0;31m"
 RESET="\033[0m"
 
 # Verificar se o script está rodando como root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$(id -u)" -ne 0 ]; then 
   echo -e "${VERMELHO}Por favor, execute como root (sudo)${RESET}"
   exit
 fi

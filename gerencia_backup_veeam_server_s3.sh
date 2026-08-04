@@ -79,7 +79,7 @@ print_alert_box() {
 # ==============================================================================
 # Verificação de Permissões
 # ==============================================================================
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
   log_error "Este script precisa ser executado como root (use sudo)."
   exit 1
 fi

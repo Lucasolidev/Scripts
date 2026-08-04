@@ -69,7 +69,7 @@ print_alert_box() {
 clear
 
 # Verificar se o script está rodando como root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$(id -u)" -ne 0 ]; then 
   log_error "Por favor, execute como root (sudo)"
   exit 1
 fi

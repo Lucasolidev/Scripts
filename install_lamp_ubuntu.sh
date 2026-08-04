@@ -95,7 +95,7 @@ print_alert_box() {
 # ==========================================
 # VERIFICAÇÃO DE PRIVILÉGIOS (ROOT)
 # ==========================================
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
     print_header "ERRO DE EXECUÇÃO"
     log_error "Este script precisa ser executado como ROOT ou via sudo."
     echo -e "  Exemplo: ${FG_YELLOW}sudo bash $0${NC}\n"

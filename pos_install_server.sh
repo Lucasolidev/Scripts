@@ -111,9 +111,14 @@ print_alert_box() {
 clear
 
 # Verificar se o script está rodando como root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$(id -u)" -ne 0 ]; then 
   log_error "Por favor, execute como root (sudo)"
   exit 1
+fi
+
+# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+  exec 0</dev/tty
 fi
 
 echo -e "\n${FG_CYAN}${BOLD}================================================================${NC}"
