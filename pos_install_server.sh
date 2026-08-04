@@ -144,8 +144,6 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   done
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja configurar regras de Firewall (UFW)? (s/N): ${NC}")" EXEC_UFW
-
 draw_separator
 log_info "Configurações coletadas. Iniciando os procedimentos..."
 
@@ -392,22 +390,20 @@ EOF
 fi
 
 # ==============================================================================
-# 9. CONFIGURAR REGRAS DE FIREWALL (UFW)
+# 9. CONFIGURAÇÃO DE FIREWALL (UFW)
 # ==============================================================================
-if [[ "$EXEC_UFW" =~ ^[Ss]$ ]]; then
-  print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
-  if command -v ufw >/dev/null 2>&1; then
-    log_info "Configurando regras de firewall no UFW..."
-    log_info "Liberando porta 22/tcp (SSH)..."
-    ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
-    log_info "Liberando porta 10050/tcp (Zabbix Agent)..."
-    ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
-    log_success "Regras do UFW configuradas com sucesso (Portas liberadas: 22/tcp [SSH] e 10050/tcp [Zabbix Agent])."
-  else
-    log_warning "UFW não encontrado. Instalação e parametrização pulada."
-  fi
+print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
+if command -v ufw >/dev/null 2>&1; then
+  log_info "Configurando regras de firewall no UFW..."
+  log_info "Liberando porta 22/tcp (SSH)..."
+  ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
+  log_info "Liberando porta 10050/tcp (Zabbix Agent)..."
+  ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
+  log_info "Ativando o Firewall UFW..."
+  ufw --force enable > /dev/null 2>&1
+  log_success "Firewall UFW ativado e configurado (Portas liberadas: 22/tcp [SSH] e 10050/tcp [Zabbix Agent])."
 else
-  log_skipped "Configuração de Firewall (UFW) pulada."
+  log_warning "UFW não encontrado no sistema."
 fi
 
 # ==============================================================================
