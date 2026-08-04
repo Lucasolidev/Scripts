@@ -403,6 +403,7 @@ echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo (NTP
 echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
 echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
 echo -e "  ${BOLD}Fail2Ban (Brute-Force):${NC}$(get_service_status fail2ban)"
+echo -e "  ${BOLD}Atualizações Automát.:${NC} $(get_service_status unattended-upgrades)"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
 if command -v ufw >/dev/null 2>&1; then
   echo -e "  ${BOLD}Firewall UFW:${NC}          $(ufw status 2>/dev/null | grep -q "active" && echo -e "${FG_GREEN}Ativo${NC}" || echo -e "${FG_YELLOW}Regras prontas (Inativo)${NC}")"
