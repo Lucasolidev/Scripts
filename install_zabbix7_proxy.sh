@@ -36,6 +36,11 @@ fi
 
 echo -e "${CIANO}--- Iniciando Instalação Automatizada Zabbix Proxy 7.0 LTS + Agent + SNMP (Ubuntu 24.04) ---${RESET}"
 
+# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+  exec 0</dev/tty
+fi
+
 # Perguntas de configuração
 read -p "$(echo -e ${AMARELO}"Digite o Hostname do Proxy (Padrão: Cliente_ZabbixProxy): "${RESET})" PROXY_HOSTNAME
 PROXY_HOSTNAME=${PROXY_HOSTNAME:-Cliente_ZabbixProxy}

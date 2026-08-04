@@ -102,6 +102,11 @@ func_get_user_dn() {
     echo "$user_dn"
 }
 
+# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+  exec 0</dev/tty
+fi
+
 # --- Loop do Menu Principal ---
 while true; do
     clear

@@ -75,6 +75,11 @@ fi
 DEFAULT_HOSTNAME="Cliente_ServBkp"
 DEFAULT_SERVER="192.168.1.254"
 
+# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+  exec 0</dev/tty
+fi
+
 # ==============================================================================
 # BLOCO DE INTERATIVIDADE E COLETAS DE PARÂMETROS
 # ==============================================================================

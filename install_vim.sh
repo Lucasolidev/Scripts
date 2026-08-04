@@ -70,6 +70,11 @@ clear
 
 print_header "CONFIGURANDO O EDITOR VIM E PLUGINS"
 
+# Se executado via pipe (ex: wget -qO- URL | bash), reconecta o STDIN ao terminal para permitir leitura interativa
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+  exec 0</dev/tty
+fi
+
 # Valida o sudo logo no início da execução
 log_warning "Solicitando credenciais de administrador..."
 sudo -v

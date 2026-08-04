@@ -19,6 +19,11 @@ VERSION="1.0"
 #
 # ==============================================================================
 
+# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+  exec 0</dev/tty
+fi
+
 # Solicita a hora no formato HH:MM
 echo "Digite o horário que deseja reiniciar (formato HH:MM, ex: 23:30):"
 read horaAlvo
