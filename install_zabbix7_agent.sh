@@ -71,13 +71,13 @@ DEFAULT_SERVER="192.168.1.254"
 # ==============================================================================
 print_header "COLETA DE PARÂMETROS"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o Hostname (Padrão: $DEFAULT_HOSTNAME): ${NC}")" INPUT_HOSTNAME </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o Hostname (Padrão: $DEFAULT_HOSTNAME): ${NC}")" INPUT_HOSTNAME
 HOSTNAME=${INPUT_HOSTNAME:-$DEFAULT_HOSTNAME}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (Padrão: $DEFAULT_SERVER): ${NC}")" INPUT_SERVER </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (Padrão: $DEFAULT_SERVER): ${NC}")" INPUT_SERVER
 SERVER=${INPUT_SERVER:-$DEFAULT_SERVER}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar estas configurações ao arquivo final? (s/n): ${NC}")" CONFIRMAR </dev/tty
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar estas configurações ao arquivo final? (s/n): ${NC}")" CONFIRMAR
 
 draw_separator
 log_info "Parâmetros coletados. Iniciando instalação..."

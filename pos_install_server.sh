@@ -145,6 +145,8 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   done
 fi
 
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Zabbix Agent (via script oficial do GitHub)? (s/N): ${NC}")" INSTALL_ZABBIX_AGENT
+
 draw_separator
 log_info "Configurações coletadas. Iniciando os procedimentos..."
 
@@ -187,7 +189,19 @@ for pacote in "${PACOTES[@]}"; do
 done
 
 # ==============================================================================
-# 3. CONFIGURAÇÃO DE LOCALES (UTF-8), TECLADO E FUSO HORÁRIO (NTP)
+# 3. INSTALAÇÃO DO ZABBIX AGENT (SCRIPT EXTERNO DO GITHUB)
+# ==============================================================================
+if [[ "$INSTALL_ZABBIX_AGENT" =~ ^[Ss]$ ]]; then
+  print_header "INSTALAÇÃO DO ZABBIX AGENT"
+  log_info "Executando instalador oficial do Zabbix Agent 7.0 a partir do GitHub..."
+  bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
+  log_success "Procedimento do Zabbix Agent concluído."
+else
+  log_skipped "Instalação do Zabbix Agent pulada."
+fi
+
+# ==============================================================================
+# 4. CONFIGURAÇÃO DE LOCALES (UTF-8), TECLADO E FUSO HORÁRIO (NTP)
 # ==============================================================================
 print_header "LOCALES (UTF-8), TECLADO E FUSO HORÁRIO"
 
@@ -217,7 +231,7 @@ setupcon --force > /dev/null 2>&1 || true
 log_success "Teclado configurado: ABNT2 (Padrão Ativo) + US-International (Alterna com Alt+Shift)."
 
 # ==============================================================================
-# 4. CONFIGURAÇÃO DE ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)
+# 5. CONFIGURAÇÃO DE ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)
 # ==============================================================================
 print_header "ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)"
 
@@ -248,7 +262,7 @@ done
 log_success "Aliases de produtividade e segurança configurados em todos os perfis .bashrc."
 
 # ==============================================================================
-# 5. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
+# 6. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO SSH (HARDENING)"
 
@@ -281,7 +295,7 @@ systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 log_success "Hardening no SSH concluído (Sem senhas em branco e timeout de ociosidade de 10 min)."
 
 # ==============================================================================
-# 6. SEGURANÇA ADICIONAL (FAIL2BAN & UNATTENDED-UPGRADES)
+# 7. SEGURANÇA ADICIONAL (FAIL2BAN & UNATTENDED-UPGRADES)
 # ==============================================================================
 print_header "PROTEÇÃO FAIL2BAN E ATUALIZAÇÕES AUTOMÁTICAS"
 
@@ -307,7 +321,7 @@ if [ -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
 fi
 
 # ==============================================================================
-# 7. VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
+# 8. VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
 # ==============================================================================
 print_header "GERENCIAMENTO DE USUÁRIOS PADRÃO"
 log_info "Verificando usuários padrão (administrador e geset)..."
@@ -339,7 +353,7 @@ else
 fi
 
 # ==============================================================================
-# 8. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
+# 9. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
 # ==============================================================================
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   print_header "GRUPO CUSTOMIZADO E VISUDO"
@@ -385,13 +399,13 @@ EOF
     chmod 0440 "/etc/sudoers.d/$ARQUIVO_FINAL_SUDO"
     log_success "Regras do visudo para o grupo $NOME_GRUPO aplicadas com sucesso!"
   else
-    log_error "Erro crítico: Sintaxe das regras do visudo inválida. As restrições NÃO foram aplicadas."
+    log_error "Erro crítico: Sintaxe das regras do visudo inválida. As restrições NÃO foram applied."
     rm -f "$SUDOERS_TMP"
   fi
 fi
 
 # ==============================================================================
-# 9. CONFIGURAÇÃO DE FIREWALL (UFW)
+# 10. CONFIGURAÇÃO DE FIREWALL (UFW)
 # ==============================================================================
 print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
 if command -v ufw >/dev/null 2>&1; then
@@ -408,7 +422,7 @@ else
 fi
 
 # ==============================================================================
-# 10. RESUMO DA INSTALAÇÃO
+# 11. RESUMO DA INSTALAÇÃO
 # ==============================================================================
 print_header "RESUMO DA INSTALAÇÃO"
 
@@ -480,7 +494,7 @@ echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}$
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 # ==============================================================================
-# 11. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# 12. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
 # ==============================================================================
 print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 
