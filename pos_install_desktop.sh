@@ -8,10 +8,13 @@ VERSION="1.1"
 # ==============================================================================
 # Execução recomendada via repositório: lucasolidev pos_install_desktop.sh
 # ==============================================================================
-# visualizar o script antes de executar:
+# Baixar o script:
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
+# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
+# Visualizar o script antes de executar:
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
 #
 # Executar via URL diretamente (exige sudo):
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh | sudo bash

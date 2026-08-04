@@ -17,10 +17,13 @@ VERSION="1.0"
 # 8. Opcionalmente configura regras no firewall UFW para tráfego web.
 # 9. Cria uma página de diagnóstico phpinfo em /var/www/html/info.php.
 # ==============================================================================
-# visualizar o script antes de executar:
+# Baixar o script:
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
+# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
+# Visualizar o script antes de executar:
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
 #
 # Executar via URL diretamente (exige sudo):
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh | sudo bash

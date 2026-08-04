@@ -9,10 +9,13 @@ VERSION="1.0"
 # ==============================================================================
 # Execução recomendada via repositório: lucasolidev install_zsh.sh
 # ==============================================================================
-# visualizar o script antes de executar:
+# Baixar o script:
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh
+# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh
+# Visualizar o script antes de executar:
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh
 #
 # Executar via URL diretamente (exige sudo):
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zsh.sh | sudo bash

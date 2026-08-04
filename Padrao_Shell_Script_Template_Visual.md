@@ -129,10 +129,13 @@
 >    # ==============================================================================
 >    # Execução recomendada via repositório: lucasolidev NOME_DO_SCRIPT_AQUI.sh
 >    # ==============================================================================
->    # visualizar o script antes de executar:
+>    # Baixar o script:
+>    # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
+>    # curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
 >    #
->    # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
+>    # Visualizar o script antes de executar:
 >    # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
+>    # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh
 >    #
 >    # Executar via URL diretamente (exige sudo):
 >    # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/NOME_DO_SCRIPT_AQUI.sh | sudo bash

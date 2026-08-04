@@ -18,9 +18,13 @@ VERSION="1.1"
 # 9. Permite criar grupos customizados (TI, DEV, etc.) parametrizando o Visudo dinamicamente.
 # 10. Insere regras de borda nativas no Firewall UFW (SSH e Zabbix Agent).
 # ==============================================================================
-# visualizar o script antes de executar:
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
+# Baixar o script:
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
+# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
+#
+# Visualizar o script antes de executar:
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
 #
 # Executar via URL diretamente (exige sudo):
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh | sudo bash

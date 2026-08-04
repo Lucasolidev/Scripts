@@ -22,10 +22,13 @@ VERSION="1.0"
 # comum (Standalone Server), o script não vai funcionar porque os comandos 
 # 'samba-tool user' não existem nesse modo.
 # ==============================================================================
-# visualizar o script antes de executar:
+# Baixar o script:
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
+# curl -O https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
 #
-# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
+# Visualizar o script antes de executar:
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
+# curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
 #
 # Executar via URL diretamente (exige sudo):
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh | sudo bash
