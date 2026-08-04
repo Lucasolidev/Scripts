@@ -68,6 +68,20 @@
 >    udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 >    setupcon --force > /dev/null 2>&1 || true
 >    log_success "Teclado e fuso horário ajustados com sucesso."
+>
+>    log_info "Ajustando alias 'll' para 'ls -alFh' (tamanhos em KB/MB/GB)..."
+>    for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
+>      if [ -f "$bashrc" ]; then
+>        if grep -q "alias ll=" "$bashrc"; then
+>          sed -i "s/alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
+>        elif grep -q "#alias ll=" "$bashrc"; then
+>          sed -i "s/#alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
+>        else
+>          echo "alias ll='ls -alFh'" >> "$bashrc"
+>        fi
+>      fi
+>    done
+>    log_success "Alias 'll' ('ls -alFh') configurado nos perfis .bashrc do sistema."
 >    ```
 > 
 > 6. **Hardening de Segurança e Manutenção**:

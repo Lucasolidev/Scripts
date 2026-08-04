@@ -147,6 +147,20 @@ if command -v gsettings >/dev/null 2>&1; then
 fi
 log_success "Teclado configurado: US-International + ABNT2 (Alterna com Alt+Shift)."
 
+log_info "Ajustando alias 'll' para 'ls -alFh' (legibilidade de tamanho de arquivo em KB/MB/GB)..."
+for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
+  if [ -f "$bashrc" ]; then
+    if grep -q "alias ll=" "$bashrc"; then
+      sudo sed -i "s/alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
+    elif grep -q "#alias ll=" "$bashrc"; then
+      sudo sed -i "s/#alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
+    else
+      echo "alias ll='ls -alFh'" | sudo tee -a "$bashrc" > /dev/null
+    fi
+  fi
+done
+log_success "Alias 'll' ('ls -alFh') configurado em todos os perfis .bashrc do sistema."
+
 # ==============================================================================
 # 3. FIREWALL DE PROTEÇÃO DO DESKTOP (UFW)
 # ==============================================================================

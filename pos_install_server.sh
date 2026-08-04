@@ -213,6 +213,20 @@ udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 setupcon --force > /dev/null 2>&1 || true
 log_success "Teclado configurado: ABNT2 (Padrão Ativo) + US-International (Alterna com Alt+Shift)."
 
+log_info "Ajustando alias 'll' para 'ls -alFh' (legibilidade de tamanho de arquivo em KB/MB/GB)..."
+for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
+  if [ -f "$bashrc" ]; then
+    if grep -q "alias ll=" "$bashrc"; then
+      sed -i "s/alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
+    elif grep -q "#alias ll=" "$bashrc"; then
+      sed -i "s/#alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
+    else
+      echo "alias ll='ls -alFh'" >> "$bashrc"
+    fi
+  fi
+done
+log_success "Alias 'll' ('ls -alFh') configurado em todos os perfis .bashrc do sistema."
+
 # ==============================================================================
 # 4. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
 # ==============================================================================
