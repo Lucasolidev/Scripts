@@ -93,7 +93,7 @@ print_alert_box() {
 clear
 
 echo -e "\n${FG_CYAN}${BOLD}================================================================${NC}"
-echo -e "${FG_CYAN}${BOLD}       SYSTEM MANAGER - PÓS-INSTALAÇÃO DO UBUNTU DESKTOP        ${NC}"
+echo -e "${FG_CYAN}${BOLD}           PÓS-INSTALAÇÃO DO UBUNTU DESKTOP                     ${NC}"
 echo -e "${FG_CYAN}${BOLD}================================================================${NC}"
 
 LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')

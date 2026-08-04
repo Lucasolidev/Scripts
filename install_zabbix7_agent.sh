@@ -35,7 +35,6 @@ draw_separator() {
 print_header() {
     local title="$1"
     echo -e ""
-    echo -e "${FG_CYAN}${BOLD}=== SYSTEM MANAGER ===${NC}"
     echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
     draw_separator
 }

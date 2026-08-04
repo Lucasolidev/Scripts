@@ -112,7 +112,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 echo -e "\n${FG_CYAN}${BOLD}================================================================${NC}"
-echo -e "${FG_CYAN}${BOLD}       SYSTEM MANAGER - PÓS-INSTALAÇÃO DO UBUNTU SERVER         ${NC}"
+echo -e "${FG_CYAN}${BOLD}           PÓS-INSTALAÇÃO DO UBUNTU SERVER                      ${NC}"
 echo -e "${FG_CYAN}${BOLD}================================================================${NC}"
 
 # ==============================================================================
