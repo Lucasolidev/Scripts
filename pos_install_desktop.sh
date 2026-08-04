@@ -147,7 +147,7 @@ if command -v gsettings >/dev/null 2>&1; then
 fi
 log_success "Teclado configurado: US-International + ABNT2 (Alterna com Alt+Shift)."
 
-log_info "Ajustando alias 'll' para 'ls -alFh' (legibilidade de tamanho de arquivo em KB/MB/GB)..."
+log_info "Configurando aliases de produtividade e segurança no Shell (ll, rm, cp, mv, df, free, ports, myip, update, clean)..."
 for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
   if [ -f "$bashrc" ]; then
     if grep -q "alias ll=" "$bashrc"; then
@@ -157,9 +157,21 @@ for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
     else
       echo "alias ll='ls -alFh'" | sudo tee -a "$bashrc" > /dev/null
     fi
+    grep -q "alias rm=" "$bashrc" || echo "alias rm='rm -i'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias cp=" "$bashrc" || echo "alias cp='cp -i'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias mv=" "$bashrc" || echo "alias mv='mv -i'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias df=" "$bashrc" || echo "alias df='df -h'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias free=" "$bashrc" || echo "alias free='free -h'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias ports=" "$bashrc" || echo "alias ports='sudo ss -tulanp'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias myip=" "$bashrc" || echo "alias myip='curl -s ifconfig.me; echo'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias \.\.=" "$bashrc" || echo "alias ..='cd ..'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias \.\.\.=" "$bashrc" || echo "alias ...='cd ../..'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt update && sudo apt upgrade -y'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt autoremove -y && sudo apt autoclean'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias reload=" "$bashrc" || echo "alias reload='source ~/.bashrc'" | sudo tee -a "$bashrc" > /dev/null
   fi
 done
-log_success "Alias 'll' ('ls -alFh') configurado em todos os perfis .bashrc do sistema."
+log_success "Aliases de produtividade e segurança configurados em todos os perfis .bashrc."
 
 # ==============================================================================
 # 3. FIREWALL DE PROTEÇÃO DO DESKTOP (UFW)
