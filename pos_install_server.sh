@@ -146,8 +146,6 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   done
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Zabbix Agent? (s/N): ${NC}")" INSTALL_ZABBIX_AGENT
-
 draw_separator
 log_info "Configurações coletadas. Iniciando os procedimentos..."
 
@@ -511,8 +509,10 @@ fi
 # ==============================================================================
 # 12. INSTALAÇÃO DO ZABBIX AGENT (SCRIPT EXTERNO DO GITHUB)
 # ==============================================================================
+print_header "INSTALAÇÃO DO ZABBIX AGENT"
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Zabbix Agent agora? (s/N): ${NC}")" INSTALL_ZABBIX_AGENT
+
 if [[ "$INSTALL_ZABBIX_AGENT" =~ ^[Ss]$ ]]; then
-  print_header "INSTALAÇÃO DO ZABBIX AGENT"
   log_info "Executando instalador oficial do Zabbix Agent 7.0 a partir do GitHub..."
   bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
   log_success "Procedimento do Zabbix Agent concluído."
