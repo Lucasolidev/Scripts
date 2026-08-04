@@ -13,11 +13,11 @@ VERSION="1.1"
 # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
 #
-# Executar via URL diretamente:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh | bash
-# bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh)
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh | bash
+# Executar via URL diretamente (exige sudo):
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh | sudo bash
+# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh)
+# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh | sudo bash
 #
 # ==============================================================================
 

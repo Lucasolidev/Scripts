@@ -13,11 +13,11 @@ VERSION="1.0"
 # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh
 #
-# Executar via URL diretamente:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh | bash
-# bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh | bash
+# Executar via URL diretamente (exige sudo):
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh | sudo bash
+# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
+# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh | sudo bash
 #
 # ==============================================================================
 

@@ -12,11 +12,11 @@ VERSION="1.0"
 # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh
 #
-# Executar via URL diretamente:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh | bash
-# bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh)
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh | bash
+# Executar via URL diretamente (exige sudo):
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh | sudo bash
+# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh)
+# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh | sudo bash
 #
 # ==============================================================================
 # ==============================================================================

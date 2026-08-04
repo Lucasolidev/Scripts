@@ -13,11 +13,11 @@ VERSION="1.0"
 # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
 #
-# Executar via URL diretamente:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh | bash
-# bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh)
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh | bash
+# Executar via URL diretamente (exige sudo):
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh | sudo bash
+# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh)
+# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh | sudo bash
 #
 # ==============================================================================
 

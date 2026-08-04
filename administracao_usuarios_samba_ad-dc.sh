@@ -27,11 +27,11 @@ VERSION="1.0"
 # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh
 #
-# Executar via URL diretamente:
-# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh | bash
-# bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh)
-# bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh)
-# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh | bash
+# Executar via URL diretamente (exige sudo):
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh | sudo bash
+# sudo bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh)
+# sudo bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh)
+# curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh | sudo bash
 #
 # ==============================================================================
 

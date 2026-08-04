@@ -35,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_instal
 ### 2. Pós-Instalação do Ubuntu Desktop (`pos_install_desktop.sh`)
 Prepara uma nova estação Ubuntu Desktop com o gerenciador `nala`, ferramentas dev/diagnóstico (`btop`, `build-essential`, `jq`, `tldr`, `htop`), Flatpak/Flathub, Google Chrome, Hack Nerd Font, Vim com temas/plugins e Zsh com Oh My Zsh (tema Agnoster) e Firewall UFW ativado:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh | sudo bash
 ```
 
 ### 3. Instalador Nginx + PHP-FPM + MariaDB (`install_nginx_php_ubuntu.sh`)
