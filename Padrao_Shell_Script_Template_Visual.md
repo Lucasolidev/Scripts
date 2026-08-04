@@ -97,9 +97,10 @@
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 >    echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional${NC}"
 >    echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-Nenhum}${NC}"
->    echo -e "  ${BOLD}Locales & Fuso Horário:${NC}${FG_GREEN}pt_BR.UTF-8 / America/Sao_Paulo${NC}"
+>    echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
 >    echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 >    echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
+>    echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo (NTP Ativo)${NC}"
 >    echo -e "  ${BOLD}Serviço Principal:${NC}     $(get_service_status nome_do_servico)"
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 >    ```
