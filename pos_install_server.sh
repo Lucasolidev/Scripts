@@ -145,7 +145,7 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   done
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Zabbix Agent (via script oficial do GitHub)? (s/N): ${NC}")" INSTALL_ZABBIX_AGENT
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Zabbix Agent? (s/N): ${NC}")" INSTALL_ZABBIX_AGENT
 
 draw_separator
 log_info "Configurações coletadas. Iniciando os procedimentos..."
