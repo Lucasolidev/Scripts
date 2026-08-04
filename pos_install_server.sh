@@ -7,16 +7,17 @@ VERSION="1.1"
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
-# 1. Valida privilégios de execução (exige Root/Sudo).
-# 2. Atualiza os espelhos do APT e aplica patches de segurança do sistema.
-# 3. Instala pacotes vitais (curl, QEMU Guest Agent, Open VM Tools, ncdu, fastfetch, htop, tmux, fail2ban, etc).
-# 4. Ajusta o fuso horário (America/Sao_Paulo) e sincronização de horário via NTP (systemd-timesyncd).
-# 5. Endurece o SSH (Hardening): Desabilita login de Root (opcional), senhas em branco e define timeout de sessão ociosa.
-# 6. Configura a jaula do Fail2Ban para proteção contra ataques de força bruta no SSH.
-# 7. Ativa atualizações automáticas de segurança (unattended-upgrades).
-# 8. Oferece criação opcional de usuário 'administrador' (sudo) e 'geset'.
-# 9. Permite criar grupos customizados (TI, DEV, etc.) parametrizando o Visudo dinamicamente.
-# 10. Insere regras de borda nativas no Firewall UFW (SSH e Zabbix Agent).
+# 1. Valida privilégios de execução (exige Root/Sudo) e captura logs de auditoria em /root e na Home.
+# 2. Atualiza os espelhos do APT e aplica patches de segurança do sistema (opcional).
+# 3. Instala utilitários vitais (curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades).
+# 4. Ajusta locales (en_US/pt_BR UTF-8), fuso horário (America/Sao_Paulo + NTP) e layout de teclado (ABNT2 + US-Intl).
+# 5. Configura aliases de produtividade e segurança no Shell (ll='ls -alFh', rm, cp, mv, df, free, ports, myip, update, clean, reload).
+# 6. Endurece o SSH (Hardening): Desabilita login de Root (opcional), impede senhas em branco e aplica timeout de ociosidade de 10 min.
+# 7. Configura a jaula do Fail2Ban (força bruta SSH) e ativa atualizações automáticas de segurança (unattended-upgrades).
+# 8. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset'.
+# 9. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
+# 10. Configura e ativa obrigatoriamente o Firewall UFW com regras de permissão para SSH (22/tcp) e Zabbix Agent (10050/tcp).
+# 11. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e lista de portas liberadas no UFW.
 # ==============================================================================
 # Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
