@@ -72,11 +72,6 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
-if [ ! -t 0 ] && [ -e /dev/tty ]; then
-  exec 0</dev/tty
-fi
-
 # ------------------------------------------------------------------------------
 # 3. INTERATIVIDADE E COLETA DE PARÂMETROS
 # ------------------------------------------------------------------------------
@@ -84,10 +79,10 @@ print_header "COLETA DE PARÂMETROS"
 
 echo -e "  ${FG_WHITE}Configuração do Servidor LEMP (Nginx + MariaDB + PHP-FPM)${NC}\n"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: meudominio.com.br): ${NC}")" DOMAIN_NAME
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: meudominio.com.br): ${NC}")" DOMAIN_NAME </dev/tty
 DOMAIN_NAME=${DOMAIN_NAME:-meudominio.com.br}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT </dev/tty
 PHP_INPUT=${PHP_INPUT:-latest}
 
 if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
@@ -108,13 +103,13 @@ else
     fi
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Limite máximo de Upload/Download em MB/GB (Padrão: 128M | 0 para ilimitado): ${NC}")" UPLOAD_MAX
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Limite máximo de Upload/Download em MB/GB (Padrão: 128M | 0 para ilimitado): ${NC}")" UPLOAD_MAX </dev/tty
 UPLOAD_MAX=${UPLOAD_MAX:-128M}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Tempo máximo de execução de scripts PHP em segundos (Padrão: 300): ${NC}")" EXEC_TIME
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Tempo máximo de execução de scripts PHP em segundos (Padrão: 300): ${NC}")" EXEC_TIME </dev/tty
 EXEC_TIME=${EXEC_TIME:-300}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS </dev/tty
 if [ -z "$DB_ROOT_PASS" ]; then
     DB_ROOT_PASS=$(openssl rand -base64 12 2>/dev/null || date +%s | sha256sum | base64 | head -c 16)
 fi

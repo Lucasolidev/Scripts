@@ -22,14 +22,9 @@ VERSION="1.0"
 #
 # ==============================================================================
 
-# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
-if [ ! -t 0 ] && [ -e /dev/tty ]; then
-  exec 0</dev/tty
-fi
-
 # Solicita a hora no formato HH:MM
 echo "Digite o horário que deseja reiniciar (formato HH:MM, ex: 23:30):"
-read horaAlvo
+read horaAlvo </dev/tty
 
 # Verifica se o comando shutdown está disponível
 if ! command -v shutdown &> /dev/null; then

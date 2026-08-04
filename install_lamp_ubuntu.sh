@@ -104,25 +104,20 @@ fi
 
 print_header "INSTALADOR AUTOMÁTICO LAMP - UBUNTU (APACHE, MARIADB, PHP 8.3)"
 
-# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
-if [ ! -t 0 ] && [ -e /dev/tty ]; then
-  exec 0</dev/tty
-fi
-
 # ==========================================
 # COLETA DE PARÂMETROS
 # ==========================================
 print_header "COLETA DE PARÂMETROS"
 
 echo -e "  ${FG_CYAN}[i]${NC} Defina a senha para o usuário root do MariaDB."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS </dev/tty
 
 if [ -z "$DB_ROOT_PASS" ]; then
     DB_ROOT_PASS=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
     log_info "Senha aleatória gerada para o MariaDB Root: ${FG_GREEN}${DB_ROOT_PASS}${NC}"
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT </dev/tty
 PHP_INPUT=${PHP_INPUT:-latest}
 
 if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
@@ -142,13 +137,13 @@ else
     fi
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar o phpMyAdmin? (s/N): ${NC}")" INSTALL_PHPMYADMIN
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar o phpMyAdmin? (s/N): ${NC}")" INSTALL_PHPMYADMIN </dev/tty
 INSTALL_PHPMYADMIN=$(echo "$INSTALL_PHPMYADMIN" | tr '[:upper:]' '[:lower:]')
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Fail2Ban (SSH/Apache)? (S/n): ${NC}")" CONFIGURE_FAIL2BAN
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja instalar e configurar o Fail2Ban (SSH/Apache)? (S/n): ${NC}")" CONFIGURE_FAIL2BAN </dev/tty
 CONFIGURE_FAIL2BAN=$(echo "$CONFIGURE_FAIL2BAN" | tr '[:upper:]' '[:lower:]')
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja liberar portas HTTP (80), HTTPS (443) e SSH (22) no UFW Firewall? (S/n): ${NC}")" CONFIGURE_UFW
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja liberar portas HTTP (80), HTTPS (443) e SSH (22) no UFW Firewall? (S/n): ${NC}")" CONFIGURE_UFW </dev/tty
 CONFIGURE_UFW=$(echo "$CONFIGURE_UFW" | tr '[:upper:]' '[:lower:]')
 
 draw_separator

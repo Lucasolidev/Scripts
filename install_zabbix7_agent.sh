@@ -78,23 +78,18 @@ fi
 DEFAULT_HOSTNAME="Cliente_ServBkp"
 DEFAULT_SERVER="192.168.1.254"
 
-# Se executado via pipe (ex: wget -qO- URL | sudo bash), reconecta o STDIN ao terminal para permitir leitura interativa
-if [ ! -t 0 ] && [ -e /dev/tty ]; then
-  exec 0</dev/tty
-fi
-
 # ==============================================================================
 # BLOCO DE INTERATIVIDADE E COLETAS DE PARÂMETROS
 # ==============================================================================
 print_header "COLETA DE PARÂMETROS"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o Hostname (Padrão: $DEFAULT_HOSTNAME): ${NC}")" INPUT_HOSTNAME
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o Hostname (Padrão: $DEFAULT_HOSTNAME): ${NC}")" INPUT_HOSTNAME </dev/tty
 HOSTNAME=${INPUT_HOSTNAME:-$DEFAULT_HOSTNAME}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (Padrão: $DEFAULT_SERVER): ${NC}")" INPUT_SERVER
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (Padrão: $DEFAULT_SERVER): ${NC}")" INPUT_SERVER </dev/tty
 SERVER=${INPUT_SERVER:-$DEFAULT_SERVER}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar estas configurações ao arquivo final? (s/n): ${NC}")" CONFIRMAR
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar estas configurações ao arquivo final? (s/n): ${NC}")" CONFIRMAR </dev/tty
 
 draw_separator
 log_info "Parâmetros coletados. Iniciando instalação..."

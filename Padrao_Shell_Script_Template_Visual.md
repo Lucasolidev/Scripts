@@ -76,14 +76,9 @@
 >    - **Firewall UFW**: Ativar regras de proteção de borda.
 >    - **Limpeza do Sistema**: Executar `apt autoremove -y` e `apt autoclean -y` ao final das instalações.
 > 
-> 7. **Registro de Logs e Compatibilidade com Pipe (`| bash`)**:
+> 7. **Registro de Logs e Compatibilidade com Leitura Interativa (`read`)**:
 >    No início da execução, inicialize a captura do console usando `exec > >(tee -a "$LOG_TMP") 2>&1`.
->    Para permitir o funcionamento do `read` interativo quando o script for executado via pipe (`curl` ou `wget ... | sudo bash`), reconecte o STDIN ao terminal:
->    ```bash
->    if [ ! -t 0 ] && [ -e /dev/tty ]; then
->      exec 0</dev/tty
->    fi
->    ```
+>    Para garantir que comandos `read` funcionem interativamente mesmo via pipe (`wget ... | sudo bash`), adicione `</dev/tty` ao final das chamadas `read -p "..." VAR </dev/tty` (jamais use `exec 0</dev/tty` globalmente, pois ele encerra a leitura do script vindo do pipe).
 >    No final do script, salve automaticamente cópias timestamped e um atalho `latest.log` no diretório `/root` e na Home do usuário real que executou o comando via Sudo.
 > 
 > 8. **Resultado Final Estruturado (Resumo da Instalação)**:
