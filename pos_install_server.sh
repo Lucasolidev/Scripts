@@ -437,7 +437,13 @@ echo -e "  ${BOLD}Fail2Ban (Brute-Force):${NC}$(get_service_status fail2ban)"
 echo -e "  ${BOLD}Atualizações Automát.:${NC} $(get_service_status unattended-upgrades)"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
 if command -v ufw >/dev/null 2>&1; then
-  echo -e "  ${BOLD}Firewall UFW:${NC}          $(ufw status 2>/dev/null | grep -q "active" && echo -e "${FG_GREEN}Ativo${NC}" || echo -e "${FG_YELLOW}Regras prontas (Inativo)${NC}")"
+  if ufw status 2>/dev/null | grep -q "active"; then
+    PORTAS_LIBERADAS=$(ufw status 2>/dev/null | grep -i "ALLOW" | awk '{print $1}' | sort -u | tr '\n' ', ' | sed 's/, $//')
+    echo -e "  ${BOLD}Firewall UFW:${NC}          ${FG_GREEN}Ativo${NC}"
+    echo -e "  ${BOLD}Portas Liberadas (UFW):${NC}${FG_CYAN}${PORTAS_LIBERADAS:-22/tcp, 10050/tcp}${NC}"
+  else
+    echo -e "  ${BOLD}Firewall UFW:${NC}          ${FG_YELLOW}Inativo${NC}"
+  fi
 fi
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
