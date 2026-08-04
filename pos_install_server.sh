@@ -187,30 +187,30 @@ done
 # ==============================================================================
 print_header "LOCALES (UTF-8), TECLADO E FUSO HORÁRIO"
 
-log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
+log_info "Configurando idioma padrão do sistema em Inglês (en_US.UTF-8) com suporte a pt_BR.UTF-8..."
 sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
 sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
-update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
-log_success "Locales UTF-8 gerados com sucesso."
+update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 > /dev/null 2>&1
+log_success "Idioma padrão do servidor configurado para en_US.UTF-8 (Inglês) com locales pt_BR gerados."
 
 log_info "Configurando fuso horário (America/Sao_Paulo) e sincronização NTP..."
 timedatectl set-timezone America/Sao_Paulo > /dev/null 2>&1 || true
 systemctl enable --now systemd-timesyncd > /dev/null 2>&1 || true
 log_success "Fuso horário ajustado para America/Sao_Paulo (NTP Ativo)."
 
-log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
+log_info "Configurando layouts de teclado (ABNT2 Padrão + US-International com Acentos)..."
 cat <<EOF > /etc/default/keyboard
 XKBMODEL="pc105"
-XKBLAYOUT="us,br"
-XKBVARIANT="intl,"
+XKBLAYOUT="br,us"
+XKBVARIANT=",intl"
 XKBOPTIONS="grp:alt_shift_toggle"
 BACKSPACE="guess"
 EOF
 
 udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 setupcon --force > /dev/null 2>&1 || true
-log_success "Teclado configurado: US-International (para acentos em teclado americano) + ABNT2 (Alterna com Alt+Shift)."
+log_success "Teclado configurado: ABNT2 (Padrão Ativo) + US-International (Alterna com Alt+Shift)."
 
 # ==============================================================================
 # 4. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
@@ -381,8 +381,8 @@ print_header "RESUMO DA INSTALAÇÃO"
 
 KEYBOARD_STATUS="Não configurado"
 if [ -f /etc/default/keyboard ]; then
-  if grep -q 'XKBLAYOUT="us,br"' /etc/default/keyboard 2>/dev/null; then
-    KEYBOARD_STATUS="US-International (Acentos) + ABNT2 (Alterna com Alt+Shift)"
+  if grep -q 'XKBLAYOUT="br,us"' /etc/default/keyboard 2>/dev/null; then
+    KEYBOARD_STATUS="ABNT2 + US-International (Alterna com Alt+Shift)"
   else
     LAYOUT=$(grep '^XKBLAYOUT=' /etc/default/keyboard 2>/dev/null | cut -d'=' -f2 | tr -d '"')
     KEYBOARD_STATUS="${LAYOUT:-Padrao}"
@@ -395,9 +395,9 @@ echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU SERVER FINALIZADA C
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
 echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades}${NC}"
-echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
+echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}en_US.UTF-8 (Padrão Inglês) / pt_BR.UTF-8${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
-echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
+echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}ABNT2 (br)${NC}"
 echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo (NTP Ativo)${NC}"
 echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
 echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
