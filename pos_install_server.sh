@@ -17,7 +17,8 @@ VERSION="1.1"
 # 8. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset'.
 # 9. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
 # 10. Configura e ativa obrigatoriamente o Firewall UFW com regras de permissão para SSH (22/tcp) e Zabbix Agent (10050/tcp).
-# 11. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e lista de portas liberadas no UFW.
+# 11. Exibe o Resumo da Instalação com auditoria de status, pacotes, serviços e grava logs em /root e na Home.
+# 12. Executa a instalação do Zabbix Agent (opcional) a partir do GitHub ao final do procedimento.
 # ==============================================================================
 # Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
@@ -189,19 +190,7 @@ for pacote in "${PACOTES[@]}"; do
 done
 
 # ==============================================================================
-# 3. INSTALAÇÃO DO ZABBIX AGENT (SCRIPT EXTERNO DO GITHUB)
-# ==============================================================================
-if [[ "$INSTALL_ZABBIX_AGENT" =~ ^[Ss]$ ]]; then
-  print_header "INSTALAÇÃO DO ZABBIX AGENT"
-  log_info "Executando instalador oficial do Zabbix Agent 7.0 a partir do GitHub..."
-  bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
-  log_success "Procedimento do Zabbix Agent concluído."
-else
-  log_skipped "Instalação do Zabbix Agent pulada."
-fi
-
-# ==============================================================================
-# 4. CONFIGURAÇÃO DE LOCALES (UTF-8), TECLADO E FUSO HORÁRIO (NTP)
+# 3. CONFIGURAÇÃO DE LOCALES (UTF-8), TECLADO E FUSO HORÁRIO (NTP)
 # ==============================================================================
 print_header "LOCALES (UTF-8), TECLADO E FUSO HORÁRIO"
 
@@ -231,7 +220,7 @@ setupcon --force > /dev/null 2>&1 || true
 log_success "Teclado configurado: ABNT2 (Padrão Ativo) + US-International (Alterna com Alt+Shift)."
 
 # ==============================================================================
-# 5. CONFIGURAÇÃO DE ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)
+# 4. CONFIGURAÇÃO DE ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)
 # ==============================================================================
 print_header "ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)"
 
@@ -262,7 +251,7 @@ done
 log_success "Aliases de produtividade e segurança configurados em todos os perfis .bashrc."
 
 # ==============================================================================
-# 6. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
+# 5. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO SSH (HARDENING)"
 
@@ -295,7 +284,7 @@ systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 log_success "Hardening no SSH concluído (Sem senhas em branco e timeout de ociosidade de 10 min)."
 
 # ==============================================================================
-# 7. SEGURANÇA ADICIONAL (FAIL2BAN & UNATTENDED-UPGRADES)
+# 6. SEGURANÇA ADICIONAL (FAIL2BAN & UNATTENDED-UPGRADES)
 # ==============================================================================
 print_header "PROTEÇÃO FAIL2BAN E ATUALIZAÇÕES AUTOMÁTICAS"
 
@@ -321,7 +310,7 @@ if [ -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
 fi
 
 # ==============================================================================
-# 8. VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
+# 7. VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
 # ==============================================================================
 print_header "GERENCIAMENTO DE USUÁRIOS PADRÃO"
 log_info "Verificando usuários padrão (administrador e geset)..."
@@ -353,7 +342,7 @@ else
 fi
 
 # ==============================================================================
-# 9. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
+# 8. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
 # ==============================================================================
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   print_header "GRUPO CUSTOMIZADO E VISUDO"
@@ -405,7 +394,7 @@ EOF
 fi
 
 # ==============================================================================
-# 10. CONFIGURAÇÃO DE FIREWALL (UFW)
+# 9. CONFIGURAÇÃO DE FIREWALL (UFW)
 # ==============================================================================
 print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
 if command -v ufw >/dev/null 2>&1; then
@@ -422,7 +411,7 @@ else
 fi
 
 # ==============================================================================
-# 11. RESUMO DA INSTALAÇÃO
+# 10. RESUMO DA INSTALAÇÃO
 # ==============================================================================
 print_header "RESUMO DA INSTALAÇÃO"
 
@@ -494,7 +483,7 @@ echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}$
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 # ==============================================================================
-# 12. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# 11. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
 # ==============================================================================
 print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 
@@ -513,6 +502,18 @@ if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
     chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/pos_install_server_latest.log" 2>/dev/null || true
     log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
   fi
+fi
+
+# ==============================================================================
+# 12. INSTALAÇÃO DO ZABBIX AGENT (SCRIPT EXTERNO DO GITHUB)
+# ==============================================================================
+if [[ "$INSTALL_ZABBIX_AGENT" =~ ^[Ss]$ ]]; then
+  print_header "INSTALAÇÃO DO ZABBIX AGENT"
+  log_info "Executando instalador oficial do Zabbix Agent 7.0 a partir do GitHub..."
+  bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh)
+  log_success "Procedimento do Zabbix Agent concluído."
+else
+  log_skipped "Instalação do Zabbix Agent pulada."
 fi
 
 rm -f "$LOG_TMP" 2>/dev/null || true
