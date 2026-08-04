@@ -213,6 +213,11 @@ udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 setupcon --force > /dev/null 2>&1 || true
 log_success "Teclado configurado: ABNT2 (Padrão Ativo) + US-International (Alterna com Alt+Shift)."
 
+# ==============================================================================
+# 4. CONFIGURAÇÃO DE ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)
+# ==============================================================================
+print_header "ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)"
+
 log_info "Configurando aliases de produtividade e segurança no Shell (ll, rm, cp, mv, df, free, ports, myip, update, clean)..."
 for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
   if [ -f "$bashrc" ]; then
@@ -240,7 +245,7 @@ done
 log_success "Aliases de produtividade e segurança configurados em todos os perfis .bashrc."
 
 # ==============================================================================
-# 4. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
+# 5. CONFIGURAÇÃO DO SSH (HARDENING & SEGURANÇA)
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO SSH (HARDENING)"
 
@@ -273,7 +278,7 @@ systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
 log_success "Hardening no SSH concluído (Sem senhas em branco e timeout de ociosidade de 10 min)."
 
 # ==============================================================================
-# 5. SEGURANÇA ADICIONAL (FAIL2BAN & UNATTENDED-UPGRADES)
+# 6. SEGURANÇA ADICIONAL (FAIL2BAN & UNATTENDED-UPGRADES)
 # ==============================================================================
 print_header "PROTEÇÃO FAIL2BAN E ATUALIZAÇÕES AUTOMÁTICAS"
 
@@ -299,7 +304,7 @@ if [ -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
 fi
 
 # ==============================================================================
-# 6. VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
+# 7. VERIFICAÇÃO E CRIAÇÃO DOS USUÁRIOS 'ADMINISTRADOR' E 'GESET'
 # ==============================================================================
 print_header "GERENCIAMENTO DE USUÁRIOS PADRÃO"
 log_info "Verificando usuários padrão (administrador e geset)..."
@@ -331,7 +336,7 @@ else
 fi
 
 # ==============================================================================
-# 7. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
+# 8. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
 # ==============================================================================
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   print_header "GRUPO CUSTOMIZADO E VISUDO"
@@ -383,7 +388,7 @@ EOF
 fi
 
 # ==============================================================================
-# 8. CONFIGURAR REGRAS DE FIREWALL (UFW)
+# 9. CONFIGURAR REGRAS DE FIREWALL (UFW)
 # ==============================================================================
 if [[ "$EXEC_UFW" =~ ^[Ss]$ ]]; then
   print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
@@ -402,7 +407,7 @@ else
 fi
 
 # ==============================================================================
-# 9. RESUMO DA INSTALAÇÃO
+# 10. RESUMO DA INSTALAÇÃO
 # ==============================================================================
 print_header "RESUMO DA INSTALAÇÃO"
 
@@ -450,7 +455,7 @@ echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}$
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 # ==============================================================================
-# 10. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# 11. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
 # ==============================================================================
 print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 

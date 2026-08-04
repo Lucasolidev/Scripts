@@ -147,6 +147,11 @@ if command -v gsettings >/dev/null 2>&1; then
 fi
 log_success "Teclado configurado: US-International + ABNT2 (Alterna com Alt+Shift)."
 
+# ==============================================================================
+# 3. CONFIGURAÇÃO DE ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)
+# ==============================================================================
+print_header "ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)"
+
 log_info "Configurando aliases de produtividade e segurança no Shell (ll, rm, cp, mv, df, free, ports, myip, update, clean)..."
 for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
   if [ -f "$bashrc" ]; then
@@ -174,7 +179,7 @@ done
 log_success "Aliases de produtividade e segurança configurados em todos os perfis .bashrc."
 
 # ==============================================================================
-# 3. FIREWALL DE PROTEÇÃO DO DESKTOP (UFW)
+# 4. FIREWALL DE PROTEÇÃO DO DESKTOP (UFW)
 # ==============================================================================
 print_header "FIREWALL DE PROTEÇÃO (UFW)"
 
@@ -185,7 +190,7 @@ sudo ufw enable > /dev/null 2>&1
 log_success "Firewall UFW ativado (Proteção de rede local/Wi-Fi ativa)."
 
 # ==============================================================================
-# 4. SERVIÇOS E MONITORAMENTO (SSH E HTOP)
+# 5. SERVIÇOS E MONITORAMENTO (SSH E HTOP)
 # ==============================================================================
 print_header "SERVIÇOS E MONITORAMENTO (SSH E HTOP)"
 
@@ -195,7 +200,7 @@ sudo systemctl enable --now ssh > /dev/null 2>&1
 log_success "OpenSSH Server e HTOP instalados e ativos."
 
 # ==============================================================================
-# 5. INFORMAÇÕES DO SISTEMA (FASTFETCH)
+# 6. INFORMAÇÕES DO SISTEMA (FASTFETCH)
 # ==============================================================================
 print_header "INFORMAÇÕES DO SISTEMA (FASTFETCH)"
 
@@ -204,7 +209,7 @@ sudo nala install -y fastfetch > /dev/null 2>&1
 log_success "Fastfetch instalado com sucesso."
 
 # ==============================================================================
-# 6. ECOSSISTEMA FLATPAK E GOOGLE CHROME
+# 7. ECOSSISTEMA FLATPAK E GOOGLE CHROME
 # ==============================================================================
 print_header "ECOSSISTEMA FLATPAK E GOOGLE CHROME"
 
@@ -217,7 +222,7 @@ sudo flatpak install -y flathub com.google.Chrome > /dev/null 2>&1
 log_success "Flatpak e Google Chrome configurados com sucesso."
 
 # ==============================================================================
-# 7. FONTE NERD FONT E POWERLINE
+# 8. FONTE NERD FONT E POWERLINE
 # ==============================================================================
 print_header "INSTALAÇÃO DE FONTE NERD FONT"
 
@@ -229,7 +234,7 @@ fc-cache -fv > /dev/null 2>&1
 log_success "Hack Nerd Font instalada com sucesso."
 
 # ==============================================================================
-# 8. EDITOR VIM E PERSONALIZAÇÃO DE PLUGINS
+# 9. EDITOR VIM E PERSONALIZAÇÃO DE PLUGINS
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO EDITOR VIM"
 
@@ -307,7 +312,7 @@ vim -u NONE -N -e -s -c "source ~/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 
 log_success "Editor Vim e plugins configurados com sucesso."
 
 # ==============================================================================
-# 9. CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH
+# 10. CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH"
 
@@ -353,7 +358,7 @@ EOF
 log_success "Zsh e Oh My Zsh (Tema Agnoster) configurados com sucesso."
 
 # ==============================================================================
-# 10. ALIASES UNIVERSAIS E FUNÇÕES DO GITHUB
+# 11. ALIASES UNIVERSAIS E FUNÇÕES DO GITHUB
 # ==============================================================================
 print_header "INJEÇÃO DE ALIASES E CUSTOMIZAÇÕES DO SHELL"
 
@@ -389,7 +394,7 @@ sudo apt-get autoclean -y > /dev/null 2>&1
 log_success "Limpeza do sistema concluída."
 
 # ==============================================================================
-# 11. RESUMO DA INSTALAÇÃO
+# 12. RESUMO DA INSTALAÇÃO
 # ==============================================================================
 print_header "RESUMO DA INSTALAÇÃO"
 
@@ -421,7 +426,7 @@ echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}$
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 # ==============================================================================
-# 12. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# 13. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
 # ==============================================================================
 print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 

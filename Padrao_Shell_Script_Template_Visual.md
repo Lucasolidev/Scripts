@@ -68,7 +68,13 @@
 >    udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 >    setupcon --force > /dev/null 2>&1 || true
 >    log_success "Teclado e fuso horário ajustados com sucesso."
->
+>    ```
+> 
+> 6. **Configuração de Aliases do Shell (Seção Dedicada)**:
+>    - Criar uma seção própria no fluxo do script com `print_header "ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)"`.
+>    - Injetar/atualizar aliases nos perfis `/root/.bashrc`, `/etc/skel/.bashrc` e `/home/*/.bashrc`:
+>    ```bash
+>    print_header "ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)"
 >    log_info "Configurando aliases de produtividade e segurança no Shell..."
 >    for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
 >      if [ -f "$bashrc" ]; then
@@ -90,18 +96,17 @@
 >    log_success "Aliases de produtividade e segurança configurados nos perfis .bashrc."
 >    ```
 > 
-> 6. **Hardening de Segurança e Manutenção**:
+> 7. **Hardening de Segurança e Manutenção**:
 >    - **SSH Hardening**: Ajustar `PermitEmptyPasswords no`, `ClientAliveInterval 300` e `ClientAliveCountMax 2`.
 >    - **Fail2Ban**: Instalar e ativar proteção contra força bruta no SSH quando for ambiente Server.
 >    - **Firewall UFW**: Ativar regras de proteção de borda.
 >    - **Limpeza do Sistema**: Executar `apt autoremove -y` e `apt autoclean -y` ao final das instalações.
 > 
-> 7. **Registro de Logs e Compatibilidade com Leitura Interativa (`read`)**:
+> 8. **Registro de Logs**:
 >    No início da execução, inicialize a captura do console usando `exec > >(tee -a "$LOG_TMP") 2>&1`.
->    Para garantir que comandos `read` funcionem interativamente mesmo via pipe (`wget ... | sudo bash`), adicione `</dev/tty` ao final das chamadas `read -p "..." VAR </dev/tty` (jamais use `exec 0</dev/tty` globalmente, pois ele encerra a leitura do script vindo do pipe).
 >    No final do script, salve automaticamente cópias timestamped e um atalho `latest.log` no diretório `/root` e na Home do usuário real que executou o comando via Sudo.
 > 
-> 8. **Resultado Final Estruturado (Resumo da Instalação)**:
+> 9. **Resultado Final Estruturado (Resumo da Instalação)**:
 >    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
 >    **Obrigatório**: É fundamental incluir a linha de **Pacotes/Programas Instalados** detalhando os softwares adicionados ao sistema durante a execução (armazenando na array `PACOTES_INSTALADOS` e formatando com `LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")`).
 >    
@@ -131,7 +136,7 @@
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 >    ```
 > 
-> 7. **Cabeçalho de Metadados e Comentários**:
+> 10. **Cabeçalho de Metadados e Comentários**:
 >    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual que está sendo criado nas URLs de exemplo:
 >    ```bash
 >    #!/bin/bash
