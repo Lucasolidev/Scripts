@@ -13,8 +13,9 @@ VERSION="1.0"
 # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh
 #
-# Executar via URL
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh
+# Executar via URL diretamente:
+# wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh | bash
+# bash <(wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh)
 # bash <(curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh)
 # curl -fsSL https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh | bash
 #
