@@ -19,7 +19,6 @@ VERSION="1.1"
 # 10. Insere regras de borda nativas no Firewall UFW (SSH e Zabbix Agent).
 # ==============================================================================
 # visualizar o script antes de executar:
-#
 # curl -s https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
 # wget -qO- https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
 #

@@ -108,6 +108,11 @@ LOG_TMP="/tmp/${LOG_FILENAME}"
 # Redireciona a saída do script para o terminal e grava no log simultaneamente
 exec > >(tee -a "$LOG_TMP") 2>&1
 
+# Se executado via pipe (ex: wget -qO- URL | bash), reconecta o STDIN ao terminal para permitir leitura interativa
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+  exec 0</dev/tty
+fi
+
 # Valida o sudo logo no início da execução para evitar travas
 log_warning "Solicitando credenciais de administrador..."
 sudo -v
