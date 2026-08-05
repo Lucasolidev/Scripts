@@ -226,6 +226,93 @@ Guia rápido para empacotar, compactar e extrair arquivos:
   tar -tzf arquivo.tar.gz
   ```
 
+### Transferência Remota de Arquivos (`scp` & `rsync`)
+
+#### Copiar arquivos via SSH com `scp` (Secure Copy Protocol)
+O `scp` é ideal para cópias simples de arquivos e diretórios entre a máquina local e servidores remotos usando o protocolo SSH.
+
+* **Enviar arquivo da máquina local para o servidor remoto:**
+  ```bash
+  scp arquivo.txt usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Enviar pasta inteira recursivamente (`-r`):**
+  ```bash
+  scp -r /caminho/pasta_local usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Baixar arquivo do servidor remoto para a máquina local:**
+  ```bash
+  scp usuario@ip_do_servidor:/caminho/remoto/arquivo.txt /caminho/local/
+  ```
+
+* **Baixar pasta inteira do servidor remoto:**
+  ```bash
+  scp -r usuario@ip_do_servidor:/caminho/remoto/pasta /caminho/local/
+  ```
+
+* **Especificar uma porta SSH diferente (`-P` maiúsculo):**
+  ```bash
+  scp -P 2222 arquivo.txt usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Usar uma chave SSH privada específica (`-i`):**
+  ```bash
+  scp -i ~/.ssh/id_ed25519 arquivo.txt usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Preservar data de modificação, acesso e permissões (`-p` minúsculo):**
+  ```bash
+  scp -p arquivo.txt usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+#### Sincronização Inteligente de Arquivos com `rsync` (Remote Sync)
+O `rsync` é mais rápido e eficiente que o `scp` para pastas grandes ou atualizações frequentes, pois transfere apenas as diferenças entre os arquivos (delta transfer), suporta exclusão de arquivos, exibe progresso e permite resumir uploads/downloads interrompidos.
+
+* **Principais opções do `rsync`:**
+  * **`-a`** (*archive*): Preserva permissões, datas, links simbólicos, dono e grupo.
+  * **`-v`** (*verbose*): Exibe detalhes da transferência.
+  * **`-z`** (*compress*): Compacta os dados durante a transferência para economizar banda.
+  * **`-P`** (*progress/partial*): Mostra barra de progresso e permite retomar transferências interrompidas.
+  * **`--delete`**: Apaga no destino os arquivos que foram removidos na origem (espelhamento).
+
+* **Enviar pasta local para servidor remoto (Sincronização padrão recomendada `-avzP`):**
+  ```bash
+  rsync -avzP /caminho/pasta_local/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+  > 💡 **Atenção com a barra `/` no final da pasta de origem:**
+  > * `/caminho/pasta_local/` (com `/`): Copia o **CONTEÚDO** da pasta.
+  > * `/caminho/pasta_local` (sem `/`): Copia a **PASTA EM SI**.
+
+* **Baixar pasta do servidor remoto para a máquina local:**
+  ```bash
+  rsync -avzP usuario@ip_do_servidor:/caminho/remoto/pasta/ /caminho/local/
+  ```
+
+* **Especificar porta SSH customizada ou chave privada no `rsync` (`-e`):**
+  ```bash
+  # Com porta SSH customizada (ex: 2222):
+  rsync -avzP -e "ssh -p 2222" /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
+
+  # Com chave SSH específica:
+  rsync -avzP -e "ssh -i ~/.ssh/id_ed25519" /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Sincronizar e remover arquivos no destino que foram excluídos da origem (`--delete`):**
+  ```bash
+  rsync -avzP --delete /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Excluir pastas ou arquivos específicos da transferência (`--exclude`):**
+  ```bash
+  rsync -avzP --exclude 'node_modules' --exclude '*.log' /caminho/projeto/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Simular a transferência antes de executar (Dry Run `-n`):**
+  ```bash
+  rsync -avzP -n /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+
 ## 👤 Gerenciamento de Usuários e Grupos
 
 ### Listar todos os usuários do sistema
