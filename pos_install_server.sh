@@ -20,10 +20,8 @@ VERSION="1.3"
 # 11. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH (22/tcp) e Zabbix Agent (10050/tcp).
 # 12. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
-# Execução recomendada (download e execução local):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh
-# chmod +x pos_install_server.sh
-# sudo ./pos_install_server.sh
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh -O pos_install_server.sh && chmod +x pos_install_server.sh && sudo ./pos_install_server.sh
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive

@@ -17,10 +17,8 @@ VERSION="1.3"
 # 8. Configura o Fail2Ban protegendo SSH, Nginx Auth e ativa a jaula anti-scanners (nginx-botsearch).
 # 9. Exibe o Resumo Final do Sistema com todas as configurações de segurança ativas.
 # ==============================================================================
-# Execução recomendada (download e execução local):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
-# chmod +x install_lemp_ubuntu.sh
-# sudo ./install_lemp_ubuntu.sh
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh -O install_lemp_ubuntu.sh && chmod +x install_lemp_ubuntu.sh && sudo ./install_lemp_ubuntu.sh
 # ==============================================================================
 
 # ------------------------------------------------------------------------------

@@ -21,10 +21,8 @@ VERSION="1.3"
 # 12. Cria uma página de diagnóstico phpinfo em /var/www/html/info.php.
 # 13. Exibe o Resumo Final do Sistema com todas as configurações de segurança ativas.
 # ==============================================================================
-# Execução recomendada (download e execução local):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh
-# chmod +x install_lamp_ubuntu.sh
-# sudo ./install_lamp_ubuntu.sh
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh -O install_lamp_ubuntu.sh && chmod +x install_lamp_ubuntu.sh && sudo ./install_lamp_ubuntu.sh
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive

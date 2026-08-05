@@ -6,10 +6,8 @@ VERSION="1.1"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU DESKTOP 26.04
 # ==============================================================================
-# Execução recomendada (download e execução local):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh
-# chmod +x pos_install_desktop.sh
-# sudo ./pos_install_desktop.sh
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh -O pos_install_desktop.sh && chmod +x pos_install_desktop.sh && sudo ./pos_install_desktop.sh
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive
