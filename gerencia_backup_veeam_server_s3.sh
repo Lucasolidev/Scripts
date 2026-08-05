@@ -5,10 +5,8 @@
 VERSION="1.0"
 # ==============================================================================
 # ==============================================================================
-# Execução recomendada (download e execução local):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh
-# chmod +x gerencia_backup_veeam_server_s3.sh
-# sudo ./gerencia_backup_veeam_server_s3.sh
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/gerencia_backup_veeam_server_s3.sh -O gerencia_backup_veeam_server_s3.sh && chmod +x gerencia_backup_veeam_server_s3.sh && sudo ./gerencia_backup_veeam_server_s3.sh
 # ==============================================================================
 # ==============================================================================
 # SCRIPT: gerencia_backup_veeam_server_s3.sh

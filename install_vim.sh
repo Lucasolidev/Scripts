@@ -7,10 +7,8 @@ VERSION="1.0"
 # SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO EDITOR VIM - UBUNTU 26.04
 # ==============================================================================
 # ==============================================================================
-# Execução recomendada (download e execução local):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_vim.sh
-# chmod +x install_vim.sh
-# sudo ./install_vim.sh
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_vim.sh -O install_vim.sh && chmod +x install_vim.sh && sudo ./install_vim.sh
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive

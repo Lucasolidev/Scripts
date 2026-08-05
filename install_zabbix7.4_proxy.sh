@@ -6,10 +6,8 @@ VERSION="1.0"
 # ==============================================================================
 # SCRIPT DE INSTALAÇÃO E ZABBIX PROXY 7.4 - UBUNTU 26.04
 # ==============================================================================
-# Execução recomendada (download e execução local):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh
-# chmod +x install_zabbix7.4_proxy.sh
-# sudo ./install_zabbix7.4_proxy.sh
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7.4_proxy.sh -O install_zabbix7.4_proxy.sh && chmod +x install_zabbix7.4_proxy.sh && sudo ./install_zabbix7.4_proxy.sh
 # ==============================================================================
 # Cores ANSI
 VERDE="\033[0;32m"
