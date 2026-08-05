@@ -3,8 +3,10 @@
 ![Shell Script](https://img.shields.io/badge/Shell_Script-121011?style=flat&logo=gnu-bash&logoColor=white)
 ![PowerShell](https://img.shields.io/badge/PowerShell-0078D4?style=flat&logo=powershell&logoColor=white)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)
 ![Nginx](https://img.shields.io/badge/Nginx-009639?style=flat&logo=nginx&logoColor=white)
 ![Apache](https://img.shields.io/badge/Apache-D22128?style=flat&logo=apache&logoColor=white)
+![Zabbix](https://img.shields.io/badge/Zabbix-F11033?style=flat&logo=zabbix&logoColor=white)
 
 Repositório centralizado de scripts de automação, ferramentas de pós-instalação e guias de referência rápida para administração de servidores e estações Linux e Windows.
 
@@ -15,6 +17,11 @@ Repositório centralizado de scripts de automação, ferramentas de pós-instala
 Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e utilitários:
 
 * 🐧 **[Guia de Ajuda Linux](ajuda_linux.md)** — Atalhos, manipulação de arquivos, permissões, POSIX ACLs, rsync/scp, usuários e comandos essenciais do Ubuntu Server.
+* 🐳 **[Guia de Ajuda Docker & Compose](ajuda_docker.md)** — Comandos de contêineres, imagens, volumes, redes e orquestração com Docker Compose.
+* 📊 **[Guia de Ajuda Zabbix](ajuda_zabbix.md)** — Monitoramento, `zabbix_get`, `zabbix_sender`, `zabbix_proxy`, agente 2 e `UserParameter`.
+* 🛢️ **[Guia de Ajuda MariaDB & MySQL](ajuda_mariadb_mysql.md)** — Administração SQL, permissões, backups (`mariadb-dump`), restore, otimização e reset de root.
+* 🛡️ **[Guia de Ajuda Firewall UFW & IPTables](ajuda_ufw_iptables.md)** — Regras de firewall, liberação por IP/porta, redirecionamento NAT (Port Forwarding) e `ss`/`tcpdump`.
+* 🌿 **[Guia de Ajuda Git & GitHub](ajuda_git.md)** — Workflow diário, gerenciamento de branches, `stash`, desfazer commits, `reset --hard` e remotos.
 * 🐘 **[Guia de Ajuda Samba](ajuda_samba.md)** — Comandos de servidor (Standalone e AD DC), `samba-tool`, `smbstatus`, comandos de cliente Linux/Windows e permissões POSIX ACL.
 * 🗂️ **[Guia de Ajuda LDAP / OpenLDAP](ajuda_ldap.md)** — Estrutura DIT, consultas com `ldapsearch`, inclusões com `ldapadd`, alterações com `ldapmodify`, `ldappasswd` e arquivos LDIF.
 * 🚀 **[Guia de Ajuda Nginx + PHP-FPM](ajuda_nginx.md)** — Estrutura de diretórios, blocos `server`, Reverse Proxy, PHP-FPM, timeouts e solução de erros (413, 502, 504).
