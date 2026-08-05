@@ -252,10 +252,13 @@ setfacl -R -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
 setfacl -R -d -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
 log_success "Diretório preparado e ACLs ativas: Novos arquivos em /var/www herdarão acesso total para www-data."
 
-log_info "Configurando ajustes globais do Nginx (tuning de conexões e suporte a WebSockets)..."
+log_info "Configurando ajustes globais do Nginx (tuning de conexões, segurança e WebSockets)..."
 cat <<EOF > /etc/nginx/conf.d/tuning.conf
 # Aumenta o limite de descriptores de arquivo para evitar avisos de ulimit
 worker_rlimit_nofile 65535;
+
+# SEGURANÇA: Oculta a versão do Nginx nos cabeçalhos HTTP e páginas de erro
+server_tokens off;
 EOF
 
 cat <<EOF > /etc/nginx/conf.d/websocket.conf

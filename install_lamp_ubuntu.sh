@@ -282,9 +282,16 @@ if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
     done
 fi
 
-log_info "Reiniciando Apache2 para carregar os módulos do PHP..."
+log_info "Aplicando endurecimento de segurança no Apache2 (ocultar versão e assinaturas)..."
+if [ -f /etc/apache2/conf-available/security.conf ]; then
+    sed -i 's/^ServerTokens .*/ServerTokens Prod/' /etc/apache2/conf-available/security.conf
+    sed -i 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
+    a2enconf security > /dev/null 2>&1 || true
+fi
+
+log_info "Reiniciando Apache2 para carregar as configurações de segurança e módulos do PHP..."
 systemctl restart apache2 > /dev/null 2>&1
-log_success "Apache2 reiniciado com suporte a PHP."
+log_success "Apache2 reiniciado com suporte a PHP e versão ocultada (ServerTokens Prod)."
 
 # ==========================================
 # CONFIGURAÇÃO DE PERMISSÕES E POSIX ACLs
