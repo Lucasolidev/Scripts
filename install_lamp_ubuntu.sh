@@ -1,21 +1,25 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.0
+# Version: 1.1
 # ------------------------------------------------
-VERSION="1.0"
+VERSION="1.1"
 # ==============================================================================
-# SCRIPT DE INSTALAÇÃO DA PILHA LAMP - UBUNTU SERVER (APACHE, MARIADB, PHP 8.3)
+# SCRIPT DE INSTALAÇÃO DA PILHA LAMP AUTOMÁTICO E ENDURECIDO - UBUNTU
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (exige Root/Sudo).
 # 2. Coleta parâmetros iniciais (senha do MariaDB, phpMyAdmin, regras UFW).
 # 3. Atualiza os repositórios do sistema.
 # 4. Instala e habilita o servidor web Apache2 com mod_rewrite ativado.
-# 5. Instala e configura o banco de dados MariaDB Server e ajusta a senha root.
-# 6. Adiciona o repositório ppa:ondrej/php e instala o PHP 8.3 com extensões essenciais.
-# 7. Opcionalmente instala e integra o phpMyAdmin ao Apache.
-# 8. Opcionalmente configura regras no firewall UFW para tráfego web.
-# 9. Cria uma página de diagnóstico phpinfo em /var/www/html/info.php.
+# 5. Aplica endurecimento de segurança no Apache2 (ServerTokens Prod e ServerSignature Off).
+# 6. Instala o MariaDB Server com senha root, limpeza de usuários anônimos e eliminação do banco 'test'.
+# 7. Adiciona o repositório ppa:ondrej/php e instala o PHP com extensões essenciais.
+# 8. Desativa funções PHP de alto risco no php.ini (system, shell_exec, passthru, show_source).
+# 9. Opcionalmente instala e integra o phpMyAdmin de forma não interativa ao Apache.
+# 10. Configura o Firewall UFW liberando portas 80 (HTTP), 443 (HTTPS) e 22 (SSH).
+# 11. Configura o Fail2Ban protegendo SSH, Apache Auth e ativa a jaula anti-scanners (apache-badbots).
+# 12. Cria uma página de diagnóstico phpinfo em /var/www/html/info.php.
+# 13. Exibe o Resumo Final do Sistema com todas as configurações de segurança ativas.
 # ==============================================================================
 # Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh

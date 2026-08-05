@@ -1,10 +1,21 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.0
+# Version: 1.1
 # ------------------------------------------------
-VERSION="1.0"
+VERSION="1.1"
 # ==============================================================================
-# INSTALADOR STACK LEMP (NGINX + MARIADB + PHP-FPM) - UBUNTU
+# INSTALADOR STACK LEMP AUTOMÁTICO E ENDURECIDO (NGINX + MARIADB + PHP-FPM)
+# ==============================================================================
+# O que este script faz (Descrição e Auditoria de Funções):
+# 1. Valida privilégios de execução (Root/Sudo) e atualiza repositórios do sistema.
+# 2. Configura a Stack LEMP (Nginx, MariaDB Server, PHP-FPM e módulos essenciais).
+# 3. Aplica endurecimento no Nginx (server_tokens off, worker_rlimit_nofile 65535 e suporte a WebSockets).
+# 4. Desativa funções PHP de alto risco no php.ini (system, shell_exec, passthru, show_source).
+# 5. Aplica segurança no MariaDB (senha root, remoção de usuários anônimos e eliminação do banco 'test').
+# 6. Aplica permissões automáticas POSIX ACLs (setfacl) em /var/www com herança total para www-data.
+# 7. Configura o Firewall UFW liberando portas 80 (HTTP), 443 (HTTPS) e 22 (SSH).
+# 8. Configura o Fail2Ban protegendo SSH, Nginx Auth e ativa a jaula anti-scanners (nginx-botsearch).
+# 9. Exibe o Resumo Final do Sistema com todas as configurações de segurança ativas.
 # ==============================================================================
 # Execução recomendada (download e execução local):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh
