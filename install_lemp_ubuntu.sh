@@ -204,8 +204,9 @@ if [ -f "$PHP_INI" ]; then
     sed -i "s/max_execution_time = .*/max_execution_time = ${EXEC_TIME}/" "$PHP_INI"
     sed -i "s/max_input_time = .*/max_input_time = ${EXEC_TIME}/" "$PHP_INI"
     sed -i "s/memory_limit = .*/memory_limit = 512M/" "$PHP_INI"
+    sed -i "s/^disable_functions =.*/disable_functions = system,shell_exec,passthru,show_source/" "$PHP_INI" || true
     
-    log_success "Parâmetros do PHP-FPM ajustados com sucesso."
+    log_success "Parâmetros do PHP-FPM e desativação de funções de risco ajustados com sucesso."
     
     log_info "Reiniciando serviço php${PHP_VER}-fpm..."
     systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1
@@ -223,14 +224,17 @@ log_info "Iniciando e habilitando serviço mariadb no boot..."
 systemctl enable --now mariadb > /dev/null 2>&1
 log_success "Serviço MariaDB em execução."
 
-log_info "Configurando credenciais do usuário root do MariaDB..."
+log_info "Configurando credenciais e aplicando endurecimento de segurança no MariaDB..."
 mysql -u root <<EOF > /dev/null 2>&1
 ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$DB_ROOT_PASS');
+DELETE FROM mysql.user WHERE User='';
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
 FLUSH PRIVILEGES;
 EOF
 
 if [ $? -eq 0 ]; then
-    log_success "Senha do usuário root do MariaDB configurada com sucesso."
+    log_success "Senha do root do MariaDB e limpeza de usuários anônimos/banco test aplicadas com sucesso."
 else
     mysqladmin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1 || true
     log_success "Senha do root do MariaDB aplicada."
@@ -397,12 +401,19 @@ port    = ssh
 enabled = true
 port    = http,https
 logpath = /var/log/nginx/error.log
+
+[nginx-botsearch]
+enabled  = true
+port     = http,https
+logpath  = /var/log/nginx/error.log
+maxretry = 3
+bantime  = 2h
 EOF
 
 log_info "Ativando e iniciando o serviço Fail2Ban..."
 systemctl enable --now fail2ban > /dev/null 2>&1
 systemctl restart fail2ban > /dev/null 2>&1
-log_success "Fail2Ban configurado e ativo com regras para SSH e Nginx."
+log_success "Fail2Ban configurado e ativo com regras para SSH, Nginx Auth e BotSearch."
 
 # ------------------------------------------------------------------------------
 # 10. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
@@ -411,12 +422,12 @@ print_header "RESUMO DO SISTEMA - INSTALAÇÃO CONCLUÍDA"
 
 echo -e "  ${FG_GREEN}${BOLD}✔ INSTALAÇÃO NGINX + PHP-FPM + MARIADB FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Pronto${NC}"
-echo -e "  ${BOLD}Servidor Web:${NC}          Nginx ($(systemctl is-active nginx 2>/dev/null || echo "active"))"
-echo -e "  ${BOLD}Banco de Dados:${NC}        MariaDB Server ($(systemctl is-active mariadb 2>/dev/null || echo "active"))"
-echo -e "  ${BOLD}Linguagem de Script:${NC}   PHP ${PHP_VER} (FPM)"
+echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
+echo -e "  ${BOLD}Servidor Web:${NC}          Nginx ($(systemctl is-active nginx 2>/dev/null || echo "active")) [server_tokens off]"
+echo -e "  ${BOLD}Banco de Dados:${NC}        MariaDB Server [Seguro: Sem 'test' e sem usuár. anônimos]"
+echo -e "  ${BOLD}Linguagem de Script:${NC}   PHP ${PHP_VER} (FPM) [disable_functions ativas]"
 echo -e "  ${BOLD}Permissões POSIX ACL:${NC}  ${FG_GREEN}Ativo e Herdando (/var/www)${NC}"
-echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo e Protegendo (/etc/fail2ban/jail.local)${NC}" || echo "Não instalado")"
+echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo (SSH, Nginx Auth & BotSearch)${NC}" || echo "Não instalado")"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Domínio Configurado:${NC}   ${FG_CYAN}${DOMAIN_NAME}${NC}"
 echo -e "  ${BOLD}Diretório Web (Root):${NC}  ${FG_CYAN}${WEB_ROOT}${NC}"

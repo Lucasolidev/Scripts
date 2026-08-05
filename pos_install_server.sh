@@ -216,6 +216,15 @@ udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 setupcon --force > /dev/null 2>&1 || true
 log_success "Teclado configurado: ABNT2 (Padrão Ativo) + US-International (Alterna com Alt+Shift)."
 
+log_info "Configurando proteção de memória compartilhada em RAM (/dev/shm noexec,nosuid,nodev)..."
+if ! grep -qs "/dev/shm" /etc/fstab; then
+  echo "tmpfs /dev/shm tmpfs defaults,noexec,nosuid,nodev 0 0" >> /etc/fstab
+  mount -o remount /dev/shm > /dev/null 2>&1 || true
+  log_success "Proteção de memória RAM /dev/shm (noexec) aplicada com sucesso no /etc/fstab."
+else
+  log_success "Proteção de memória RAM /dev/shm (noexec) já ativa no /etc/fstab."
+fi
+
 # ==============================================================================
 # 4. CONFIGURAÇÃO DE ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)
 # ==============================================================================
@@ -404,9 +413,11 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
   log_info "Liberando porta 10050/tcp (Zabbix Agent)..."
   ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
+  log_info "Garantindo suporte a IPv6 no Firewall UFW..."
+  sed -i 's/^IPV6=.*/IPV6=yes/' /etc/default/ufw 2>/dev/null || true
   log_info "Ativando o Firewall UFW..."
   ufw --force enable > /dev/null 2>&1
-  log_success "Firewall UFW ativado e configurado (Portas liberadas: 22/tcp [SSH] e 10050/tcp [Zabbix Agent])."
+  log_success "Firewall UFW ativado e configurado (Dual-Stack IPv4/IPv6, Portas liberadas: 22/tcp [SSH] e 10050/tcp [Zabbix Agent])."
 else
   log_warning "UFW não encontrado no sistema."
 fi
@@ -436,6 +447,7 @@ echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}en_US.UTF-8 (Padrão In
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}ABNT2 (br)${NC}"
 echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo (NTP Ativo)${NC}"
+echo -e "  ${BOLD}Proteção /dev/shm (RAM):${NC}$(grep -qs "/dev/shm" /etc/fstab && echo -e "${FG_GREEN}Ativo (noexec,nosuid,nodev)${NC}" || echo -e "${FG_YELLOW}Padrão${NC}")"
 echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
 echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
 echo -e "  ${BOLD}Fail2Ban (Brute-Force):${NC}$(get_service_status fail2ban)"

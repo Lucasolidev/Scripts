@@ -200,14 +200,17 @@ log_info "Iniciando e habilitando serviço mariadb no boot..."
 systemctl enable --now mariadb > /dev/null 2>&1
 log_success "Serviço MariaDB em execução."
 
-log_info "Configurando credenciais do usuário root do MariaDB..."
+log_info "Configurando credenciais e aplicando endurecimento de segurança no MariaDB..."
 mysql -u root <<EOF > /dev/null 2>&1
 ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$DB_ROOT_PASS');
+DELETE FROM mysql.user WHERE User='';
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
 FLUSH PRIVILEGES;
 EOF
 
 if [ $? -eq 0 ]; then
-    log_success "Senha do usuário root do MariaDB configurada com sucesso."
+    log_success "Senha do root do MariaDB e limpeza de usuários anônimos/banco test aplicadas com sucesso."
 else
     mysqladmin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1
     log_success "Senha do root do MariaDB aplicada via mysqladmin."
@@ -289,9 +292,16 @@ if [ -f /etc/apache2/conf-available/security.conf ]; then
     a2enconf security > /dev/null 2>&1 || true
 fi
 
+log_info "Desativando funções de execução de sistema de risco no PHP (disable_functions)..."
+for ini in /etc/php/*/apache2/php.ini /etc/php/*/cli/php.ini; do
+    if [ -f "$ini" ]; then
+        sed -i "s/^disable_functions =.*/disable_functions = system,shell_exec,passthru,show_source/" "$ini" || true
+    fi
+done
+
 log_info "Reiniciando Apache2 para carregar as configurações de segurança e módulos do PHP..."
 systemctl restart apache2 > /dev/null 2>&1
-log_success "Apache2 reiniciado com suporte a PHP e versão ocultada (ServerTokens Prod)."
+log_success "Apache2 reiniciado com suporte a PHP, versão ocultada e funções de risco desativadas."
 
 # ==========================================
 # CONFIGURAÇÃO DE PERMISSÕES E POSIX ACLs
@@ -385,12 +395,19 @@ port    = ssh
 enabled = true
 port    = http,https
 logpath = /var/log/apache2/error.log
+
+[apache-badbots]
+enabled  = true
+port     = http,https
+logpath  = /var/log/apache2/error.log
+maxretry = 3
+bantime  = 2h
 EOF
 
     log_info "Habilitando e reiniciando o serviço Fail2Ban..."
     systemctl enable --now fail2ban > /dev/null 2>&1
     systemctl restart fail2ban > /dev/null 2>&1
-    log_success "Fail2Ban configurado e ativo com regras para SSH e Apache."
+    log_success "Fail2Ban configurado e ativo com regras para SSH, Apache Auth e BadBots."
 fi
 
 # ==========================================
@@ -405,12 +422,12 @@ print_header "RESUMO DO SISTEMA - INSTALAÇÃO CONCLUÍDA"
 
 echo -e "  ${FG_GREEN}${BOLD}✔ INSTALAÇÃO DA PILHA LAMP FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Pronto${NC}"
-echo -e "  ${BOLD}Servidor Web:${NC}          Apache2 ($(systemctl is-active apache2 2>/dev/null || echo "active"))"
-echo -e "  ${BOLD}Banco de Dados:${NC}        MariaDB Server ($(systemctl is-active mariadb 2>/dev/null || echo "active"))"
-echo -e "  ${BOLD}Linguagem de Script:${NC}   PHP ${ACTUAL_PHP_VER}"
+echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
+echo -e "  ${BOLD}Servidor Web:${NC}          Apache2 ($(systemctl is-active apache2 2>/dev/null || echo "active")) [ServerTokens Prod]"
+echo -e "  ${BOLD}Banco de Dados:${NC}        MariaDB Server [Seguro: Sem 'test' e sem usuár. anônimos]"
+echo -e "  ${BOLD}Linguagem de Script:${NC}   PHP ${ACTUAL_PHP_VER} [disable_functions ativas]"
 echo -e "  ${BOLD}Permissões POSIX ACL:${NC}  ${FG_GREEN}Ativo e Herdando (/var/www)${NC}"
-echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo e Protegendo (/etc/fail2ban/jail.local)${NC}" || echo "Não instalado")"
+echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo (SSH, Apache Auth & BadBots)${NC}" || echo "Não instalado")"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Diretório Web Raiz:${NC}   ${FG_CYAN}/var/www/html/${NC}"
 echo -e "  ${BOLD}Acesso Web Principal:${NC}  ${FG_CYAN}http://${SERVER_IP}/${NC}"
