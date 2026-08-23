@@ -388,7 +388,7 @@ ACTUAL_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
 
 if [ -n "$ACTUAL_SOCK" ]; then
     cat <<EOF > /etc/apache2/conf-available/joomla-php-fpm.conf
-<FilesMatch \\.php\$>
+<FilesMatch \.php$>
     SetHandler "proxy:unix:${ACTUAL_SOCK}|fcgi://localhost"
 </FilesMatch>
 EOF
