@@ -307,6 +307,19 @@ print_header "INSTALAÇÃO DO PHP (RECOMENDADO JOOMLA 5)"
 # Tenta configurar o PPA ondrej/php se a versão solicitada for específica (ex: 8.3 no Ubuntu LTS)
 log_info "Configurando repositórios de pacotes do PHP..."
 LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
+
+# Caso a versão do Ubuntu (ex: 26.04) não tenha pacotes compilados no PPA, ajusta as sources para o Ubuntu 24.04 LTS (noble)
+UBUNTU_CODENAME=$(lsb_release -cs 2>/dev/null || echo "noble")
+for f in /etc/apt/sources.list.d/*ondrej*php*.list /etc/apt/sources.list.d/*ondrej*php*.sources; do
+    if [ -f "$f" ]; then
+        sed -i 's/devel/noble/g; s/resolute/noble/g; s/plucky/noble/g; s/oracular/noble/g' "$f" 2>/dev/null || true
+    fi
+done
+
+if [ ! -f /etc/apt/sources.list.d/ondrej-ubuntu-php-*.list ] && [ ! -f /etc/apt/sources.list.d/ondrej-php.list ]; then
+    echo "deb [signed-by=/etc/apt/trusted.gpg.d/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu noble main" > /etc/apt/sources.list.d/ondrej-php.list
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC0831756756D7F66C4F4EA0AAE5267A6C" | gpg --dearmor -o /etc/apt/trusted.gpg.d/ondrej-php.gpg > /dev/null 2>&1 || true
+fi
 apt-get update -y > /dev/null 2>&1 || true
 
 PHP_INSTALLED=false
