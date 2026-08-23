@@ -373,13 +373,11 @@ else
     log_warning "Versão PHP detectada: ${PHP_VER}"
 fi
 
-# Garante o serviço PHP-FPM ativo
-systemctl enable --now "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable --now php-fpm > /dev/null 2>&1 || true
-
 # Configura o Apache para processar PHP via FastCGI / PHP-FPM (Padrão ouro moderno)
 log_info "Integrando PHP-FPM ao Apache 2.4 (proxy_fcgi)..."
 a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
 a2enconf "php${PHP_VER}-fpm" > /dev/null 2>&1 || a2enconf php-fpm > /dev/null 2>&1 || true
+systemctl restart apache2 > /dev/null 2>&1 || true
 
 # ==============================================================================
 # 7. AJUSTES DE PERFORMANCE E HARDENING NO PHP.INI
@@ -445,10 +443,6 @@ cat <<EOF > /etc/apache2/sites-available/${DOMAIN_NAME}.conf
         Require all granted
     </Directory>
 
-    <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php${PHP_VER}-fpm.sock|fcgi://localhost"
-    </FilesMatch>
-
     # Bloqueio de Segurança: Arquivos Ocultos (.git, .env, etc.)
     <FilesMatch "^\.">
         Require all denied
@@ -483,10 +477,6 @@ cat <<EOF > /etc/apache2/sites-available/000-default.conf
         AllowOverride All
         Require all granted
     </Directory>
-
-    <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php${PHP_VER}-fpm.sock|fcgi://localhost"
-    </FilesMatch>
 
     # Headers de Segurança
     Header always set X-Content-Type-Options "nosniff"
