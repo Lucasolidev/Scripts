@@ -266,14 +266,14 @@ log_success "Serviço MariaDB em execução."
 log_info "Configurando credenciais e aplicando endurecimento de segurança no MariaDB..."
 TMP_SQL=$(mktemp)
 cat <<EOF > "$TMP_SQL"
-ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$DB_ROOT_PASS');
+ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('${DB_ROOT_PASS}');
 DELETE FROM mysql.user WHERE User='';
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
 FLUSH PRIVILEGES;
 EOF
 
-mariadb < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" < "$TMP_SQL" > /dev/null 2>&1 || mysql -u root < "$TMP_SQL" > /dev/null 2>&1 || true
+mariadb < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root < "$TMP_SQL" > /dev/null 2>&1 || mysqladmin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1 || true
 rm -f "$TMP_SQL"
 log_success "Senha do root do MariaDB e limpeza de usuários anônimos/banco test aplicadas com sucesso."
 
