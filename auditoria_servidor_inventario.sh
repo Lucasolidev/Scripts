@@ -244,15 +244,24 @@ print_header "5. VERSÕES DO PHP E MÓDULOS"
 
 if command -v php > /dev/null 2>&1; then
     CLI_PHP_VER=$(php -r 'echo PHP_VERSION;' 2>/dev/null)
-    log_success "PHP CLI Padrão: ${BOLD}PHP ${CLI_PHP_VER}${NC}"
+    log_success "PHP CLI Padrão (Linha de Comando): ${BOLD}PHP ${CLI_PHP_VER}${NC}"
     
+    # Checa versão ativa no Apache
+    APACHE_PHP_MOD=$(ls /etc/apache2/mods-enabled/php*.load 2>/dev/null | head -n 1)
+    if [ -n "$APACHE_PHP_MOD" ]; then
+        AP_VER=$(basename "$APACHE_PHP_MOD" .load | sed 's/php//')
+        log_success "PHP Ativo no Web Server Apache:   ${BOLD}PHP ${AP_VER}${NC}"
+    fi
+
     echo -e "\n  ${BOLD}Versões do PHP encontradas no sistema (/etc/php/):${NC}"
     if [ -d /etc/php ]; then
         for php_dir in /etc/php/*; do
             if [ -d "$php_dir" ]; then
                 V=$(basename "$php_dir")
                 FPM_STATUS=$(get_service_status "php${V}-fpm")
-                echo -e "    • ${BOLD}PHP ${V}${NC} [FPM: ${FPM_STATUS}]"
+                IS_APACHE=""
+                [ -f "/etc/apache2/mods-enabled/php${V}.load" ] && IS_APACHE="${FG_GREEN}[Ativo no Apache]${NC}"
+                echo -e "    • ${BOLD}PHP ${V}${NC} ${IS_APACHE} [FPM: ${FPM_STATUS}]"
             fi
         done
     fi

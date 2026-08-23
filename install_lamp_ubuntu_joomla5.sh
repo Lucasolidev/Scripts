@@ -366,8 +366,9 @@ if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
 fi
 
 # Garante a comutação para a versão solicitada no CLI e no Apache
-if command -v "php${PHP_VER}" > /dev/null 2>&1; then
+if [ -f "/usr/bin/php${PHP_VER}" ]; then
     log_info "Ativando PHP ${PHP_VER} como padrão no sistema (CLI e Apache)..."
+    update-alternatives --install /usr/bin/php php "/usr/bin/php${PHP_VER}" 100 > /dev/null 2>&1 || true
     update-alternatives --set php "/usr/bin/php${PHP_VER}" > /dev/null 2>&1 || true
     
     # Desativa outros módulos de PHP no Apache e ativa a versão solicitada
