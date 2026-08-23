@@ -200,13 +200,20 @@ if command -v apache2 > /dev/null 2>&1 || command -v httpd > /dev/null 2>&1; the
     log_success "Apache detectado: ${BOLD}${APACHE_VER}${NC} [$(get_service_status apache2)]"
     
     echo -e "    ${BOLD}Módulos Apache Habilitados:${NC}"
-    APACHE_MODS=$($APACHE_BIN -M 2>/dev/null | grep -o "[a-z0-9_]*_module" | sed 's/_module//' | xargs)
+    APACHE_MODS=$(apache2ctl -M 2>/dev/null | grep -E "_module" | awk '{print $1}' | sed 's/_module//' | xargs)
+    [ -z "$APACHE_MODS" ] && APACHE_MODS=$($APACHE_BIN -M 2>/dev/null | grep -E "_module" | awk '{print $1}' | sed 's/_module//' | xargs)
     echo -e "    ${DIM}${APACHE_MODS:-Nenhum detectado}${NC}"
     
     echo -e "\n    ${BOLD}VirtualHosts / Sites Ativos no Apache:${NC}"
-    $APACHE_BIN -S 2>/dev/null | grep -E "namevhost|port 80|port 443|default" | while read -r line; do
-        echo -e "      • ${line}"
-    done
+    APACHE_VHOSTS=$(apache2ctl -S 2>/dev/null | grep -E "port 80|port 443|namevhost|default" | sed 's/^[ \t]*//')
+    [ -z "$APACHE_VHOSTS" ] && APACHE_VHOSTS=$($APACHE_BIN -S 2>/dev/null | grep -E "port 80|port 443|namevhost|default" | sed 's/^[ \t]*//')
+    if [ -n "$APACHE_VHOSTS" ]; then
+        echo "$APACHE_VHOSTS" | while read -r line; do
+            echo -e "      • ${line}"
+        done
+    else
+        echo -e "      • Nenhum VirtualHost ativo encontrado."
+    fi
 else
     log_info "Apache2: Não instalado"
 fi
@@ -307,23 +314,34 @@ for base_dir in "${SCAN_DIRS[@]}"; do
         while IFS= read -r joomla_ver_file; do
             if [ -f "$joomla_ver_file" ]; then
                 APP_DIR=$(dirname "$(dirname "$joomla_ver_file")")
-                J_VER=$(grep -E 'public const (RELEASE|DEV_LEVEL|DEV_STATUS)|public \$RELEASE|public \$DEV_LEVEL' "$joomla_ver_file" 2>/dev/null | awk '{print $NF}' | tr -d "';" | xargs)
-                J_VER_CLEAN=$(echo "$J_VER" | tr ' ' '.')
+                [ "$APP_DIR" = "." ] && APP_DIR=$(pwd)
+                
+                # Tenta extrair a versão exata via PHP CLI instanciando a classe Version do Joomla
+                J_VER_EXACT=$(php -r "require_once '$joomla_ver_file'; if (class_exists('Joomla\CMS\Version')) { echo \Joomla\CMS\Version::MAJOR_VERSION . '.' . \Joomla\CMS\Version::MINOR_VERSION . '.' . \Joomla\CMS\Version::PATCH_VERSION; } elseif (class_exists('JVersion')) { \$v = new JVersion(); echo \$v->getShortVersion(); }" 2>/dev/null)
+                
+                # Fallback via regex no arquivo Version.php
+                if [ -z "$J_VER_EXACT" ]; then
+                    MAJOR=$(grep -E "const\s+MAJOR_VERSION|public\s+\$RELEASE" "$joomla_ver_file" 2>/dev/null | head -n 1 | awk '{print $NF}' | tr -d "';\"")
+                    MINOR=$(grep -E "const\s+MINOR_VERSION|public\s+\$DEV_LEVEL" "$joomla_ver_file" 2>/dev/null | head -n 1 | awk '{print $NF}' | tr -d "';\"")
+                    PATCH=$(grep -E "const\s+PATCH_VERSION|public\s+\$BUILD" "$joomla_ver_file" 2>/dev/null | head -n 1 | awk '{print $NF}' | tr -d "';\"")
+                    [ -n "$MAJOR" ] && J_VER_EXACT="${MAJOR}.${MINOR:-0}.${PATCH:-0}"
+                fi
+
                 log_success "Joomla Detectado!"
                 log_item "Caminho" "${FG_CYAN}${APP_DIR}${NC}"
-                log_item "Versão"  "${FG_YELLOW}Joomla ${J_VER_CLEAN:-5.x/4.x}${NC}"
+                log_item "Versão"  "${FG_YELLOW}Joomla ${J_VER_EXACT:-5.x/4.x}${NC}"
                 
                 # Checa se configuration.php existe para extrair o banco
                 if [ -f "${APP_DIR}/configuration.php" ]; then
-                    J_DB=$(grep "public \$db " "${APP_DIR}/configuration.php" | cut -d"'" -f2)
-                    J_USER=$(grep "public \$user " "${APP_DIR}/configuration.php" | cut -d"'" -f2)
-                    J_PREFIX=$(grep "public \$dbprefix " "${APP_DIR}/configuration.php" | cut -d"'" -f2)
-                    log_item "Banco Vinculado" "Base: ${FG_CYAN}${J_DB}${NC} | Usuário: ${J_USER} | Prefixo: ${J_PREFIX}"
+                    J_DB=$(grep "public \$db " "${APP_DIR}/configuration.php" 2>/dev/null | cut -d"'" -f2)
+                    J_USER=$(grep "public \$user " "${APP_DIR}/configuration.php" 2>/dev/null | cut -d"'" -f2)
+                    J_PREFIX=$(grep "public \$dbprefix " "${APP_DIR}/configuration.php" 2>/dev/null | cut -d"'" -f2)
+                    log_item "Banco Vinculado" "Base: ${FG_CYAN}${J_DB:-Não definido}${NC} | Usuário: ${J_USER:-Não definido} | Prefixo: ${J_PREFIX:-jos_}"
                 fi
                 echo -e ""
                 ((FOUND_APPS++))
             fi
-        done < <(find "$base_dir" -maxdepth 5 -type f \( -path "*/libraries/src/Version.php" -o -path "*/includes/version.php" \) 2>/dev/null)
+        done < <(find "$base_dir" -maxdepth 6 -type f \( -path "*/libraries/src/Version.php" -o -path "*/includes/version.php" \) 2>/dev/null)
 
         # 2. WordPress
         while IFS= read -r wp_ver_file; do
