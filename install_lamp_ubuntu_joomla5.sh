@@ -257,15 +257,19 @@ log_success "Serviço MariaDB em execução ($(mariadb --version 2>/dev/null | a
 
 log_info "Otimizando charset MariaDB para UTF8MB4 (Obrigatório Joomla 5)..."
 cat <<'EOF' > /etc/mysql/mariadb.conf.d/60-joomla5.cnf
-[client-server]
-character-set-server = utf8mb4
-collation-server     = utf8mb4_unicode_ci
+[client]
+default-character-set = utf8mb4
+
+[mysql]
+default-character-set = utf8mb4
 
 [mysqld]
-innodb_file_per_table = 1
+character-set-server   = utf8mb4
+collation-server       = utf8mb4_unicode_ci
+innodb_file_per_table  = 1
 innodb_buffer_pool_size = 256M
-max_allowed_packet    = 64M
-sql_mode              = "STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+max_allowed_packet     = 64M
+sql_mode               = "STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
 EOF
 
 systemctl restart mariadb > /dev/null 2>&1
