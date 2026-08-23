@@ -109,7 +109,11 @@
 > 8. **Estrutura Sequencial e Numerada de Etapas**:
 >    Todas as etapas lógicas de execução do script devem ser claramente identificadas por cabeçalhos e comentários numerados sequencialmente (ex: `# 1. VERIFICAÇÃO DE PRIVILÉGIOS`, `# 2. COLETA DE PARÂMETROS`, ..., `# N. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG`). Isso facilita a auditoria, leitura e manutenção do código.
 > 
-> 9. **Registro e Salvamento de Logs (Etapa Final Obrigatória)**:
+> 9. **Isolamento e Separação Rígida por Versão da Distribuição (OS Release Branching)**:
+>    - **Regra Arquitetural Obrigatória:** Quando houver diferenças de repositórios, versões de pacotes ou comportamentos entre versões de SO (ex: Ubuntu 22.04 / 24.04 LTS vs Ubuntu 26.04 Dev), **SEPARE RIGOROSAMENTE** os blocos de código em condicionais explícitas baseadas em `lsb_release -rs` ou `/etc/os-release`.
+>    - **Proteção do Ambiente Estável de Produção:** Mudanças ou adaptações para versões em desenvolvimento (ex: Ubuntu 26.04) **JAMAIS** devem alterar, sobrescrever ou arriscar o fluxo de versões LTS estáveis de produção (ex: Ubuntu 22.04 / 24.04). Mantenha fluxos de código isolados e dedicados por ramo de distribuição.
+> 
+> 10. **Registro e Salvamento de Logs (Etapa Final Obrigatória)**:
 >    - No início da execução (logo após validação de privilégios), inicialize a captura do console e arquivo temporário:
 >      ```bash
 >      LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
@@ -147,7 +151,7 @@
 >      echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 >      ```
 > 
-> 10. **Resultado Final Estruturado (Resumo da Instalação)**:
+> 11. **Resultado Final Estruturado (Resumo da Instalação)**:
 >    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
 >    **Obrigatório**: É fundamental incluir a linha de **Pacotes/Programas Instalados** detalhando os softwares adicionados ao sistema durante a execução (armazenando na array `PACOTES_INSTALADOS` e formatando com `LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")`).
 >    
@@ -177,7 +181,7 @@
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 >    ```
 > 
-> 11. **Cabeçalho de Metadados e Comentários**:
+> 12. **Cabeçalho de Metadados e Comentários**:
 >    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual que está sendo criado nas URLs de exemplo:
 >    ```bash
 >    #!/bin/bash
