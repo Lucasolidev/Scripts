@@ -39,8 +39,10 @@
 >    }
 >    ```
 > 
-> 3. **Interatividade e Coleta de Parâmetros**:
->    Todas as perguntas (`read -p`) devem ser agrupadas no início em um bloco chamado `"COLETA DE PARÂMETROS"`. Utilize o padrão `  ${FG_YELLOW}${ARROW} Pergunta? (s/N): ${NC}` nas perguntas do `read` (onde `(s/N)` indica que o padrão ao apertar ENTER é Não).
+> 3. **Interatividade e Coleta de Parâmetros com Feedback Visual Imediato**:
+>    - Todas as perguntas (`read -p`) devem ser agrupadas no início em um bloco chamado `"COLETA DE PARÂMETROS"`.
+>    - Utilize o padrão `  ${FG_YELLOW}${ARROW} Pergunta? (s/N): ${NC}` nas perguntas do `read` (onde `(s/N)` indica que o padrão ao apertar ENTER é Não).
+>    - **Feedback Visual Imediato (`log_info`)**: Imediatamente após a coleta de qualquer entrada do usuário (seja um valor digitado, gerado aleatoriamente ou o valor padrão assumido ao dar ENTER), exiba uma linha com `log_info` confirmando o valor definido (ex: `log_info "Nome do Banco definido: ${FG_GREEN}${JOOMLA_DB_NAME}${NC}"`). Isso dá clareza e segurança visual ao operador.
 > 
 > 4. **Instalação Silenciosa e Limpa**:
 >    Quando houver instalação de pacotes via `apt` ou outro gerenciador, execute de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.
