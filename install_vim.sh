@@ -1,11 +1,10 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.0
+# Version: 1.1
 # ------------------------------------------------
-VERSION="1.0"
+VERSION="1.1"
 # ==============================================================================
-# SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO EDITOR VIM - UBUNTU 26.04
-# ==============================================================================
+# SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO EDITOR VIM - UBUNTU SERVER / DESKTOP
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_vim.sh -O install_vim.sh && chmod +x install_vim.sh && sudo ./install_vim.sh
@@ -64,28 +63,22 @@ sudo -v
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
 print_header "INSTALAÇÃO DE PACOTES"
-log_info "Verificando e instalando dependências base (nala, curl, git)..."
-if sudo apt-get update > /dev/null 2>&1 && sudo apt-get install -y nala curl git > /dev/null 2>&1; then
-    log_success "Dependências instaladas."
+log_info "Verificando e instalando dependências base (curl, git, vim)..."
+if sudo apt-get update > /dev/null 2>&1 && sudo apt-get install -y curl git vim > /dev/null 2>&1; then
+    log_success "Dependências e Vim instalados."
 else
     log_error "Falha ao instalar dependências base."
 fi
 
-log_info "Instalando vim e python3-pip via nala..."
-if sudo nala install -y vim python3-pip > /dev/null 2>&1; then
-    log_success "Vim e python3-pip instalados."
-else
-    log_error "Falha ao instalar vim e pip."
-fi
-
 print_header "CONFIGURAÇÃO DO VIM"
 log_info "Baixando o gerenciador de plugins 'vim-plug'..."
-curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+sudo mkdir -p /root/.vim/autoload /root/.vim/plugged /etc/skel/.vim/autoload /etc/skel/.vim/plugged
+sudo curl -fLo /root/.vim/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim > /dev/null 2>&1
-log_success "Vim-plug baixado."
+log_success "Vim-plug baixado com sucesso."
 
-log_info "Criando o arquivo de configuração ~/.vimrc..."
-cat << 'EOF' > ~/.vimrc
+log_info "Criando o arquivo de configuração /root/.vimrc..."
+sudo cat << 'EOF' > /root/.vimrc
 " Seção de Plugins (vim-plug) """""""""""""""""""""""""""""""""""""""""""""""""
 call plug#begin('~/.vim/plugged')
 
@@ -150,14 +143,28 @@ let g:airline_theme = 'sonokai'
 let g:airline#extensions#tabline#enabled = 1
 let g:airline_powerline_fonts = 1
 EOF
-log_success "Arquivo ~/.vimrc criado com sucesso."
+log_success "Arquivo /root/.vimrc criado com sucesso."
 
-log_info "Instalando os plugins do Vim de forma isolada..."
-vim -u NONE -N -e -s -c "source ~/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1
+log_info "Instalando os plugins do Vim via vim-plug..."
+sudo vim -u NONE -N -e -s -c "source /root/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1 || true
 log_success "Plugins do Vim instalados."
 
+log_info "Replicando configurações para /etc/skel e diretórios /home..."
+sudo cp /root/.vimrc /etc/skel/.vimrc 2>/dev/null || true
+sudo cp -r /root/.vim /etc/skel/ 2>/dev/null || true
+
+for user_home in /home/*; do
+  if [ -d "$user_home" ]; then
+    user_name=$(basename "$user_home")
+    sudo cp /root/.vimrc "$user_home/.vimrc" 2>/dev/null || true
+    sudo cp -r /root/.vim "$user_home/" 2>/dev/null || true
+    sudo chown -R "$user_name:$user_name" "$user_home/.vimrc" "$user_home/.vim" 2>/dev/null || true
+  fi
+done
+log_success "Configurações aplicadas para todos os usuários em /home e /etc/skel."
+
 print_header "RESUMO DO SISTEMA"
-log_success "Editor Vim instalado e personalizado com sucesso!"
+log_success "Editor Vim instalado e personalizado com sucesso para todos os usuários!"
 echo ""
 draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"

@@ -1,15 +1,15 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.5
+# Version: 1.6
 # ------------------------------------------------
-VERSION="1.5"
+VERSION="1.6"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (exige Root/Sudo) e captura logs de auditoria em /root e na Home.
 # 2. Atualiza os espelhos do APT e aplica patches de segurança do sistema (opcional).
-# 3. Instala utilitários vitais (curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades).
+# 3. Instala utilitários vitais (curl, vim, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades).
 # 4. Ajusta locales (en_US/pt_BR UTF-8), fuso horário (America/Sao_Paulo + NTP) e layout de teclado (ABNT2 + US-Intl).
 # 5. Aplica proteção de memória compartilhada em RAM (/dev/shm) montada com 'noexec,nosuid,nodev' no /etc/fstab contra botnets/webshells.
 # 6. Configura aliases de produtividade e segurança no Shell (ll='ls -alFh', rm, cp, mv, df, free, ports, myip, update, clean, reload).
@@ -18,8 +18,9 @@ VERSION="1.5"
 # 9. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset' (sudo).
 # 10. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
 # 11. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH (22/tcp) e Zabbix Agent (10050/tcp).
-# 12. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, IP, Uptime, RAM e Disco.
-# 13. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
+# 12. Configura e personaliza o editor Vim com tema Sonokai, Airline e plugins com suporte multi-usuário (/root, /etc/skel, /home).
+# 13. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, IP, Uptime, RAM e Disco.
+# 14. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh -O pos_install_server.sh && chmod +x pos_install_server.sh && sudo ./pos_install_server.sh
@@ -60,7 +61,7 @@ print_header() {
     local title="$1"
     echo -e ""
     echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
-    draw_separator
+    draw_separato
 }
 
 get_service_status() {
@@ -102,7 +103,7 @@ print_alert_box() {
 garantir_home() {
     local usuario="$1"
     if id "$usuario" &>/dev/null; then
-        local home_dir
+        local home_di
         home_dir=$(getent passwd "$usuario" | cut -d: -f6)
         if [ -n "$home_dir" ] && [ ! -d "$home_dir" ]; then
             log_warning "Diretório home '$home_dir' do usuário '$usuario' não existia. Criando..."
@@ -120,7 +121,7 @@ garantir_home() {
 # INÍCIO DO SCRIPT
 # ==============================================================================
 
-clear
+clea
 
 # Verificar se o script está rodando como root
 if [ "$(id -u)" -ne 0 ]; then 
@@ -164,7 +165,7 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   done
 fi
 
-draw_separator
+draw_separato
 log_info "Configurações coletadas. Iniciando os procedimentos..."
 
 # ==============================================================================
@@ -375,9 +376,9 @@ log_info "Verificando usuários padrão (administrador e geset)..."
 if [[ "$CRIAR_ADMIN" =~ ^[Ss]$ ]]; then
   if ! id "administrador" &>/dev/null; then
     log_warning "Usuário 'administrador' não encontrado. Criando com acesso Sudo..."
-    useradd -m -s /bin/bash -G sudo administrador
+    useradd -m -s /bin/bash -G sudo administrado
     echo -e "  ${FG_YELLOW}${ARROW} Defina a senha para o usuário 'administrador':${NC}"
-    passwd administrador
+    passwd administrado
   else
     log_success "Usuário 'administrador' já existe."
   fi
@@ -477,7 +478,107 @@ else
 fi
 
 # ==============================================================================
-# 10. BANNER DINÂMICO DE BOAS-VINDAS NO LOGIN (/etc/profile.d/motd_banner.sh)
+# 10. CONFIGURAÇÃO DO EDITOR VIM E PLUGINS
+# ==============================================================================
+print_header "CONFIGURAÇÃO DO EDITOR VIM (PLUGINS & TEMA SONOKAI)"
+
+log_info "Configurando o editor Vim com tema Sonokai e Airline..."
+mkdir -p /root/.vim/autoload /root/.vim/plugged /etc/skel/.vim/autoload /etc/skel/.vim/plugged
+
+if [ ! -f /root/.vim/autoload/plug.vim ]; then
+  log_info "Baixando o gerenciador de plugins 'vim-plug'..."
+  curl -fLo /root/.vim/autoload/plug.vim --create-dirs \
+      https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim > /dev/null 2>&1 || true
+fi
+
+cat << 'EOF' > /root/.vimrc
+" Seção de Plugins (vim-plug) """""""""""""""""""""""""""""""""""""""""""""""""
+call plug#begin('~/.vim/plugged')
+
+Plug 'sainnhe/sonokai'
+Plug 'vim-airline/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+Plug 'ryanoasis/vim-devicons'
+Plug 'sheerun/vim-polyglot'
+
+call plug#end()
+
+" Global Sets """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+syntax on            " Enable syntax highlight
+set nu               " Enable line numbers
+set tabstop=4        " Show existing tab with 4 spaces width
+set softtabstop=4    " Show existing tab with 4 spaces width
+set shiftwidth=4     " When indenting with '>', use 4 spaces width
+set expandtab        " On pressing tab, insert 4 spaces
+set smarttab         " insert tabs on the start of a line according to shiftwidth
+set smartindent      " Automatically inserts one extra level of indentation in some cases
+set hidden           " Hides the current buffer when a new file is openned
+set incsearch        " Incremental search
+set ignorecase       " Ingore case in search
+set smartcase        " Consider case if there is a upper case characte
+set scrolloff=8      " Minimum number of lines to keep above and below the curso
+set colorcolumn=100  " Draws a line at the given line to keep aware of the line size
+set signcolumn=yes   " Add a column on the left. Useful for linting
+set cmdheight=2      " Give more space for displaying messages
+set updatetime=100   " Time in miliseconds to consider the changes
+set encoding=utf-8   " The encoding should be utf-8 to activate the font icons
+set nobackup         " No backup files
+set nowritebackup    " No backup files
+set splitright       " Create the vertical splits to the right
+set splitbelow       " Create the horizontal splits below
+set autoread         " Update vim after file update from outside
+set mouse=a          " Enable mouse support
+filetype on          " Detect and set the filetype option and trigger the FileType Event
+filetype plugin on   " Load the plugin file for the file type, if any
+filetype indent on   " Load the indent file for the file type, if any
+
+" Themes """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+if exists('+termguicolors')
+  let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
+  let &t_8b = "\<Esc>[48;2;%lu;%lu;%lum"
+  set termguicolors
+endif
+
+let g:sonokai_style = 'andromeda'
+let g:sonokai_enable_italic = 1
+let g:sonokai_disable_italic_comment = 0
+let g:sonokai_diagnostic_line_highlight = 1
+let g:sonokai_current_word = 'bold'
+colorscheme sonokai
+
+if (has("nvim"))
+    highlight Normal guibg=NONE ctermbg=NONE
+    highlight EndOfBuffer guibg=NONE ctermbg=NONE
+endif
+
+" AirLine """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+let g:airline_theme = 'sonokai'
+let g:airline#extensions#tabline#enabled = 1
+let g:airline_powerline_fonts = 1
+EOF
+
+if command -v vim >/dev/null 2>&1 && [ -f /root/.vim/autoload/plug.vim ]; then
+  log_info "Instalando plugins do Vim via vim-plug..."
+  vim -u NONE -N -e -s -c "source /root/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1 || true
+fi
+
+# Replica a configuração do Vim para o /etc/skel e para todos os usuários em /home
+cp /root/.vimrc /etc/skel/.vimrc 2>/dev/null || true
+cp -r /root/.vim /etc/skel/ 2>/dev/null || true
+
+for user_home in /home/*; do
+  if [ -d "$user_home" ]; then
+    user_name=$(basename "$user_home")
+    cp /root/.vimrc "$user_home/.vimrc" 2>/dev/null || true
+    cp -r /root/.vim "$user_home/" 2>/dev/null || true
+    chown -R "$user_name:$user_name" "$user_home/.vimrc" "$user_home/.vim" 2>/dev/null || true
+  fi
+done
+
+log_success "Editor Vim configurado com plugins (Sonokai/Airline) em /root, /etc/skel e /home."
+
+# ==============================================================================
+# 11. BANNER DINÂMICO DE BOAS-VINDAS NO LOGIN (/etc/profile.d/motd_banner.sh)
 # ==============================================================================
 print_header "BANNER DE BOAS-VINDAS NO LOGIN"
 log_info "Configurando banner de boas-vindas dinâmico em /etc/profile.d/motd_banner.sh..."
@@ -485,7 +586,7 @@ log_info "Configurando banner de boas-vindas dinâmico em /etc/profile.d/motd_ba
 cat << 'EOF' > /etc/profile.d/motd_banner.sh
 #!/bin/bash
 # ==============================================================================
-# Banner Dinâmico de Boas-Vindas e Diagnóstico do Servidor
+# Banner Dinâmico de Boas-Vindas e Diagnóstico do Servido
 # Exibido automaticamente em sessões interativas de shell (SSH / Console)
 # ==============================================================================
 if [ -n "$PS1" ]; then
@@ -513,7 +614,7 @@ chmod +x /etc/profile.d/motd_banner.sh
 log_success "Banner dinâmico configurado com sucesso em /etc/profile.d/motd_banner.sh."
 
 # ==============================================================================
-# 11. RESUMO DA INSTALAÇÃO
+# 12. RESUMO DA INSTALAÇÃO
 # ==============================================================================
 print_header "RESUMO DA INSTALAÇÃO"
 
@@ -532,7 +633,7 @@ LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU SERVER FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
-echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades, ufw}${NC}"
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades, ufw, vim}${NC}"
 echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}en_US.UTF-8 (Padrão Inglês) / pt_BR.UTF-8${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}ABNT2 (br)${NC}"
@@ -542,6 +643,7 @@ echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-ag
 echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
 echo -e "  ${BOLD}Fail2Ban (Brute-Force):${NC}$(get_service_status fail2ban)"
 echo -e "  ${BOLD}Atualizações Automát.:${NC} $(get_service_status unattended-upgrades)"
+echo -e "  ${BOLD}Editor Vim:${NC}            $( [ -f /root/.vimrc ] && echo -e "${FG_GREEN}Configurado (Tema Sonokai / Airline)${NC}" || echo -e "${FG_YELLOW}Padrão${NC}")"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
 echo -e "  ${BOLD}Banner no Login:${NC}       $( [ -f /etc/profile.d/motd_banner.sh ] && echo -e "${FG_GREEN}Ativo (/etc/profile.d/motd_banner.sh)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
 if command -v ufw >/dev/null 2>&1; then
@@ -589,7 +691,7 @@ echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}$
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 # ==============================================================================
-# 12. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# 13. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
 # ==============================================================================
 print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 
@@ -612,5 +714,5 @@ fi
 
 rm -f "$LOG_TMP" 2>/dev/null || true
 
-draw_separator
+draw_separato
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
