@@ -269,24 +269,32 @@ EOF
 systemctl restart mariadb > /dev/null 2>&1
 
 log_info "Aplicando endurecimento de segurança no MariaDB e criando banco de dados do Joomla 5..."
-mysql -u root <<EOF > /dev/null 2>&1
+mariadb <<EOF > /dev/null 2>&1
 ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$DB_ROOT_PASS');
 DELETE FROM mysql.user WHERE User='';
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
 CREATE DATABASE IF NOT EXISTS \`$JOOMLA_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
+CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
+ALTER USER '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
+ALTER USER '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
 GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'localhost';
+GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'127.0.0.1';
 FLUSH PRIVILEGES;
 EOF
 
 if [ $? -eq 0 ]; then
     log_success "Banco '${JOOMLA_DB_NAME}' e usuário '${JOOMLA_DB_USER}' criados com permissões completas em UTF8MB4."
 else
-    mysql -u root -p"$DB_ROOT_PASS" <<EOF > /dev/null 2>&1
+    mariadb -u root -p"$DB_ROOT_PASS" <<EOF > /dev/null 2>&1
 CREATE DATABASE IF NOT EXISTS \`$JOOMLA_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
+CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
+ALTER USER '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
+ALTER USER '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
 GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'localhost';
+GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'127.0.0.1';
 FLUSH PRIVILEGES;
 EOF
     log_success "Banco e usuário configurados com sucesso."
