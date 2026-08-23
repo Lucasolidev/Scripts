@@ -606,6 +606,15 @@ echo -e "     • Herança contínua via POSIX ACLs restrita ao usuário www-dat
 echo -e "     • Banco de dados dedicado com privilégios limitados estritamente ao banco do Joomla"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
+echo -e "\n  ${BOLD}⚙️ O QUE FAZ O AGENDADOR DE TAREFAS (CRON JOOMLA 5):${NC}"
+echo -e "  O comando ${FG_CYAN}cli/joomla.php scheduler:run${NC} executa a cada 5min em segundo plano:"
+echo -e "    • ${BOLD}Limpeza Automática:${NC}  Remove cache obsoleto e sessões expiradas para não inflar o banco"
+echo -e "    • ${BOLD}Smart Search:${NC}        Atualiza o índice de busca inteligente com os novos conteúdos"
+echo -e "    • ${BOLD}Segurança:${NC}           Verifica atualizações do Joomla/extensões e notifica o admin"
+echo -e "    • ${BOLD}Fila de E-mails:${NC}     Processa envio em lote de newsletters/contatos sem travar o site"
+echo -e "    • ${BOLD}Artigos Agendados:${NC}   Publica e despublica conteúdos programados pontualmente"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+
 echo -e "\n  ${BOLD}📌 APONTAMENTO DE DNS RECOMENDADO:${NC}"
 echo -e "  Crie no painel DNS do seu domínio (${DOMAIN_NAME}):"
 echo -e "    • Tipo ${FG_CYAN}A${NC}  | Nome: ${FG_YELLOW}@${NC}   | Destino (IP): ${FG_GREEN}${SERVER_IP}${NC}"
