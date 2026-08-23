@@ -487,9 +487,32 @@ cat <<EOF > /etc/apache2/sites-available/${DOMAIN_NAME}.conf
 </VirtualHost>
 EOF
 
-a2dissite 000-default.conf > /dev/null 2>&1 || true
+# Configura tanto o site do domínio quanto o VirtualHost padrão (IP direto) para o diretório do Joomla
+cat <<EOF > /etc/apache2/sites-available/000-default.conf
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot ${JOOMLA_ROOT}
+
+    <Directory ${JOOMLA_ROOT}>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    # Headers de Segurança
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+EOF
+
+a2ensite 000-default.conf > /dev/null 2>&1 || true
 a2ensite "${DOMAIN_NAME}.conf" > /dev/null 2>&1
-log_success "VirtualHost ${DOMAIN_NAME}.conf ativado com suporte completo a .htaccess e URLs amigáveis (SEF)."
+log_success "VirtualHost ${DOMAIN_NAME}.conf e 000-default.conf ativados com suporte completo a .htaccess e URLs amigáveis (SEF)."
 
 # ==============================================================================
 # 9. DOWNLOAD E EXTRAÇÃO DO JOOMLA 5.x
@@ -617,9 +640,11 @@ echo -e "    • Usuário do Banco:      ${FG_CYAN}${JOOMLA_DB_USER}${NC}"
 echo -e "    • Senha do Usuário:      ${FG_YELLOW}${JOOMLA_DB_PASS}${NC}"
 echo -e "    • Senha do MariaDB Root: ${FG_YELLOW}${DB_ROOT_PASS}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}URLs de Acesso para Finalizar a Instalação:${NC}"
-echo -e "    • Via Domínio:           ${FG_CYAN}http://${DOMAIN_NAME}/${NC}"
-echo -e "    • Via IP Direto (Hosts): ${FG_CYAN}http://${SERVER_IP}/${NC}"
+echo -e "  ${BOLD}URLs de Acesso para Finalizar a Instalação e Administração:${NC}"
+echo -e "    • Portal Principal (Domínio): ${FG_CYAN}http://${DOMAIN_NAME}/${NC}"
+echo -e "    • Painel Admin (Domínio):     ${FG_CYAN}http://${DOMAIN_NAME}/administrator${NC}"
+echo -e "    • Portal Principal (Via IP):  ${FG_CYAN}http://${SERVER_IP}/${NC}"
+echo -e "    • Painel Admin (Via IP):      ${FG_CYAN}http://${SERVER_IP}/administrator${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
 echo -e "\n  ${BOLD}🔒 MEDIDAS DE SEGURANÇA E HARDENING APLICADAS:${NC}"
