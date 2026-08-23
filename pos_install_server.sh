@@ -200,6 +200,29 @@ for pacote in "${PACOTES[@]}"; do
     if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" || "$pacote" == "fail2ban" ]]; then
       systemctl enable --now "$pacote" > /dev/null 2>&1
     fi
+  elif [[ "$pacote" == "fastfetch" ]]; then
+    log_info "Fastfetch não encontrado nos repositórios padrão. Tentando via PPA/GitHub..."
+    apt-get install -y software-properties-common > /dev/null 2>&1
+    add-apt-repository -y ppa:zhangsongcui3371/fastfetch > /dev/null 2>&1
+    apt-get update -y > /dev/null 2>&1
+    if apt-get install -y fastfetch > /dev/null 2>&1; then
+      log_success "Pacote fastfetch instalado via PPA com sucesso."
+      PACOTES_INSTALADOS+=("fastfetch")
+    else
+      FASTFETCH_DEB_URL=$(curl -s https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | grep -o 'https://[^"]*linux-amd64.deb' | head -n1)
+      if [ -n "$FASTFETCH_DEB_URL" ] && curl -sL "$FASTFETCH_DEB_URL" -o /tmp/fastfetch.deb; then
+        dpkg -i /tmp/fastfetch.deb > /dev/null 2>&1 || apt-get install -f -y > /dev/null 2>&1
+        rm -f /tmp/fastfetch.deb
+        if command -v fastfetch >/dev/null 2>&1; then
+          log_success "Pacote fastfetch instalado via .deb do GitHub com sucesso."
+          PACOTES_INSTALADOS+=("fastfetch")
+        else
+          log_warning "Não foi possível instalar o pacote: fastfetch."
+        fi
+      else
+        log_warning "Não foi possível instalar o pacote: fastfetch."
+      fi
+    fi
   else
     log_warning "Não foi possível instalar o pacote: $pacote (pode não estar disponível)."
   fi

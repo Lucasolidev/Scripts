@@ -211,8 +211,30 @@ log_success "OpenSSH Server e HTOP instalados e ativos."
 print_header "INFORMAÇÕES DO SISTEMA (FASTFETCH)"
 
 log_info "Instalando Fastfetch..."
-sudo nala install -y fastfetch > /dev/null 2>&1
-log_success "Fastfetch instalado com sucesso."
+if sudo nala install -y fastfetch > /dev/null 2>&1 || sudo apt-get install -y fastfetch > /dev/null 2>&1; then
+  log_success "Fastfetch instalado com sucesso."
+else
+  log_info "Fastfetch não encontrado nos repositórios padrão. Tentando via PPA/GitHub..."
+  sudo apt-get install -y software-properties-common > /dev/null 2>&1
+  sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch > /dev/null 2>&1
+  sudo apt-get update -y > /dev/null 2>&1
+  if sudo apt-get install -y fastfetch > /dev/null 2>&1; then
+    log_success "Fastfetch instalado via PPA com sucesso."
+  else
+    FASTFETCH_DEB_URL=$(curl -s https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | grep -o 'https://[^"]*linux-amd64.deb' | head -n1)
+    if [ -n "$FASTFETCH_DEB_URL" ] && curl -sL "$FASTFETCH_DEB_URL" -o /tmp/fastfetch.deb; then
+      sudo dpkg -i /tmp/fastfetch.deb > /dev/null 2>&1 || sudo apt-get install -f -y > /dev/null 2>&1
+      rm -f /tmp/fastfetch.deb
+      if command -v fastfetch >/dev/null 2>&1; then
+        log_success "Fastfetch instalado via .deb do GitHub com sucesso."
+      else
+        log_warning "Não foi possível instalar o Fastfetch."
+      fi
+    else
+      log_warning "Não foi possível instalar o Fastfetch."
+    fi
+  fi
+fi
 
 # ==============================================================================
 # 7. ECOSSISTEMA FLATPAK E GOOGLE CHROME
