@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.4
+# Version: 1.5
 # ------------------------------------------------
-VERSION="1.4"
+VERSION="1.5"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
@@ -146,6 +146,8 @@ print_header "COLETA DE PARÂMETROS"
 
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/N): ${NC}")" PERMITIR_ROOT_SSH
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja habilitar o Firewall UFW? (S/n): ${NC}")" HABILITAR_UFW
+HABILITAR_UFW=${HABILITAR_UFW:-S}
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset' (sudo)? (s/N): ${NC}")" CRIAR_GESET
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO
@@ -188,7 +190,7 @@ fi
 print_header "INSTALAÇÃO DE UTILITÁRIOS"
 print_alert_box "Pacotes do sistema (qemu-guest-agent, open-vm-tools, fail2ban, htop, tmux, etc) serão instalados agora."
 
-PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales htop tmux fail2ban dnsutils net-tools unattended-upgrades)
+PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw)
 PACOTES_INSTALADOS=()
 for pacote in "${PACOTES[@]}"; do
   log_info "Instalando o pacote: $pacote..."
@@ -427,19 +429,23 @@ fi
 # 9. CONFIGURAÇÃO DE FIREWALL (UFW)
 # ==============================================================================
 print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
-if command -v ufw >/dev/null 2>&1; then
-  log_info "Configurando regras de firewall no UFW..."
-  log_info "Liberando porta 22/tcp (SSH)..."
-  ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
-  log_info "Liberando porta 10050/tcp (Zabbix Agent)..."
-  ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
-  log_info "Garantindo suporte a IPv6 no Firewall UFW..."
-  sed -i 's/^IPV6=.*/IPV6=yes/' /etc/default/ufw 2>/dev/null || true
-  log_info "Ativando o Firewall UFW..."
-  ufw --force enable > /dev/null 2>&1
-  log_success "Firewall UFW ativado e configurado (Dual-Stack IPv4/IPv6, Portas liberadas: 22/tcp [SSH] e 10050/tcp [Zabbix Agent])."
+if [[ "$HABILITAR_UFW" =~ ^[Ss]$ ]]; then
+  if command -v ufw >/dev/null 2>&1; then
+    log_info "Configurando regras de firewall no UFW..."
+    log_info "Liberando porta 22/tcp (SSH)..."
+    ufw allow 22/tcp comment 'Acesso SSH Remoto' > /dev/null 2>&1
+    log_info "Liberando porta 10050/tcp (Zabbix Agent)..."
+    ufw allow 10050/tcp comment 'Zabbix Agent Port' > /dev/null 2>&1
+    log_info "Garantindo suporte a IPv6 no Firewall UFW..."
+    sed -i 's/^IPV6=.*/IPV6=yes/' /etc/default/ufw 2>/dev/null || true
+    log_info "Ativando o Firewall UFW..."
+    ufw --force enable > /dev/null 2>&1
+    log_success "Firewall UFW ativado e configurado (Dual-Stack IPv4/IPv6, Portas liberadas: 22/tcp [SSH] e 10050/tcp [Zabbix Agent])."
+  else
+    log_warning "UFW não encontrado no sistema."
+  fi
 else
-  log_warning "UFW não encontrado no sistema."
+  log_skipped "Configuração do Firewall UFW pulada pelo usuário."
 fi
 
 # ==============================================================================
@@ -498,7 +504,7 @@ LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU SERVER FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
-echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades}${NC}"
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades, ufw}${NC}"
 echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}en_US.UTF-8 (Padrão Inglês) / pt_BR.UTF-8${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}ABNT2 (br)${NC}"
@@ -536,6 +542,8 @@ if command -v ufw >/dev/null 2>&1; then
   else
     echo -e "  ${BOLD}Firewall UFW:${NC}          ${FG_YELLOW}Inativo${NC}"
   fi
+else
+  echo -e "  ${BOLD}Firewall UFW:${NC}          ${FG_YELLOW}Inativo (Não Instalado)${NC}"
 fi
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
