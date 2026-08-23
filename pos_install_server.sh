@@ -517,7 +517,7 @@ echo -e "  ${BOLD}Atualizações Automát.:${NC} $(get_service_status unattended
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
 echo -e "  ${BOLD}Banner no Login:${NC}       $( [ -f /etc/profile.d/motd_banner.sh ] && echo -e "${FG_GREEN}Ativo (/etc/profile.d/motd_banner.sh)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
 if command -v ufw >/dev/null 2>&1; then
-  if ufw status 2>/dev/null | grep -q "active"; then
+  if ufw status 2>/dev/null | grep -q "^Status:[[:space:]]*active"; then
     PORTAS_RAW=$(ufw status 2>/dev/null | grep -i "ALLOW" | awk '{print $1}' | sort -u)
     PORTAS_FORMATADAS=""
     for p in $PORTAS_RAW; do
@@ -538,7 +538,7 @@ if command -v ufw >/dev/null 2>&1; then
       fi
     done
     echo -e "  ${BOLD}Firewall UFW:${NC}          ${FG_GREEN}Ativo${NC}"
-    echo -e "  ${BOLD}Portas Liberadas (UFW):${NC}${FG_CYAN}${PORTAS_FORMATADAS:-22/tcp (SSH), 10050/tcp (Zabbix Agent)}${NC}"
+    echo -e "  ${BOLD}Portas Liberadas (UFW):${NC}${FG_CYAN}${PORTAS_FORMATADAS:-Nenhuma porta liberada}${NC}"
   else
     echo -e "  ${BOLD}Firewall UFW:${NC}          ${FG_YELLOW}Inativo${NC}"
   fi

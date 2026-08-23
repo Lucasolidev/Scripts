@@ -422,7 +422,7 @@ echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
 echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo${NC}"
-echo -e "  ${BOLD}Firewall UFW:${NC}          $(sudo ufw status 2>/dev/null | grep -q "active" && echo -e "${FG_GREEN}Ativo (Bloqueio de Entrada)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
+echo -e "  ${BOLD}Firewall UFW:${NC}          $(sudo ufw status 2>/dev/null | grep -q "^Status:[[:space:]]*active" && echo -e "${FG_GREEN}Ativo (Bloqueio de Entrada)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
 echo -e "  ${BOLD}OpenSSH Server:${NC}        $(get_service_status ssh)"
 echo -e "  ${BOLD}Shell Padrão:${NC}          ${FG_CYAN}Zsh + Oh My Zsh (Tema Agnoster)${NC}"
 echo -e "  ${BOLD}Flatpak / Flathub:${NC}     ${FG_GREEN}Ativo e Integrado${NC}"
