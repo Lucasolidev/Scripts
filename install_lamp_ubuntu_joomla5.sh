@@ -556,6 +556,15 @@ if [[ "$DOWNLOAD_JOOMLA" != "n" && "$DOWNLOAD_JOOMLA" != "nao" ]]; then
             cp "${JOOMLA_ROOT}/htaccess.txt" "${JOOMLA_ROOT}/.htaccess"
             log_success "Arquivo .htaccess nativo do Joomla ativado para URLs amigáveis."
         fi
+
+        # Se o Joomla já tiver sido configurado anteriormente, sincroniza a nova senha do banco no configuration.php
+        if [ -f "${JOOMLA_ROOT}/configuration.php" ]; then
+            log_info "Sincronizando nova senha do MariaDB no arquivo configuration.php existente do Joomla..."
+            sed -i "s/public \$password = '.*/public \$password = '${JOOMLA_DB_PASS}';/" "${JOOMLA_ROOT}/configuration.php" || true
+            sed -i "s/public \$user = '.*/public \$user = '${JOOMLA_DB_USER}';/" "${JOOMLA_ROOT}/configuration.php" || true
+            sed -i "s/public \$db = '.*/public \$db = '${JOOMLA_DB_NAME}';/" "${JOOMLA_ROOT}/configuration.php" || true
+            log_success "Arquivo configuration.php sincronizado com as novas credenciais do banco."
+        fi
         log_success "Joomla 5 baixado e extraído com sucesso em ${JOOMLA_ROOT}."
     else
         log_warning "Não foi possível baixar automaticamente o pacote do Joomla. Criando arquivo de teste..."
