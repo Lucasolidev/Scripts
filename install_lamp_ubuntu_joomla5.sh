@@ -347,20 +347,26 @@ if [[ "$UBUNTU_RELEASE" == "22.04" || "$UBUNTU_RELEASE" == "24.04" ]]; then
 
 else
     # ==========================================================================
-    # FLUXO UBUNTU 26.04 DEV (PHP NATIVO 8.5)
+    # FLUXO UBUNTU 26.04 DEV (PHP NATIVO)
     # ==========================================================================
     log_info "Ubuntu ${UBUNTU_RELEASE} detectado: Instalando suíte nativa do PHP do repositório Ubuntu..."
     
-    # No Ubuntu 26.04, instala os pacotes nativos explicitamente
-    DEBIAN_FRONTEND=noninteractive apt-get install -y php-cli php-fpm php-common php-mysql php-curl php-gd php-mbstring php-xml php-zip php-opcache php-intl php-bcmath php-imagick php-soap php-readline > /dev/null 2>&1 || true
-    DEBIAN_FRONTEND=noninteractive apt-get install -y php8.5 php8.5-cli php8.5-fpm php8.5-mysql php8.5-curl php8.5-gd php8.5-mbstring php8.5-xml php8.5-zip php8.5-intl php8.5-opcache > /dev/null 2>&1 || true
+    # Atualiza lista de pacotes e instala o PHP nativo do repositório do sistema
+    DEBIAN_FRONTEND=noninteractive apt-get install -y php-cli php-fpm php-mysql php-curl php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-imagick php-soap php-readline || true
     
-    INST_PHP_BIN=$(which php 2>/dev/null || ls /usr/bin/php8.5 /usr/bin/php[0-9.]* 2>/dev/null | head -n 1)
+    # Caso os meta-pacotes falhem no Ubuntu 26, descobre a versão exata (ex: 8.5)
+    NAT_FPM=$(apt-cache search -n "^php[0-9.]*-fpm$" | head -n 1 | awk '{print $1}')
+    if [ -n "$NAT_FPM" ]; then
+        NAT_V=$(echo "$NAT_FPM" | sed 's/[^0-9.]//g')
+        DEBIAN_FRONTEND=noninteractive apt-get install -y "php${NAT_V}" "php${NAT_V}-fpm" "php${NAT_V}-cli" "php${NAT_VER}-mysql" "php${NAT_V}-curl" "php${NAT_V}-gd" "php${NAT_V}-mbstring" "php${NAT_V}-xml" "php${NAT_V}-zip" || true
+    fi
+
+    INST_PHP_BIN=$(which php 2>/dev/null || ls /usr/bin/php[0-9.]* 2>/dev/null | head -n 1)
     if [ -n "$INST_PHP_BIN" ]; then
         update-alternatives --install /usr/bin/php php "$INST_PHP_BIN" 100 > /dev/null 2>&1 || true
         update-alternatives --set php "$INST_PHP_BIN" > /dev/null 2>&1 || true
     fi
-    PHP_VER="8.5"
+    PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.5")
     log_success "PHP ${PHP_VER} nativo instalado e configurado no Ubuntu 26.04."
 fi
 
