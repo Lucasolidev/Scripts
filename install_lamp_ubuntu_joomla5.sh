@@ -379,23 +379,30 @@ if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
     done
 fi
 
-# Garante a comutação para a versão solicitada no CLI e no Apache
-if [ -f "/usr/bin/php${PHP_VER}" ]; then
-    log_info "Ativando PHP ${PHP_VER} como padrão no sistema (CLI e Apache)..."
-    update-alternatives --install /usr/bin/php php "/usr/bin/php${PHP_VER}" 100 > /dev/null 2>&1 || true
-    update-alternatives --set php "/usr/bin/php${PHP_VER}" > /dev/null 2>&1 || true
-    
-    # Desativa outros módulos de PHP no Apache e ativa a versão solicitada
-    for old_mod in /etc/apache2/mods-enabled/php*.load; do
-        if [ -f "$old_mod" ]; then
-            mod_name=$(basename "$old_mod" .load)
-            a2dismod "$mod_name" > /dev/null 2>&1 || true
+# Garante a comutação e ativação do PHP no CLI e no Apache
+log_info "Garantindo ativação do módulo PHP no Apache e no CLI..."
+a2dismod mpm_event > /dev/null 2>&1 || true
+a2enmod mpm_prefork > /dev/null 2>&1 || true
+
+# Ativa o módulo específico ou genérico do PHP no Apache
+if [ -f "/etc/apache2/mods-available/php${PHP_VER}.load" ]; then
+    a2enmod "php${PHP_VER}" > /dev/null 2>&1 || true
+else
+    for php_load in /etc/apache2/mods-available/php*.load; do
+        if [ -f "$php_load" ]; then
+            mod_name=$(basename "$php_load" .load)
+            a2enmod "$mod_name" > /dev/null 2>&1 || true
         fi
     done
-    a2enmod "php${PHP_VER}" > /dev/null 2>&1 || true
-    systemctl restart apache2 > /dev/null 2>&1 || true
-    log_success "PHP ${PHP_VER} definido e ativado como padrão."
 fi
+
+if [ -f "/usr/bin/php${PHP_VER}" ]; then
+    update-alternatives --install /usr/bin/php php "/usr/bin/php${PHP_VER}" 100 > /dev/null 2>&1 || true
+    update-alternatives --set php "/usr/bin/php${PHP_VER}" > /dev/null 2>&1 || true
+fi
+
+systemctl restart apache2 > /dev/null 2>&1 || true
+log_success "Módulo PHP ativado no Apache e serviço reiniciado."
 
 # Detecta a versão real ativa instalada do PHP no sistema para os passos seguintes
 DETECTED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
