@@ -44,8 +44,9 @@
 >    - Utilize o padrão `  ${FG_YELLOW}${ARROW} Pergunta? (s/N): ${NC}` nas perguntas do `read` (onde `(s/N)` indica que o padrão ao apertar ENTER é Não).
 >    - **Feedback Visual Imediato (`log_info`)**: Imediatamente após a coleta de qualquer entrada do usuário (seja um valor digitado, gerado aleatoriamente ou o valor padrão assumido ao dar ENTER), exiba uma linha com `log_info` confirmando o valor definido (ex: `log_info "Nome do Banco definido: ${FG_GREEN}${JOOMLA_DB_NAME}${NC}"`). Isso dá clareza e segurança visual ao operador.
 > 
-> 4. **Instalação Silenciosa e Limpa**:
->    Quando houver instalação de pacotes via `apt` ou outro gerenciador, execute de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.
+> 4. **Instalação Silenciosa e Limpa (`apt-get`)**:
+>    - **Regra Obrigatória:** Sempre utilize **`apt-get`** em vez de `apt` para garantir máxima compatibilidade, estabilidade de CLI e execução não-interativa segura sem avisos ou caracteres ocultos nos arquivos de log.
+>    - Execute a instalação de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.
 > 
 > 5. **Configuração de Teclado, Locales e Fuso Horário (America/Sao_Paulo)**:
 >    Quando houver configuração de locales, teclado e fuso horário, utilize o bloco padrão:
@@ -91,8 +92,8 @@
 >        grep -q "alias myip=" "$bashrc" || echo "alias myip='curl -s ifconfig.me; echo'" >> "$bashrc"
 >        grep -q "alias \.\.=" "$bashrc" || echo "alias ..='cd ..'" >> "$bashrc"
 >        grep -q "alias \.\.\.=" "$bashrc" || echo "alias ...='cd ../..'" >> "$bashrc"
->        grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt update && sudo apt upgrade -y'" >> "$bashrc"
->        grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt autoremove -y && sudo apt autoclean'" >> "$bashrc"
+>        grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt-get update && sudo apt-get upgrade -y'" >> "$bashrc"
+>        grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt-get autoremove -y && sudo apt-get autoclean'" >> "$bashrc"
 >        grep -q "alias reload=" "$bashrc" || echo "alias reload='source ~/.bashrc'" >> "$bashrc"
 >      fi
 >    done
@@ -103,7 +104,7 @@
 >    - **SSH Hardening**: Ajustar `PermitEmptyPasswords no`, `ClientAliveInterval 300` e `ClientAliveCountMax 2`.
 >    - **Fail2Ban**: Instalar e ativar proteção contra força bruta no SSH quando for ambiente Server.
 >    - **Firewall UFW**: Ativar regras de proteção de borda.
->    - **Limpeza do Sistema**: Executar `apt autoremove -y` e `apt autoclean -y` ao final das instalações.
+>    - **Limpeza do Sistema**: Executar `apt-get autoremove -y` e `apt-get autoclean -y` ao final das instalações.
 > 
 > 8. **Estrutura Sequencial e Numerada de Etapas**:
 >    Todas as etapas lógicas de execução do script devem ser claramente identificadas por cabeçalhos e comentários numerados sequencialmente (ex: `# 1. VERIFICAÇÃO DE PRIVILÉGIOS`, `# 2. COLETA DE PARÂMETROS`, ..., `# N. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG`). Isso facilita a auditoria, leitura e manutenção do código.

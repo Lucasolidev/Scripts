@@ -170,7 +170,7 @@ draw_separator
 print_header "PREPARANDO SISTEMA E REPOSITÓRIOS"
 
 log_info "Atualizando a lista de pacotes do APT..."
-apt update -y > /dev/null 2>&1 || true
+apt-get update -y > /dev/null 2>&1 || true
 log_success "Lista de pacotes atualizada."
 
 log_info "Instalando dependências essenciais de infraestrutura..."
@@ -195,7 +195,7 @@ for pkg in "${PRE_REQ_PACKAGES[@]}"; do
         log_info "Pacote '$pkg' já está instalado."
     else
         log_info "Instalando '$pkg'..."
-        if apt install -y "$pkg" > /dev/null 2>&1; then
+        if apt-get install -y "$pkg" > /dev/null 2>&1; then
             log_success "Pacote '$pkg' instalado com sucesso."
         else
             log_warning "Aviso na instalação de '$pkg'."
@@ -209,7 +209,7 @@ done
 print_header "INSTALAÇÃO E HARDENING DO APACHE 2.4.x"
 
 log_info "Instalando o Apache2..."
-if apt install -y apache2 > /dev/null 2>&1; then
+if apt-get install -y apache2 > /dev/null 2>&1; then
     log_success "Apache2 instalado com sucesso."
 else
     log_error "Falha na instalação do Apache2."
@@ -240,15 +240,15 @@ if ! dpkg -l | grep -q "mariadb-server"; then
     rm -f /etc/apt/sources.list.d/mariadb*maxscale* 2>/dev/null || true
     curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- --mariadb-server-version="mariadb-11.4" > /dev/null 2>&1 || true
     rm -f /etc/apt/sources.list.d/mariadb*maxscale* 2>/dev/null || true
-    apt update -y > /dev/null 2>&1 || true
+    apt-get update -y > /dev/null 2>&1 || true
 fi
 
 log_info "Instalando o MariaDB Server..."
-if apt install -y mariadb-server mariadb-client > /dev/null 2>&1; then
+if apt-get install -y mariadb-server mariadb-client > /dev/null 2>&1; then
     log_success "MariaDB Server instalado com sucesso."
 else
     log_warning "Tentando instalar via repositório padrão do sistema..."
-    apt install -y mariadb-server mariadb-client > /dev/null 2>&1 || true
+    apt-get install -y mariadb-server mariadb-client > /dev/null 2>&1 || true
 fi
 
 log_info "Iniciando e habilitando o serviço MariaDB..."
@@ -307,7 +307,7 @@ print_header "INSTALAÇÃO DO PHP (RECOMENDADO JOOMLA 5)"
 # Tenta configurar o PPA ondrej/php se a versão solicitada for específica (ex: 8.3 no Ubuntu LTS)
 log_info "Configurando repositórios de pacotes do PHP..."
 LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
-apt update -y > /dev/null 2>&1 || true
+apt-get update -y > /dev/null 2>&1 || true
 
 PHP_INSTALLED=false
 if apt-cache show "php${PHP_VER}-fpm" > /dev/null 2>&1; then
@@ -330,7 +330,7 @@ if apt-cache show "php${PHP_VER}-fpm" > /dev/null 2>&1; then
         "php${PHP_VER}-soap"
         "php${PHP_VER}-readline"
     )
-    apt install -y "${JOOMLA_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
+    apt-get install -y "${JOOMLA_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
     if command -v "php${PHP_VER}" > /dev/null 2>&1 || [ -f "/usr/bin/php${PHP_VER}" ]; then
         PHP_INSTALLED=true
         log_success "PHP ${PHP_VER} instalado com sucesso via PPA."
@@ -358,7 +358,7 @@ if [ "$PHP_INSTALLED" = false ]; then
         "php-soap"
         "php-readline"
     )
-    apt install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
+    apt-get install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
 fi
 
 # Detecta a versão real ativa instalada do PHP no sistema

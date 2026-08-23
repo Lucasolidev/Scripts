@@ -92,8 +92,8 @@ else
 fi
 
 log_info "Atualizando pacotes e instalando Zabbix Agent..."
-apt update -y > /dev/null 2>&1
-if apt install -y zabbix-agent > /dev/null 2>&1; then
+apt-get update -y > /dev/null 2>&1
+if apt-get install -y zabbix-agent > /dev/null 2>&1; then
     log_success "Zabbix Agent instalado."
 else
     log_error "Falha ao instalar o Zabbix Agent."

@@ -172,11 +172,11 @@ if [[ "$EXEC_UPDATE" =~ ^[Ss]$ ]]; then
   print_header "ATUALIZAÇÃO DO SISTEMA"
   print_alert_box "O sistema será atualizado antes de prosseguirmos com as configurações."
 
-  log_info "Atualizando a lista de pacotes (apt update)..."
-  apt update -y
+  log_info "Atualizando a lista de pacotes (apt-get update)..."
+  apt-get update -y
 
-  log_info "Aplicando atualizações de segurança e sistema (apt upgrade)..."
-  apt upgrade -y
+  log_info "Aplicando atualizações de segurança e sistema (apt-get upgrade)..."
+  apt-get upgrade -y
   log_success "Sistema atualizado."
 else
   log_skipped "Atualização do sistema pulada."
@@ -192,7 +192,7 @@ PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales htop tmux fa
 PACOTES_INSTALADOS=()
 for pacote in "${PACOTES[@]}"; do
   log_info "Instalando o pacote: $pacote..."
-  if apt install -y "$pacote" > /dev/null 2>&1; then
+  if apt-get install -y "$pacote" > /dev/null 2>&1; then
     log_success "Pacote $pacote instalado com sucesso."
     PACOTES_INSTALADOS+=("$pacote")
     if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" || "$pacote" == "fail2ban" ]]; then
@@ -270,8 +270,8 @@ for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
     grep -q "alias myip=" "$bashrc" || echo "alias myip='curl -s ifconfig.me; echo'" >> "$bashrc"
     grep -q "alias \.\.=" "$bashrc" || echo "alias ..='cd ..'" >> "$bashrc"
     grep -q "alias \.\.\.=" "$bashrc" || echo "alias ...='cd ../..'" >> "$bashrc"
-    grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt update && sudo apt upgrade -y'" >> "$bashrc"
-    grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt autoremove -y && sudo apt autoclean'" >> "$bashrc"
+    grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt-get update && sudo apt-get upgrade -y'" >> "$bashrc"
+    grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt-get autoremove -y && sudo apt-get autoclean'" >> "$bashrc"
     grep -q "alias reload=" "$bashrc" || echo "alias reload='source ~/.bashrc'" >> "$bashrc"
   fi
 done

@@ -39,11 +39,11 @@ PROXY_IP=${PROXY_IP:-192.168.x.x}
 echo -e "${CIANO}[Etapa 1] Configurando repositório do Zabbix 7.0 LTS...${RESET}"
 wget -q https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
 dpkg -i zabbix-release_latest_7.0+ubuntu24.04_all.deb > /dev/null
-apt update
+apt-get update -y
 
 # 2. Instalação dos Pacotes (O APT agora cria o usuário zabbix nativamente aqui)
 echo -e "${CIANO}[Etapa 2] Instalando pacotes do Zabbix Proxy, Agent e SNMP...${RESET}"
-apt install -y zabbix-proxy-sqlite3 zabbix-agent curl snmpd snmp-mibs-downloader fping openssl snmp sqlite3
+apt-get install -y zabbix-proxy-sqlite3 zabbix-agent curl snmpd snmp-mibs-downloader fping openssl snmp sqlite3
 
 # 3. Preparar diretórios de log, runtime e aplicação de permissões (Agora com usuário já existente)
 echo -e "${CIANO}[Etapa 3] Configurando diretórios de trabalho e permissões...${RESET}"

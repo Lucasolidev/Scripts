@@ -177,8 +177,8 @@ for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
     grep -q "alias myip=" "$bashrc" || echo "alias myip='curl -s ifconfig.me; echo'" | sudo tee -a "$bashrc" > /dev/null
     grep -q "alias \.\.=" "$bashrc" || echo "alias ..='cd ..'" | sudo tee -a "$bashrc" > /dev/null
     grep -q "alias \.\.\.=" "$bashrc" || echo "alias ...='cd ../..'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt update && sudo apt upgrade -y'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt autoremove -y && sudo apt autoclean'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt-get update && sudo apt-get upgrade -y'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt-get autoremove -y && sudo apt-get autoclean'" | sudo tee -a "$bashrc" > /dev/null
     grep -q "alias reload=" "$bashrc" || echo "alias reload='source ~/.bashrc'" | sudo tee -a "$bashrc" > /dev/null
   fi
 done

@@ -168,7 +168,7 @@ draw_separator
 print_header "PREPARANDO REPOSITÓRIOS"
 
 log_info "Atualizando a lista de pacotes do APT..."
-apt update -y > /dev/null 2>&1 || true
+apt-get update -y > /dev/null 2>&1 || true
 log_success "Lista de pacotes atualizada."
 
 log_info "Instalando dependências prévias (software-properties-common, curl, ca-certificates)..."
@@ -178,7 +178,7 @@ for pkg in "${PRE_REQ_PACKAGES[@]}"; do
         log_info "Pacote '$pkg' já está instalado."
     else
         log_info "Instalando '$pkg'..."
-        if apt install -y "$pkg" > /dev/null 2>&1; then
+        if apt-get install -y "$pkg" > /dev/null 2>&1; then
             log_success "Pacote '$pkg' instalado com sucesso."
         else
             log_warning "Falha ao instalar '$pkg'."
@@ -192,7 +192,7 @@ done
 print_header "INSTALAÇÃO DO SERVIDOR WEB (APACHE2)"
 
 log_info "Instalando o Apache2..."
-if apt install -y apache2 > /dev/null 2>&1; then
+if apt-get install -y apache2 > /dev/null 2>&1; then
     log_success "Apache2 instalado com sucesso."
 else
     log_error "Falha na instalação do Apache2."
@@ -247,7 +247,7 @@ fi
 print_header "INSTALAÇÃO DO BANCO DE DADOS (MARIADB SERVER)"
 
 log_info "Instalando o MariaDB Server..."
-if apt install -y mariadb-server mariadb-client > /dev/null 2>&1; then
+if apt-get install -y mariadb-server mariadb-client > /dev/null 2>&1; then
     log_success "MariaDB Server instalado com sucesso."
 else
     log_error "Falha na instalação do MariaDB Server."
@@ -281,7 +281,7 @@ print_header "INSTALAÇÃO DO PHP E EXTENSÕES"
 
 log_info "Adicionando repositório PPA ondrej/php..."
 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
-apt update -y > /dev/null 2>&1 || true
+apt-get update -y > /dev/null 2>&1 || true
 
 if [ -n "$PHP_VER" ]; then
     PHP_MAIN_PKG="php${PHP_VER}"
@@ -334,7 +334,7 @@ PHP_FALLBACK_PACKAGES=(
 log_info "Instalando pacotes do PHP (${LOG_PHP_MSG})..."
 PHP_INSTALLED_COUNT=0
 for pkg in "${PHP_PACKAGES[@]}"; do
-    if apt install -y "$pkg" > /dev/null 2>&1; then
+    if apt-get install -y "$pkg" > /dev/null 2>&1; then
         log_success "Pacote '$pkg' instalado com sucesso."
         ((PHP_INSTALLED_COUNT++))
     fi
@@ -343,7 +343,7 @@ done
 if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
     log_warning "Pacotes específicos do PHP não encontrados no repositório. Instalando versão padrão do repositório do sistema..."
     for pkg in "${PHP_FALLBACK_PACKAGES[@]}"; do
-        if apt install -y "$pkg" > /dev/null 2>&1; then
+        if apt-get install -y "$pkg" > /dev/null 2>&1; then
             log_success "Pacote nativo '$pkg' instalado com sucesso."
         else
             log_warning "Falha ao instalar o pacote '$pkg'."
@@ -417,7 +417,7 @@ if [ "$INSTALL_PHPMYADMIN" = "s" ] || [ "$INSTALL_PHPMYADMIN" = "sim" ]; then
     echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2" | debconf-set-selections
 
     log_info "Instalando phpMyAdmin de forma não interativa..."
-    if apt install -y phpmyadmin php-mbstring php-zip php-gd > /dev/null 2>&1; then
+    if apt-get install -y phpmyadmin php-mbstring php-zip php-gd > /dev/null 2>&1; then
         phpenmod mbstring > /dev/null 2>&1
         systemctl restart apache2 > /dev/null 2>&1
         log_success "phpMyAdmin instalado e integrado ao Apache2."
@@ -449,7 +449,7 @@ fi
 if [ "$CONFIGURE_FAIL2BAN" != "n" ] && [ "$CONFIGURE_FAIL2BAN" != "nao" ]; then
     print_header "INSTALAÇÃO E CONFIGURAÇÃO DO FAIL2BAN"
     log_info "Instalando o Fail2Ban..."
-    apt install -y fail2ban > /dev/null 2>&1
+    apt-get install -y fail2ban > /dev/null 2>&1
 
     log_info "Garantindo existência dos arquivos de log do Apache..."
     mkdir -p /var/log/apache2 /etc/fail2ban/jail.d
