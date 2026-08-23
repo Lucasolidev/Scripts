@@ -389,11 +389,13 @@ a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
 a2enconf "php${PHP_VER}-fpm" > /dev/null 2>&1 || a2enconf php-fpm > /dev/null 2>&1 || true
 
 # Configura o Handler explícito universal do PHP-FPM para evitar falha no Apache
-PHP_SOCK="/run/php/php${PHP_VER}-fpm.sock"
-if [ -S "$PHP_SOCK" ] || [ -d "/run/php" ]; then
+ACTUAL_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
+[ -z "$ACTUAL_SOCK" ] && ACTUAL_SOCK="/run/php/php${PHP_VER}-fpm.sock"
+
+if [ -n "$ACTUAL_SOCK" ]; then
     cat <<EOF > /etc/apache2/conf-available/joomla-php-fpm.conf
 <FilesMatch \\.php\$>
-    SetHandler "proxy:unix:${PHP_SOCK}|fcgi://localhost"
+    SetHandler "proxy:unix:${ACTUAL_SOCK}|fcgi://localhost"
 </FilesMatch>
 EOF
     a2enconf joomla-php-fpm > /dev/null 2>&1 || true
