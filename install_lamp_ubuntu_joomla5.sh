@@ -434,6 +434,7 @@ cat <<EOF > /etc/apache2/sites-available/${DOMAIN_NAME}.conf
     ServerAlias www.${DOMAIN_NAME}
     ServerAdmin webmaster@${DOMAIN_NAME}
     DocumentRoot ${JOOMLA_ROOT}
+    DirectoryIndex index.php index.html
 
     <Directory ${JOOMLA_ROOT}>
         Options -Indexes +FollowSymLinks
@@ -468,6 +469,7 @@ cat <<EOF > /etc/apache2/sites-available/000-default.conf
 <VirtualHost *:80>
     ServerAdmin webmaster@localhost
     DocumentRoot ${JOOMLA_ROOT}
+    DirectoryIndex index.php index.html
 
     <Directory ${JOOMLA_ROOT}>
         Options -Indexes +FollowSymLinks
@@ -495,18 +497,19 @@ log_success "VirtualHost ${DOMAIN_NAME}.conf e 000-default.conf ativados com sup
 # ==============================================================================
 if [[ "$DOWNLOAD_JOOMLA" != "n" && "$DOWNLOAD_JOOMLA" != "nao" ]]; then
     print_header "DOWNLOAD DO PACOTE OFICIAL DO JOOMLA 5"
-    log_info "Consultando a versão estável mais recente do Joomla 5..."
-    JOOMLA_API_URL="https://api.github.com/repos/joomla/joomla-cms/releases"
-    LATEST_JOOMLA_ZIP=$(curl -s $JOOMLA_API_URL | grep "browser_download_url.*Joomla_5.*Full_Package.zip" | head -n 1 | cut -d '"' -f 4)
+    log_info "Baixando pacote oficial de instalação do Joomla 5.x..."
     
-    if [ -z "$LATEST_JOOMLA_ZIP" ]; then
-        LATEST_JOOMLA_ZIP="https://github.com/joomla/joomla-cms/releases/download/5.2.4/Joomla_5.2.4-Stable-Full_Package.zip"
-    fi
+    # URL de fallback direta garantida caso a API do GitHub atinja rate limit
+    LATEST_JOOMLA_ZIP="https://github.com/joomla/joomla-cms/releases/download/5.2.4/Joomla_5.2.4-Stable-Full_Package.zip"
+    
+    # Tenta descobrir release mais recente dinamicamente
+    API_ZIP=$(curl -s "https://api.github.com/repos/joomla/joomla-cms/releases/latest" 2>/dev/null | grep "browser_download_url.*Joomla_5.*Full_Package.zip" | head -n 1 | cut -d '"' -f 4)
+    [ -n "$API_ZIP" ] && LATEST_JOOMLA_ZIP="$API_ZIP"
 
-    log_info "Baixando pacote: ${LATEST_JOOMLA_ZIP}..."
-    wget -q -O /tmp/joomla_pkg.zip "$LATEST_JOOMLA_ZIP"
+    log_info "Baixando de: ${LATEST_JOOMLA_ZIP}..."
+    wget -q -O /tmp/joomla_pkg.zip "$LATEST_JOOMLA_ZIP" || curl -fsSL -o /tmp/joomla_pkg.zip "$LATEST_JOOMLA_ZIP"
 
-    if [ -f /tmp/joomla_pkg.zip ]; then
+    if [ -s /tmp/joomla_pkg.zip ]; then
         log_info "Extraindo arquivos do Joomla 5 em ${JOOMLA_ROOT}..."
         unzip -q -o /tmp/joomla_pkg.zip -d "$JOOMLA_ROOT"
         rm -f /tmp/joomla_pkg.zip
@@ -516,9 +519,14 @@ if [[ "$DOWNLOAD_JOOMLA" != "n" && "$DOWNLOAD_JOOMLA" != "nao" ]]; then
             cp "${JOOMLA_ROOT}/htaccess.txt" "${JOOMLA_ROOT}/.htaccess"
             log_success "Arquivo .htaccess nativo do Joomla ativado para URLs amigáveis."
         fi
-        log_success "Joomla 5 baixado e extraído com sucesso."
+        log_success "Joomla 5 baixado e extraído com sucesso em ${JOOMLA_ROOT}."
     else
-        log_warning "Não foi possível baixar automaticamente o pacote do Joomla. Crie os arquivos em ${JOOMLA_ROOT} manualmente."
+        log_warning "Não foi possível baixar automaticamente o pacote do Joomla. Criando arquivo de teste..."
+        cat <<'EOF' > "${JOOMLA_ROOT}/index.php"
+<?php
+phpinfo();
+?>
+EOF
     fi
 fi
 
@@ -534,6 +542,10 @@ find "$JOOMLA_ROOT" -type f -exec chmod 664 {} + > /dev/null 2>&1 || true
 setfacl -R -m u:www-data:rwx,g:www-data:rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
 setfacl -R -d -m u:www-data:rwx,g:www-data:rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
 log_success "POSIX ACLs ativadas: Permissões de escrita e leitura garantidas para o Apache/Joomla."
+
+# Reinicia o Apache e PHP-FPM para aplicar todas as configurações
+systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
+systemctl restart apache2 > /dev/null 2>&1 || true
 
 # ==============================================================================
 # 11. CONFIGURAÇÃO DE ROTINAS AGENDADAS (CRON JOBS DO JOOMLA)
