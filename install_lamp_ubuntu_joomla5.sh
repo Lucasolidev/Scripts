@@ -351,35 +351,16 @@ else
     # ==========================================================================
     log_info "Ubuntu ${UBUNTU_RELEASE} detectado: Instalando suíte nativa do PHP do repositório Ubuntu..."
     
-    NAT_VER=$(apt-cache search -n "^php[0-9.]*-cli$" | head -n 1 | sed 's/[^0-9.]//g')
-    [ -z "$NAT_VER" ] && NAT_VER="8.5"
-
-    FALLBACK_PHP_PACKAGES=(
-        "php${NAT_VER}"
-        "php${NAT_VER}-fpm"
-        "php${NAT_VER}-cli"
-        "php${NAT_VER}-common"
-        "php${NAT_VER}-mysql"
-        "php${NAT_VER}-curl"
-        "php${NAT_VER}-gd"
-        "php${NAT_VER}-mbstring"
-        "php${NAT_VER}-xml"
-        "php${NAT_VER}-zip"
-        "php${NAT_VER}-opcache"
-        "php${NAT_VER}-intl"
-        "php${NAT_VER}-bcmath"
-        "php${NAT_VER}-imagick"
-        "php${NAT_VER}-soap"
-        "php${NAT_VER}-readline"
-    )
-    DEBIAN_FRONTEND=noninteractive apt-get install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
+    # No Ubuntu 26.04, instala os pacotes nativos explicitamente
+    DEBIAN_FRONTEND=noninteractive apt-get install -y php-cli php-fpm php-common php-mysql php-curl php-gd php-mbstring php-xml php-zip php-opcache php-intl php-bcmath php-imagick php-soap php-readline > /dev/null 2>&1 || true
+    DEBIAN_FRONTEND=noninteractive apt-get install -y php8.5 php8.5-cli php8.5-fpm php8.5-mysql php8.5-curl php8.5-gd php8.5-mbstring php8.5-xml php8.5-zip php8.5-intl php8.5-opcache > /dev/null 2>&1 || true
     
-    INST_PHP_BIN=$(ls /usr/bin/php${NAT_VER} /usr/bin/php[0-9.]* 2>/dev/null | head -n 1)
+    INST_PHP_BIN=$(which php 2>/dev/null || ls /usr/bin/php8.5 /usr/bin/php[0-9.]* 2>/dev/null | head -n 1)
     if [ -n "$INST_PHP_BIN" ]; then
         update-alternatives --install /usr/bin/php php "$INST_PHP_BIN" 100 > /dev/null 2>&1 || true
         update-alternatives --set php "$INST_PHP_BIN" > /dev/null 2>&1 || true
     fi
-    PHP_VER="${NAT_VER}"
+    PHP_VER="8.5"
     log_success "PHP ${PHP_VER} nativo instalado e configurado no Ubuntu 26.04."
 fi
 
