@@ -237,7 +237,9 @@ print_header "INSTALAÇÃO E HARDENING DO MARIADB SERVER (RECOMENDADO JOOMLA 5: 
 
 log_info "Configurando repositório oficial MariaDB Server (Versão Recomendada 11.4 LTS)..."
 if ! dpkg -l | grep -q "mariadb-server"; then
+    rm -f /etc/apt/sources.list.d/mariadb*maxscale* 2>/dev/null || true
     curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- --mariadb-server-version="mariadb-11.4" > /dev/null 2>&1 || true
+    rm -f /etc/apt/sources.list.d/mariadb*maxscale* 2>/dev/null || true
     apt update -y > /dev/null 2>&1 || true
 fi
 
