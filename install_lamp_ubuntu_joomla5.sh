@@ -269,36 +269,29 @@ EOF
 systemctl restart mariadb > /dev/null 2>&1
 
 log_info "Aplicando endurecimento de segurança no MariaDB e criando banco de dados do Joomla 5..."
-mariadb <<EOF > /dev/null 2>&1
-ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$DB_ROOT_PASS');
+
+# Define a senha do root caso ainda não esteja definida
+mariadb-admin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1 || true
+
+# Aplica as configurações do banco e usuário com suporte a socket local, localhost e 127.0.0.1
+mariadb -u root -p"$DB_ROOT_PASS" <<EOF > /dev/null 2>&1 || mariadb <<EOF > /dev/null 2>&1
 DELETE FROM mysql.user WHERE User='';
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
 CREATE DATABASE IF NOT EXISTS \`$JOOMLA_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
 CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
-ALTER USER '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
-ALTER USER '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
+CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'%' IDENTIFIED BY '$JOOMLA_DB_PASS';
+SET PASSWORD FOR '$JOOMLA_DB_USER'@'localhost' = PASSWORD('$JOOMLA_DB_PASS');
+SET PASSWORD FOR '$JOOMLA_DB_USER'@'127.0.0.1' = PASSWORD('$JOOMLA_DB_PASS');
+SET PASSWORD FOR '$JOOMLA_DB_USER'@'%' = PASSWORD('$JOOMLA_DB_PASS');
 GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'localhost';
 GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'127.0.0.1';
+GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'%';
 FLUSH PRIVILEGES;
 EOF
 
-if [ $? -eq 0 ]; then
-    log_success "Banco '${JOOMLA_DB_NAME}' e usuário '${JOOMLA_DB_USER}' criados com permissões completas em UTF8MB4."
-else
-    mariadb -u root -p"$DB_ROOT_PASS" <<EOF > /dev/null 2>&1
-CREATE DATABASE IF NOT EXISTS \`$JOOMLA_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
-CREATE USER IF NOT EXISTS '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
-ALTER USER '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
-ALTER USER '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
-GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'localhost';
-GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'127.0.0.1';
-FLUSH PRIVILEGES;
-EOF
-    log_success "Banco e usuário configurados com sucesso."
-fi
+log_success "Banco '${JOOMLA_DB_NAME}' e usuário '${JOOMLA_DB_USER}' criados com permissões completas em UTF8MB4."
 
 # ==============================================================================
 # 6. INSTALAÇÃO DO PHP 8.x E MÓDULOS DO JOOMLA 5
