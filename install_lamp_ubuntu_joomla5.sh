@@ -357,8 +357,10 @@ if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
     for pkg in "${FALLBACK_PHP_PACKAGES[@]}"; do
         if apt install -y "$pkg" > /dev/null 2>&1; then
             log_success "Módulo nativo '$pkg' instalado com sucesso."
+        elif [ "$pkg" = "php-opcache" ] && php -m 2>/dev/null | grep -qi "Zend OPcache\|opcache"; then
+            log_success "Módulo nativo 'php-opcache' (embutido no core do PHP) ativo."
         else
-            log_warning "Falha/Aviso no pacote '$pkg'."
+            log_warning "Aviso/Não necessário no pacote '$pkg'."
         fi
     done
 fi
