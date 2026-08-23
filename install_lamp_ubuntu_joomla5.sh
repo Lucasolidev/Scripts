@@ -388,6 +388,9 @@ log_info "Integrando PHP-FPM ao Apache 2.4 (proxy_fcgi)..."
 a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
 a2enconf "php${PHP_VER}-fpm" > /dev/null 2>&1 || a2enconf php-fpm > /dev/null 2>&1 || true
 
+# Garante o serviço PHP-FPM ativo e em execução
+systemctl enable --now "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable --now php-fpm > /dev/null 2>&1 || true
+
 # Configura o Handler explícito universal do PHP-FPM para evitar falha no Apache
 ACTUAL_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
 [ -z "$ACTUAL_SOCK" ] && ACTUAL_SOCK="/run/php/php${PHP_VER}-fpm.sock"
@@ -401,6 +404,7 @@ EOF
     a2enconf joomla-php-fpm > /dev/null 2>&1 || true
 fi
 
+systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
 systemctl restart apache2 > /dev/null 2>&1 || true
 
 # ==============================================================================
