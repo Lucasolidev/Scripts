@@ -103,11 +103,48 @@
 >    - **Firewall UFW**: Ativar regras de proteção de borda.
 >    - **Limpeza do Sistema**: Executar `apt autoremove -y` e `apt autoclean -y` ao final das instalações.
 > 
-> 8. **Registro de Logs**:
->    No início da execução, inicialize a captura do console usando `exec > >(tee -a "$LOG_TMP") 2>&1`.
->    No final do script, salve automaticamente cópias timestamped e um atalho `latest.log` no diretório `/root` e na Home do usuário real que executou o comando via Sudo.
+> 8. **Estrutura Sequencial e Numerada de Etapas**:
+>    Todas as etapas lógicas de execução do script devem ser claramente identificadas por cabeçalhos e comentários numerados sequencialmente (ex: `# 1. VERIFICAÇÃO DE PRIVILÉGIOS`, `# 2. COLETA DE PARÂMETROS`, ..., `# N. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG`). Isso facilita a auditoria, leitura e manutenção do código.
 > 
-> 9. **Resultado Final Estruturado (Resumo da Instalação)**:
+> 9. **Registro e Salvamento de Logs (Etapa Final Obrigatória)**:
+>    - No início da execução (logo após validação de privilégios), inicialize a captura do console e arquivo temporário:
+>      ```bash
+>      LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+>      LOG_FILENAME="nome_do_script_${LOG_TIMESTAMP}.log"
+>      LOG_TMP="/tmp/${LOG_FILENAME}"
+>      exec > >(tee -a "$LOG_TMP") 2>&1
+>      ```
+>    - Na **última etapa numerada do script**, salve automaticamente cópias timestamped e um atalho `<nome_do_script>_latest.log` no diretório `/root` e na Home do usuário real que executou o comando via `sudo`:
+>      ```bash
+>      # ==============================================================================
+>      # [NÚMERO_ETAPA]. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+>      # ==============================================================================
+>      print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
+>
+>      # Salva cópias no diretório /root
+>      cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
+>      cp "$LOG_TMP" "/root/nome_do_script_latest.log" 2>/dev/null || true
+>      log_success "Log salvo em: /root/${LOG_FILENAME}"
+>      log_success "Atalho do último log: /root/nome_do_script_latest.log"
+>
+>      # Se executado via sudo, salva também na pasta home do usuário real
+>      if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+>        REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+>        if [ -d "$REAL_USER_HOME" ]; then
+>          cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
+>          cp "$LOG_TMP" "${REAL_USER_HOME}/nome_do_script_latest.log" 2>/dev/null || true
+>          chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/nome_do_script_latest.log" 2>/dev/null || true
+>          log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
+>        fi
+>      fi
+>
+>      rm -f "$LOG_TMP" 2>/dev/null || true
+>
+>      draw_separator
+>      echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
+>      ```
+> 
+> 10. **Resultado Final Estruturado (Resumo da Instalação)**:
 >    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
 >    **Obrigatório**: É fundamental incluir a linha de **Pacotes/Programas Instalados** detalhando os softwares adicionados ao sistema durante a execução (armazenando na array `PACOTES_INSTALADOS` e formatando com `LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")`).
 >    
@@ -137,7 +174,7 @@
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 >    ```
 > 
-> 10. **Cabeçalho de Metadados e Comentários**:
+> 11. **Cabeçalho de Metadados e Comentários**:
 >    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual que está sendo criado nas URLs de exemplo:
 >    ```bash
 >    #!/bin/bash

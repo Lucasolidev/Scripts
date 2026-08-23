@@ -16,20 +16,22 @@ Repositório centralizado de scripts de automação, ferramentas de pós-instala
 
 Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e utilitários:
 
-* 🐧 **[Guia de Ajuda Linux](ajuda_linux.md)** — Atalhos, manipulação de arquivos, permissões, POSIX ACLs, rsync/scp, usuários e comandos essenciais do Ubuntu Server.
-* 🐳 **[Guia de Ajuda Docker & Compose](ajuda_docker.md)** — Comandos de contêineres, imagens, volumes, redes e orquestração com Docker Compose.
-* 📊 **[Guia de Ajuda Zabbix](ajuda_zabbix.md)** — Monitoramento, `zabbix_get`, `zabbix_sender`, `zabbix_proxy`, agente 2 e `UserParameter`.
-* 🛢️ **[Guia de Ajuda MariaDB & MySQL](ajuda_mariadb_mysql.md)** — Administração SQL, permissões, backups (`mariadb-dump`), restore, otimização e reset de root.
-* 🛡️ **[Guia de Ajuda Firewall UFW & IPTables](ajuda_ufw_iptables.md)** — Regras de firewall, liberação por IP/porta, redirecionamento NAT (Port Forwarding) e `ss`/`tcpdump`.
-* 🌿 **[Guia de Ajuda Git & GitHub](ajuda_git.md)** — Workflow diário, gerenciamento de branches, `stash`, desfazer commits, `reset --hard` e remotos.
-* 🐘 **[Guia de Ajuda Samba](ajuda_samba.md)** — Comandos de servidor (Standalone e AD DC), `samba-tool`, `smbstatus`, comandos de cliente Linux/Windows e permissões POSIX ACL.
-* 🗂️ **[Guia de Ajuda LDAP / OpenLDAP](ajuda_ldap.md)** — Estrutura DIT, consultas com `ldapsearch`, inclusões com `ldapadd`, alterações com `ldapmodify`, `ldappasswd` e arquivos LDIF.
-* 🚀 **[Guia de Ajuda Nginx + PHP-FPM](ajuda_nginx.md)** — Estrutura de diretórios, blocos `server`, Reverse Proxy, PHP-FPM, timeouts e solução de erros (413, 502, 504).
-* 🌐 **[Guia de Ajuda Apache2](ajuda_apache2.md)** — Estrutura de diretórios, `a2enmod`, `a2ensite`, suporte a `.htaccess`, POSIX ACLs, VirtualHosts e diagnóstico.
-* 🖥️ **[Guia de Ajuda Tmux](ajuda_tmux.md)** — Gerenciamento de sessões, navegação de abas, divisão de painéis e rolagem de histórico no terminal.
-* 💻 **[Guia de Ajuda WSL 2](ajuda_wsl.md)** — Instalação, gerenciamento de distros, backups (`.tar`), limites do `.wslconfig` e integração Windows/Linux.
-* 🪟 **[Guia de Ajuda Windows](ajuda_windows.md)** — Comandos essenciais de PowerShell, CMD, redes e administração de sistemas Windows.
-* 📝 **[Guia de Ajuda Vim](ajuda_vim.md)** — Comandos de edição, navegação, buscas e atalhos de teclado no editor Vim.
+* 🐧 **[Guia de Ajuda Linux](Ajuda/ajuda_linux.md)** — Atalhos, manipulação de arquivos, permissões, POSIX ACLs, rsync/scp, usuários e comandos essenciais do Ubuntu Server.
+* 🐳 **[Guia de Ajuda Docker & Compose](Ajuda/ajuda_docker.md)** — Comandos de contêineres, imagens, volumes, redes e orquestração com Docker Compose.
+* 📊 **[Guia de Ajuda Zabbix](Ajuda/ajuda_zabbix.md)** — Monitoramento, `zabbix_get`, `zabbix_sender`, `zabbix_proxy`, agente 2 e `UserParameter`.
+* 🛢️ **[Guia de Ajuda MariaDB & MySQL](Ajuda/ajuda_mariadb_mysql.md)** — Administração SQL, permissões, backups (`mariadb-dump`), restore, otimização e reset de root.
+* 🛡️ **[Guia de Ajuda Firewall UFW & IPTables](Ajuda/ajuda_ufw_iptables.md)** — Regras de firewall, liberação por IP/porta, redirecionamento NAT (Port Forwarding) e `ss`/`tcpdump`.
+* 🔒 **[Guia de Ajuda Fail2Ban](Ajuda/ajuda_fail2ban.md)** — Prevenção de intrusão e brute force, status de jails, unban/ban de IPs, whitelists (`ignoreip`) e logs.
+* 🌿 **[Guia de Ajuda Git & GitHub](Ajuda/ajuda_git.md)** — Workflow diário, gerenciamento de branches, `stash`, desfazer commits, `reset --hard` e remotos.
+* 🐘 **[Guia de Ajuda Samba](Ajuda/ajuda_samba.md)** — Comandos de servidor (Standalone e AD DC), `samba-tool`, `smbstatus`, comandos de cliente Linux/Windows e permissões POSIX ACL.
+* 🗂️ **[Guia de Ajuda LDAP / OpenLDAP](Ajuda/ajuda_ldap.md)** — Estrutura DIT, consultas com `ldapsearch`, inclusões com `ldapadd`, alterações com `ldapmodify`, `ldappasswd` e arquivos LDIF.
+* 🚀 **[Guia de Ajuda Nginx + PHP-FPM](Ajuda/ajuda_nginx.md)** — Estrutura de diretórios, blocos `server`, Reverse Proxy, PHP-FPM, timeouts e solução de erros (413, 502, 504).
+* 🌐 **[Guia de Ajuda Apache2](Ajuda/ajuda_apache2.md)** — Estrutura de diretórios, `a2enmod`, `a2ensite`, suporte a `.htaccess`, POSIX ACLs, VirtualHosts e diagnóstico.
+* 🖥️ **[Guia de Ajuda Tmux](Ajuda/ajuda_tmux.md)** — Gerenciamento de sessões, navegação de abas, divisão de painéis e rolagem de histórico no terminal.
+* 💻 **[Guia de Ajuda WSL 2](Ajuda/ajuda_wsl.md)** — Instalação, gerenciamento de distros, backups (`.tar`), limites do `.wslconfig` e integração Windows/Linux.
+* 🪟 **[Guia de Ajuda Windows](Ajuda/ajuda_windows.md)** — Comandos essenciais de PowerShell, CMD, redes e administração de sistemas Windows.
+* 📝 **[Guia de Ajuda Vim](Ajuda/ajuda_vim.md)** — Comandos de edição, navegação, buscas e atalhos de teclado no editor Vim.
+* 📋 **[Checklist de Coleta Pré-Migração Web](Ajuda/checklist_pre_migracao_joomla.md)** — Procedimento de auditoria, coleta de credenciais, dump de banco, arquivos e DNS antes da virada de servidor.
 
 ---
 
@@ -59,8 +61,16 @@ Instala e otimiza a pilha LAMP (Apache2 com mod_rewrite, `ServerTokens Prod`, Ma
 wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh -O install_lamp_ubuntu.sh && chmod +x install_lamp_ubuntu.sh && sudo ./install_lamp_ubuntu.sh
 ```
 
+### 5. Instalador LAMP Especializado - Joomla 5.x (`install_lamp_ubuntu_joomla5.sh`)
+Instala e configura a pilha LAMP genérica e reutilizável para qualquer domínio com todos os **requisitos recomendados oficiais do Joomla 5.x** (Apache 2.4 com mod_rewrite/HTTP2, MariaDB 11.4 com UTF8MB4, PHP 8.3 com memória de 512MB, OPcache otimizado, rotinas agendadas no Cron para `cli/joomla.php`, headers de segurança e permissões POSIX ACL):
+```bash
+wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu_joomla5.sh -O install_lamp_ubuntu_joomla5.sh && chmod +x install_lamp_ubuntu_joomla5.sh && sudo ./install_lamp_ubuntu_joomla5.sh
+```
+
+
 ---
 
 ## 📐 Padrões de Código e Templates
-* 📄 **[Template Padrão Shell Script](Padrao_Shell_Script_Template_Visual.md)** — Modelo padrão com paleta de cores ANSI, logs, hardening e cabeçalhos visuais para scripts Bash.
-* 📄 **[Template Padrão PowerShell Script](Padrao_PowerShell_Script_Template_Visual.md)** — Modelo padrão para scripts de automação em PowerShell.
+* 📄 **[Template Padrão Shell Script](Architecture/ARCHITECTURE_Shell_Script_Template_Visual.md)** — Modelo padrão com paleta de cores ANSI, logs, hardening e cabeçalhos visuais para scripts Bash.
+* 📄 **[Template Padrão PowerShell Script](Architecture/ARCHITECTURE_PowerShell_Script_Template_Visual.md)** — Modelo padrão para scripts de automação em PowerShell.
+* 📐 **[Padrão de Guias de Ajuda](Architecture/ARCHITECTURE_AJUDA.md)** — Especificação e padronização para a criação de novos manuais e cheat sheets.

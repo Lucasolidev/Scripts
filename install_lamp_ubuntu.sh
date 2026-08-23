@@ -1,25 +1,28 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.3
+# Version: 1.5
 # ------------------------------------------------
-VERSION="1.3"
+VERSION="1.5"
 # ==============================================================================
 # SCRIPT DE INSTALAÇÃO DA PILHA LAMP AUTOMÁTICO E ENDURECIDO - UBUNTU
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
-# 1. Valida privilégios de execução (exige Root/Sudo).
-# 2. Coleta parâmetros iniciais (senha do MariaDB, phpMyAdmin, regras UFW).
-# 3. Atualiza os repositórios do sistema.
-# 4. Instala e habilita o servidor web Apache2 com mod_rewrite ativado.
+# 1. Valida privilégios de execução (exige Root/Sudo) e inicializa captura de log.
+# 2. Coleta parâmetros iniciais (Diretório Web Raiz, Senha MariaDB, PHP, phpMyAdmin, UFW).
+# 3. Atualiza os repositórios do sistema e instala dependências prévias.
+# 4. Instala e habilita o servidor web Apache2 com mod_rewrite e módulos essenciais.
 # 5. Aplica endurecimento de segurança no Apache2 (ServerTokens Prod e ServerSignature Off).
 # 6. Instala o MariaDB Server com senha root, limpeza de usuários anônimos e eliminação do banco 'test'.
-# 7. Adiciona o repositório ppa:ondrej/php e instala o PHP com extensões essenciais.
+# 7. Adiciona repositório ppa:ondrej/php e instala PHP com pacote completo de extensões modernas:
+#    (pdo_mysql, mysqli, cli, common, curl, gd, mbstring, xml, zip, opcache, intl, bcmath, imagick, soap, readline).
 # 8. Desativa funções PHP de alto risco no php.ini (system, shell_exec, passthru, show_source).
-# 9. Opcionalmente instala e integra o phpMyAdmin de forma não interativa ao Apache.
-# 10. Configura o Firewall UFW liberando portas 80 (HTTP), 443 (HTTPS) e 22 (SSH).
-# 11. Configura o Fail2Ban protegendo SSH, Apache Auth e ativa a jaula anti-scanners (apache-badbots).
-# 12. Cria uma página de diagnóstico phpinfo em /var/www/html/info.php.
-# 13. Exibe o Resumo Final do Sistema com todas as configurações de segurança ativas.
+# 9. Aplica herança de permissões POSIX ACLs no DocumentRoot configurado.
+# 10. Cria uma página de diagnóstico phpinfo em <WEB_ROOT>/info.php.
+# 11. Opcionalmente instala e integra o phpMyAdmin de forma não interativa ao Apache.
+# 12. Configura o Firewall UFW liberando portas 80 (HTTP), 443 (HTTPS) e 22 (SSH).
+# 13. Configura o Fail2Ban protegendo SSH, Apache Auth e ativa a jaula anti-scanners (apache-badbots).
+# 14. Exibe o Resumo Final do Sistema com todas as configurações de segurança ativas.
+# 15. Geração e salvamento automático dos arquivos de log em /root e na Home do usuário.
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu.sh -O install_lamp_ubuntu.sh && chmod +x install_lamp_ubuntu.sh && sudo ./install_lamp_ubuntu.sh
@@ -73,6 +76,15 @@ print_header() {
     draw_separator
 }
 
+get_service_status() {
+    local service="$1"
+    if systemctl is-active --quiet "$service" 2>/dev/null; then
+        echo -e "${FG_GREEN}Ativo${NC}"
+    else
+        echo -e "${FG_YELLOW}Inativo${NC}"
+    fi
+}
+
 log_info()    { echo -e "  ${FG_CYAN}[i]${NC}  ${BOLD}INFO:${NC}      $1"; }
 log_success() { echo -e "  ${FG_GREEN}[+]${NC}  ${FG_GREEN}${BOLD}SUCESSO:${NC}   $1"; }
 log_warning() { echo -e "  ${FG_YELLOW}[!]${NC}  ${FG_YELLOW}${BOLD}ATENÇÃO:${NC}   $1"; }
@@ -84,9 +96,9 @@ print_alert_box() {
     echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
 }
 
-# ==========================================
-# VERIFICAÇÃO DE PRIVILÉGIOS (ROOT)
-# ==========================================
+# ==============================================================================
+# 1. VERIFICAÇÃO DE PRIVILÉGIOS (ROOT) E INICIALIZAÇÃO DE LOG
+# ==============================================================================
 if [ "$(id -u)" -ne 0 ]; then
     print_header "ERRO DE EXECUÇÃO"
     log_error "Este script precisa ser executado como ROOT ou via sudo."
@@ -94,14 +106,24 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-print_header "INSTALADOR AUTOMÁTICO LAMP - UBUNTU (APACHE, MARIADB, PHP 8.3)"
+LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+LOG_FILENAME="install_lamp_ubuntu_${LOG_TIMESTAMP}.log"
+LOG_TMP="/tmp/${LOG_FILENAME}"
+exec > >(tee -a "$LOG_TMP") 2>&1
 
-# ==========================================
-# COLETA DE PARÂMETROS
-# ==========================================
+print_header "INSTALADOR AUTOMÁTICO LAMP - UBUNTU (APACHE, MARIADB, PHP)"
+
+# ==============================================================================
+# 2. COLETA DE PARÂMETROS
+# ==============================================================================
 print_header "COLETA DE PARÂMETROS"
 
-echo -e "  ${FG_CYAN}[i]${NC} Defina a senha para o usuário root do MariaDB."
+echo -e "  ${FG_CYAN}[i]${NC} Diretório raiz da aplicação web (permite informar outro disco/ponto de montagem)."
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Diretório Web Raiz [Padrão: /var/www/html]: ${NC}")" CUSTOM_WEB_ROOT
+WEB_ROOT=${CUSTOM_WEB_ROOT:-"/var/www/html"}
+log_info "Diretório Web Raiz: ${FG_GREEN}${WEB_ROOT}${NC}"
+
+echo -e "\n  ${FG_CYAN}[i]${NC} Defina a senha para o usuário root do MariaDB."
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar uma aleatória): ${NC}")" DB_ROOT_PASS
 
 if [ -z "$DB_ROOT_PASS" ]; then
@@ -109,7 +131,7 @@ if [ -z "$DB_ROOT_PASS" ]; then
     log_info "Senha aleatória gerada para o MariaDB Root: ${FG_GREEN}${DB_ROOT_PASS}${NC}"
 fi
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.3): ${NC}")" PHP_INPUT
 PHP_INPUT=${PHP_INPUT:-latest}
 
 if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
@@ -140,9 +162,9 @@ CONFIGURE_UFW=$(echo "$CONFIGURE_UFW" | tr '[:upper:]' '[:lower:]')
 
 draw_separator
 
-# ==========================================
-# ATUALIZAÇÃO DO SISTEMA
-# ==========================================
+# ==============================================================================
+# 3. ATUALIZAÇÃO DO SISTEMA E PRÉ-REQUISITOS
+# ==============================================================================
 print_header "PREPARANDO REPOSITÓRIOS"
 
 log_info "Atualizando a lista de pacotes do APT..."
@@ -164,9 +186,9 @@ for pkg in "${PRE_REQ_PACKAGES[@]}"; do
     fi
 done
 
-# ==========================================
-# INSTALAÇÃO DO APACHE2
-# ==========================================
+# ==============================================================================
+# 4. INSTALAÇÃO DO SERVIDOR WEB (APACHE2)
+# ==============================================================================
 print_header "INSTALAÇÃO DO SERVIDOR WEB (APACHE2)"
 
 log_info "Instalando o Apache2..."
@@ -177,17 +199,51 @@ else
     exit 1
 fi
 
-log_info "Habilitando módulo mod_rewrite no Apache..."
-a2enmod rewrite > /dev/null 2>&1
-log_success "Módulo mod_rewrite habilitado."
+log_info "Habilitando módulos essenciais no Apache (rewrite, headers, ssl, deflate)..."
+for mod in rewrite headers ssl deflate expires; do
+    a2enmod "$mod" > /dev/null 2>&1
+done
+log_success "Módulos do Apache habilitados."
 
 log_info "Iniciando e habilitando serviço apache2 no boot..."
 systemctl enable --now apache2 > /dev/null 2>&1
 log_success "Serviço apache2 em execução."
 
-# ==========================================
-# INSTALAÇÃO DO MARIADB SERVER
-# ==========================================
+# ==============================================================================
+# 5. HARDENING DE SEGURANÇA NO APACHE2
+# ==============================================================================
+print_header "HARDENING DO APACHE2"
+
+log_info "Aplicando endurecimento de segurança no Apache2 (ocultar versão e assinaturas)..."
+if [ -f /etc/apache2/conf-available/security.conf ]; then
+    sed -i 's/^ServerTokens .*/ServerTokens Prod/' /etc/apache2/conf-available/security.conf
+    sed -i 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
+    a2enconf security > /dev/null 2>&1 || true
+fi
+
+# Configura o DocumentRoot no VirtualHost se for diferente do default
+if [ "$WEB_ROOT" != "/var/www/html" ]; then
+    log_info "Atualizando DocumentRoot no VirtualHost padrão do Apache (/etc/apache2/sites-available/000-default.conf)..."
+    cat <<EOF > /etc/apache2/sites-available/000-default.conf
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot ${WEB_ROOT}
+
+    <Directory ${WEB_ROOT}>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+EOF
+fi
+
+# ==============================================================================
+# 6. INSTALAÇÃO E HARDENING DO BANCO DE DADOS (MARIADB SERVER)
+# ==============================================================================
 print_header "INSTALAÇÃO DO BANCO DE DADOS (MARIADB SERVER)"
 
 log_info "Instalando o MariaDB Server..."
@@ -218,9 +274,9 @@ else
     log_success "Senha do root do MariaDB aplicada via mysqladmin."
 fi
 
-# ==========================================
-# INSTALAÇÃO DO PHP E EXTENSÕES
-# ==========================================
+# ==============================================================================
+# 7. INSTALAÇÃO DO PHP E EXTENSÕES
+# ==============================================================================
 print_header "INSTALAÇÃO DO PHP E EXTENSÕES"
 
 log_info "Adicionando repositório PPA ondrej/php..."
@@ -249,6 +305,9 @@ PHP_PACKAGES=(
     "${PKG_PREFIX}opcache"
     "${PKG_PREFIX}intl"
     "${PKG_PREFIX}bcmath"
+    "${PKG_PREFIX}imagick"
+    "${PKG_PREFIX}soap"
+    "${PKG_PREFIX}readline"
 )
 
 PHP_FALLBACK_PACKAGES=(
@@ -265,6 +324,9 @@ PHP_FALLBACK_PACKAGES=(
     "php-opcache"
     "php-intl"
     "php-bcmath"
+    "php-imagick"
+    "php-soap"
+    "php-readline"
 )
 
 log_info "Instalando pacotes do PHP (${LOG_PHP_MSG})..."
@@ -287,12 +349,10 @@ if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
     done
 fi
 
-log_info "Aplicando endurecimento de segurança no Apache2 (ocultar versão e assinaturas)..."
-if [ -f /etc/apache2/conf-available/security.conf ]; then
-    sed -i 's/^ServerTokens .*/ServerTokens Prod/' /etc/apache2/conf-available/security.conf
-    sed -i 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
-    a2enconf security > /dev/null 2>&1 || true
-fi
+# ==============================================================================
+# 8. OTIMIZAÇÃO E HARDENING NO PHP.INI
+# ==============================================================================
+print_header "HARDENING NO PHP.INI"
 
 log_info "Desativando funções de execução de sistema de risco no PHP (disable_functions)..."
 for ini in /etc/php/*/apache2/php.ini /etc/php/*/cli/php.ini; do
@@ -305,33 +365,33 @@ log_info "Reiniciando Apache2 para carregar as configurações de segurança e m
 systemctl restart apache2 > /dev/null 2>&1
 log_success "Apache2 reiniciado com suporte a PHP, versão ocultada e funções de risco desativadas."
 
-# ==========================================
-# CONFIGURAÇÃO DE PERMISSÕES E POSIX ACLs
-# ==========================================
+# ==============================================================================
+# 9. CONFIGURAÇÃO DE PERMISSÕES (POSIX ACLs)
+# ==============================================================================
 print_header "CONFIGURAÇÃO DE PERMISSÕES (POSIX ACLs)"
-log_info "Aplicando herança de permissões automática com POSIX ACLs (setfacl) em /var/www..."
-mkdir -p /var/www/html
-chown -R www-data:www-data /var/www
-chmod -R 775 /var/www
-setfacl -R -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
-setfacl -R -d -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
-log_success "ACLs ativas: Novos arquivos em /var/www herdarão acesso total para www-data."
+log_info "Aplicando herança de permissões automática com POSIX ACLs (setfacl) em ${WEB_ROOT}..."
+mkdir -p "$WEB_ROOT"
+chown -R www-data:www-data "$WEB_ROOT"
+chmod -R 775 "$WEB_ROOT"
+setfacl -R -m u:www-data:rwx,g:www-data:rwx "$WEB_ROOT" > /dev/null 2>&1 || true
+setfacl -R -d -m u:www-data:rwx,g:www-data:rwx "$WEB_ROOT" > /dev/null 2>&1 || true
+log_success "ACLs ativas: Novos arquivos em ${WEB_ROOT} herdarão acesso total para www-data."
 
-# ==========================================
-# CRIANDO PÁGINA DE DIAGNÓSTICO (info.php)
-# ==========================================
-log_info "Criando arquivo de teste phpinfo em /var/www/html/info.php..."
-cat <<'EOF' > /var/www/html/info.php
+# ==============================================================================
+# 10. DIAGNÓSTICO DO PHP (info.php)
+# ==============================================================================
+log_info "Criando arquivo de teste phpinfo em ${WEB_ROOT}/info.php..."
+cat <<'EOF' > "${WEB_ROOT}/info.php"
 <?php
 phpinfo();
 ?>
 EOF
-chown www-data:www-data /var/www/html/info.php
-log_success "Arquivo /var/www/html/info.php criado."
+chown www-data:www-data "${WEB_ROOT}/info.php"
+log_success "Arquivo ${WEB_ROOT}/info.php criado."
 
-# ==========================================
-# INSTALAÇÃO OPCIONAL DO PHPMYADMIN
-# ==========================================
+# ==============================================================================
+# 11. INSTALAÇÃO OPCIONAL DO PHPMYADMIN
+# ==============================================================================
 if [ "$INSTALL_PHPMYADMIN" = "s" ] || [ "$INSTALL_PHPMYADMIN" = "sim" ]; then
     print_header "INSTALAÇÃO DO PHPMYADMIN"
     log_info "Configurando seleções automáticas do debconf para phpMyAdmin..."
@@ -351,9 +411,9 @@ if [ "$INSTALL_PHPMYADMIN" = "s" ] || [ "$INSTALL_PHPMYADMIN" = "sim" ]; then
     fi
 fi
 
-# ==========================================
-# CONFIGURAÇÃO DE FIREWALL (UFW)
-# ==========================================
+# ==============================================================================
+# 12. CONFIGURAÇÃO DE FIREWALL (UFW)
+# ==============================================================================
 if [ "$CONFIGURE_UFW" != "n" ] && [ "$CONFIGURE_UFW" != "nao" ]; then
     print_header "CONFIGURAÇÃO DE FIREWALL (UFW)"
     if command -v ufw > /dev/null 2>&1; then
@@ -368,31 +428,21 @@ if [ "$CONFIGURE_UFW" != "n" ] && [ "$CONFIGURE_UFW" != "nao" ]; then
     fi
 fi
 
-# ==========================================
-# CONFIGURAÇÃO DO FAIL2BAN (PROTEÇÃO SSH E APACHE)
-# ==========================================
+# ==============================================================================
+# 13. CONFIGURAÇÃO DO FAIL2BAN (PROTEÇÃO SSH E APACHE)
+# ==============================================================================
 if [ "$CONFIGURE_FAIL2BAN" != "n" ] && [ "$CONFIGURE_FAIL2BAN" != "nao" ]; then
     print_header "INSTALAÇÃO E CONFIGURAÇÃO DO FAIL2BAN"
     log_info "Instalando o Fail2Ban..."
     apt install -y fail2ban > /dev/null 2>&1
 
     log_info "Garantindo existência dos arquivos de log do Apache..."
-    mkdir -p /var/log/apache2
+    mkdir -p /var/log/apache2 /etc/fail2ban/jail.d
     touch /var/log/apache2/error.log /var/log/apache2/access.log
     chown -R www-data:adm /var/log/apache2 > /dev/null 2>&1 || true
 
-    log_info "Criando arquivo de configuração em /etc/fail2ban/jail.local..."
-    cat <<EOF > /etc/fail2ban/jail.local
-[DEFAULT]
-backend = systemd
-bantime  = 1h
-findtime = 10m
-maxretry = 5
-
-[sshd]
-enabled = true
-port    = ssh
-
+    log_info "Criando arquivo de configuração em /etc/fail2ban/jail.d/apache.local..."
+    cat <<EOF > /etc/fail2ban/jail.d/apache.local
 [apache-auth]
 enabled = true
 port    = http,https
@@ -406,15 +456,14 @@ maxretry = 3
 bantime  = 2h
 EOF
 
-    log_info "Habilitando e reiniciando o serviço Fail2Ban..."
     systemctl enable --now fail2ban > /dev/null 2>&1
     systemctl restart fail2ban > /dev/null 2>&1
     log_success "Fail2Ban configurado e ativo com regras para SSH, Apache Auth e BadBots."
 fi
 
-# ==========================================
-# RESUMO FINAL DO SISTEMA
-# ==========================================
+# ==============================================================================
+# 14. RESUMO FINAL DO SISTEMA
+# ==============================================================================
 SERVER_IP=$(hostname -I | awk '{print $1}')
 [ -z "$SERVER_IP" ] && SERVER_IP="localhost"
 ACTUAL_PHP_VER=$(php -r 'echo PHP_VERSION;' 2>/dev/null || echo "8.3")
@@ -428,10 +477,10 @@ echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecid
 echo -e "  ${BOLD}Servidor Web:${NC}          Apache2 ($(systemctl is-active apache2 2>/dev/null || echo "active")) [ServerTokens Prod]"
 echo -e "  ${BOLD}Banco de Dados:${NC}        MariaDB Server [Seguro: Sem 'test' e sem usuár. anônimos]"
 echo -e "  ${BOLD}Linguagem de Script:${NC}   PHP ${ACTUAL_PHP_VER} [disable_functions ativas]"
-echo -e "  ${BOLD}Permissões POSIX ACL:${NC}  ${FG_GREEN}Ativo e Herdando (/var/www)${NC}"
+echo -e "  ${BOLD}Permissões POSIX ACL:${NC}  ${FG_GREEN}Ativo e Herdando (${WEB_ROOT})${NC}"
 echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo (SSH, Apache Auth & BadBots)${NC}" || echo "Não instalado")"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}Diretório Web Raiz:${NC}   ${FG_CYAN}/var/www/html/${NC}"
+echo -e "  ${BOLD}Diretório Web Raiz:${NC}   ${FG_CYAN}${WEB_ROOT}${NC}"
 echo -e "  ${BOLD}Acesso Web Principal:${NC}  ${FG_CYAN}http://${SERVER_IP}/${NC}"
 echo -e "  ${BOLD}Diagnóstico PHP:${NC}      ${FG_CYAN}http://${SERVER_IP}/info.php${NC}"
 
@@ -455,7 +504,32 @@ if systemctl is-active fail2ban >/dev/null 2>&1; then
 fi
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
-log_warning "Por razões de segurança, lembre-se de remover ou restringir o acesso ao arquivo /var/www/html/info.php após a validação."
-echo -e ""
+log_warning "Por razões de segurança, lembre-se de remover ou restringir o acesso ao arquivo ${WEB_ROOT}/info.php após a validação."
+
+# ==============================================================================
+# 15. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# ==============================================================================
+print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
+
+# Salva cópias no diretório /root
+cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
+cp "$LOG_TMP" "/root/install_lamp_ubuntu_latest.log" 2>/dev/null || true
+log_success "Log salvo em: /root/${LOG_FILENAME}"
+log_success "Atalho do último log: /root/install_lamp_ubuntu_latest.log"
+
+# Se executado via sudo, salva também na pasta home do usuário real
+if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+    REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    if [ -d "$REAL_USER_HOME" ]; then
+        cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
+        cp "$LOG_TMP" "${REAL_USER_HOME}/install_lamp_ubuntu_latest.log" 2>/dev/null || true
+        chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/install_lamp_ubuntu_latest.log" 2>/dev/null || true
+        log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
+    fi
+fi
+
+rm -f "$LOG_TMP" 2>/dev/null || true
+
 draw_separator
+echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 echo -e "${FG_GREEN}${BOLD}❯ Instalação concluída com sucesso!${NC}\n"

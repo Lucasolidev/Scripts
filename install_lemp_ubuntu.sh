@@ -1,44 +1,68 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.3
+# Version: 1.5
 # ------------------------------------------------
-VERSION="1.3"
+VERSION="1.5"
 # ==============================================================================
-# INSTALADOR STACK LEMP AUTOMÁTICO E ENDURECIDO (NGINX + MARIADB + PHP-FPM)
+# SCRIPT DE INSTALAÇÃO DA PILHA LEMP AUTOMÁTICO E ENDURECIDO - UBUNTU
+# NGINX + MARIADB + PHP-FPM COM SUPORTE A WEBSOCKETS E HERANÇA POSIX ACL
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
-# 1. Valida privilégios de execução (Root/Sudo) e atualiza repositórios do sistema.
-# 2. Configura a Stack LEMP (Nginx, MariaDB Server, PHP-FPM e módulos essenciais).
-# 3. Aplica endurecimento no Nginx (server_tokens off, worker_rlimit_nofile 65535 e suporte a WebSockets).
-# 4. Desativa funções PHP de alto risco no php.ini (system, shell_exec, passthru, show_source).
-# 5. Aplica segurança no MariaDB (senha root, remoção de usuários anônimos e eliminação do banco 'test').
-# 6. Aplica permissões automáticas POSIX ACLs (setfacl) em /var/www com herança total para www-data.
-# 7. Configura o Firewall UFW liberando portas 80 (HTTP), 443 (HTTPS) e 22 (SSH).
-# 8. Configura o Fail2Ban protegendo SSH, Nginx Auth e ativa a jaula anti-scanners (nginx-botsearch).
-# 9. Exibe o Resumo Final do Sistema com todas as configurações de segurança ativas.
+# 1. Valida privilégios de execução (exige Root/Sudo) e inicializa captura de log.
+# 2. Coleta parâmetros (Domínio, Diretório Web Raiz, Versão PHP, Uploads, Timeout e Senha MariaDB).
+# 3. Adiciona repositórios oficiais e instala dependências, Nginx, MariaDB Server e PHP-FPM.
+# 4. Instala pacote completo de módulos PHP modernos:
+#    (fpm, cli, common, mysql, curl, gd, mbstring, xml, zip, opcache, intl, bcmath, imagick, soap, readline).
+# 5. Configura o PHP-FPM com limites de upload customizados, timeouts e desativação de funções inseguras.
+# 6. Aplica endurecimento no MariaDB (sem base test, sem usuários anônimos e senha segura).
+# 7. Cria VirtualHost no Nginx com suporte a WebSockets, HTTP/2, client_max_body_size e FastCGI.
+# 8. Aplica herança de permissões POSIX ACLs no diretório configurado.
+# 9. Cria arquivo de diagnóstico phpinfo em <WEB_ROOT>/info.php.
+# 10. Configura Firewall UFW (80, 443, 22) e Fail2Ban (SSH e Nginx BotSearch).
+# 11. Exibe Resumo Final do Sistema com todas as configurações ativas.
+# 12. Geração e salvamento automático dos arquivos de log em /root e na Home do usuário.
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lemp_ubuntu.sh -O install_lemp_ubuntu.sh && chmod +x install_lemp_ubuntu.sh && sudo ./install_lemp_ubuntu.sh
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# 1. PALETA DE CORES E ESTILOS (ANSI)
-# ------------------------------------------------------------------------------
-NC="\033[0m"
-BOLD="\033[1m"
-DIM="\033[2m"
+export DEBIAN_FRONTEND=noninteractive
 
-FG_CYAN="\033[36m"
-FG_YELLOW="\033[33m"
-FG_GREEN="\033[32m"
-FG_RED="\033[31m"
-FG_WHITE="\033[37m"
+# ==========================================
+# PALETA DE CORES (ANSI ESCAPE CODES)
+# ==========================================
+NC='\033[0m'              # Reset (Sem Cor)
+BOLD='\033[1m'
+DIM='\033[2m'
+UNDERLINE='\033[4m'
 
+# Cores de Fonte (Foreground)
+FG_BLACK='\033[30m'
+FG_RED='\033[31m'
+FG_GREEN='\033[32m'
+FG_YELLOW='\033[33m'
+FG_BLUE='\033[34m'
+FG_MAGENTA='\033[35m'
+FG_CYAN='\033[36m'
+FG_WHITE='\033[37m'
+
+# Cores de Fundo (Background)
+BG_BLACK='\033[40m'
+BG_RED='\033[41m'
+BG_GREEN='\033[42m'
+BG_YELLOW='\033[43m'
+BG_BLUE='\033[44m'
+BG_MAGENTA='\033[45m'
+BG_CYAN='\033[46m'
+BG_WHITE='\033[47m'
+
+# Símbolos Customizados
 ARROW="❯"
 
-# ------------------------------------------------------------------------------
-# 2. FUNÇÕES AUXILIARES VISUAIS
-# ------------------------------------------------------------------------------
+# ==========================================
+# FUNÇÕES DE HIGHLIGHT E LOGGING
+# ==========================================
+
 draw_separator() {
     echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
 }
@@ -61,25 +85,35 @@ print_alert_box() {
     echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
 }
 
-# ------------------------------------------------------------------------------
-# CHECAGEM DE ROOT
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 1. VERIFICAÇÃO DE PRIVILÉGIOS (ROOT) E INICIALIZAÇÃO DE LOG
+# ==============================================================================
 if [ "$(id -u)" -ne 0 ]; then
-    log_error "Este script precisa ser executado como root (sudo)."
+    print_header "ERRO DE EXECUÇÃO"
+    log_error "Este script precisa ser executado como ROOT ou via sudo."
+    echo -e "  Exemplo: ${FG_YELLOW}sudo bash $0${NC}\n"
     exit 1
 fi
 
-# ------------------------------------------------------------------------------
-# 3. INTERATIVIDADE E COLETA DE PARÂMETROS
-# ------------------------------------------------------------------------------
+LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+LOG_FILENAME="install_lemp_ubuntu_${LOG_TIMESTAMP}.log"
+LOG_TMP="/tmp/${LOG_FILENAME}"
+exec > >(tee -a "$LOG_TMP") 2>&1
+
+print_header "INSTALADOR AUTOMÁTICO LEMP ENDURECIDO - UBUNTU"
+
+# ==============================================================================
+# 2. COLETA INTERATIVA DE PARÂMETROS
+# ==============================================================================
 print_header "COLETA DE PARÂMETROS"
 
-echo -e "  ${FG_WHITE}Configuração do Servidor LEMP (Nginx + MariaDB + PHP-FPM)${NC}\n"
-
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio ou subdomínio (ex: meudominio.com.br): ${NC}")" DOMAIN_NAME
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Domínio do site (ex: meusite.com.br): ${NC}")" DOMAIN_NAME
 DOMAIN_NAME=${DOMAIN_NAME:-meudominio.com.br}
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.2): ${NC}")" PHP_INPUT
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Diretório Web Raiz [Padrão: /var/www/${DOMAIN_NAME}]: ${NC}")" CUSTOM_WEB_ROOT
+WEB_ROOT=${CUSTOM_WEB_ROOT:-"/var/www/${DOMAIN_NAME}"}
+
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar (Pressione ENTER para a mais recente | ou informe ex: 8.3): ${NC}")" PHP_INPUT
 PHP_INPUT=${PHP_INPUT:-latest}
 
 if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
@@ -87,7 +121,6 @@ if [[ "$PHP_INPUT" =~ ^[Ll]atest$ || "$PHP_INPUT" == "mais recente" ]]; then
     PKG_PREFIX="php-"
     LOG_PHP_MSG="Mais recente do repositório"
 else
-    # Extrai apenas números e ponto caso o usuário digite php8.2 ou 8.2
     CLEAN_VER=$(echo "$PHP_INPUT" | sed 's/[^0-9.]//g')
     if [ -n "$CLEAN_VER" ]; then
         PHP_VER="$CLEAN_VER"
@@ -112,13 +145,14 @@ if [ -z "$DB_ROOT_PASS" ]; then
 fi
 
 log_info "Domínio configurado: ${BOLD}${DOMAIN_NAME}${NC}"
+log_info "Diretório Web Raiz: ${BOLD}${WEB_ROOT}${NC}"
 log_info "Versão do PHP solicitada: ${BOLD}${LOG_PHP_MSG}${NC}"
 log_info "Limite de Upload: ${BOLD}${UPLOAD_MAX}${NC}"
 log_info "Timeout de Execução: ${BOLD}${EXEC_TIME}s${NC}"
 
-# ------------------------------------------------------------------------------
-# 4. INSTALAÇÃO SILENCIOSA E PREPARAÇÃO DO AMBIENTE
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 3. INSTALAÇÃO DE PACOTES E REPOSITÓRIOS
+# ==============================================================================
 print_header "INSTALAÇÃO DE PACOTES E DEPENDÊNCIAS"
 
 log_info "Atualizando lista de repositórios..."
@@ -145,8 +179,12 @@ PACKAGES=(
     "${PKG_PREFIX}mbstring"
     "${PKG_PREFIX}xml"
     "${PKG_PREFIX}zip"
+    "${PKG_PREFIX}opcache"
     "${PKG_PREFIX}intl"
     "${PKG_PREFIX}bcmath"
+    "${PKG_PREFIX}imagick"
+    "${PKG_PREFIX}soap"
+    "${PKG_PREFIX}readline"
     "unzip"
     "git"
     "ufw"
@@ -154,7 +192,7 @@ PACKAGES=(
     "acl"
 )
 
-# Caso a versão específica não seja encontrada no repositório, fallback para a versão mais recente (php-fpm)
+# Fallback caso a versão específica não seja encontrada
 if [ -n "$PHP_VER" ] && ! apt-cache show "${PKG_PREFIX}fpm" > /dev/null 2>&1; then
     log_warning "Pacote ${PKG_PREFIX}fpm não encontrado no repositório. Tentando instalar versão padrão do sistema (php-fpm)..."
     PHP_VER=""
@@ -172,8 +210,12 @@ if [ -n "$PHP_VER" ] && ! apt-cache show "${PKG_PREFIX}fpm" > /dev/null 2>&1; th
         "php-mbstring"
         "php-xml"
         "php-zip"
+        "php-opcache"
         "php-intl"
         "php-bcmath"
+        "php-imagick"
+        "php-soap"
+        "php-readline"
         "unzip"
         "git"
         "ufw"
@@ -192,12 +234,11 @@ for pkg in "${PACKAGES[@]}"; do
     fi
 done
 
-# ------------------------------------------------------------------------------
-# 5. CONFIGURAÇÃO DO PHP-FPM PARA ARQUIVOS GRANDES
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 4. CONFIGURAÇÃO E HARDENING DO PHP-FPM
+# ==============================================================================
 print_header "CONFIGURAÇÃO DO PHP-FPM"
 
-# Detectar versão real do PHP instalada caso tenha sido instalado php-fpm nativo
 INSTALLED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
 if [ -n "$INSTALLED_PHP_VER" ]; then
     PHP_VER="$INSTALLED_PHP_VER"
@@ -224,9 +265,9 @@ else
     log_error "Arquivo de configuração do PHP-FPM (${PHP_INI}) não encontrado."
 fi
 
-# ------------------------------------------------------------------------------
-# 6. CONFIGURAÇÃO DO BANCO DE DADOS (MARIADB SERVER)
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 5. CONFIGURAÇÃO E HARDENING DO BANCO DE DADOS (MARIADB SERVER)
+# ==============================================================================
 print_header "CONFIGURAÇÃO DO BANCO DE DADOS (MARIADB SERVER)"
 
 log_info "Iniciando e habilitando serviço mariadb no boot..."
@@ -249,21 +290,15 @@ else
     log_success "Senha do root do MariaDB aplicada."
 fi
 
-# ------------------------------------------------------------------------------
-# 7. CONFIGURAÇÃO DO NGINX (LEMP STACK)
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 6. CONFIGURAÇÃO E HARDENING DO NGINX
+# ==============================================================================
 print_header "CONFIGURAÇÃO DO NGINX"
 
-WEB_ROOT="/var/www/${DOMAIN_NAME}"
 log_info "Criando diretório da aplicação em ${WEB_ROOT}..."
 mkdir -p "$WEB_ROOT"
-chown -R www-data:www-data /var/www
-chmod -R 775 /var/www
-
-log_info "Aplicando herança de permissões automática com POSIX ACLs (setfacl) em /var/www..."
-setfacl -R -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
-setfacl -R -d -m u:www-data:rwx,g:www-data:rwx /var/www > /dev/null 2>&1 || true
-log_success "Diretório preparado e ACLs ativas: Novos arquivos em /var/www herdarão acesso total para www-data."
+chown -R www-data:www-data "$WEB_ROOT"
+chmod -R 775 "$WEB_ROOT"
 
 log_info "Configurando ajustes globais do Nginx (tuning de conexões, segurança e WebSockets)..."
 cat <<EOF > /etc/nginx/conf.d/tuning.conf
@@ -298,104 +333,88 @@ server {
     client_max_body_size ${UPLOAD_MAX};
     client_body_timeout ${EXEC_TIME}s;
     send_timeout ${EXEC_TIME}s;
-    fastcgi_read_timeout ${EXEC_TIME}s;
-    fastcgi_send_timeout ${EXEC_TIME}s;
 
-    # Cabeçalhos Globais de Segurança (OWASP Best Practices)
-    add_header X-Frame-Options "SAMEORIGIN" always;
+    # Logs customizados
+    access_log /var/log/nginx/${DOMAIN_NAME}_access.log;
+    error_log /var/log/nginx/${DOMAIN_NAME}_error.log;
+
+    # Headers de Segurança
     add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-    # Roteamento padrão (compatível com WordPress, Laravel, etc)
     location / {
-        try_files \$uri \$uri/ /index.php?\$args;
+        try_files \$uri \$uri/ /index.php?\$query_string;
     }
 
-    # Otimização de cache para arquivos estáticos (CSS, JS, Imagens, Fontes)
-    location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)\$ {
-        expires 30d;
-        add_header Cache-Control "public, no-transform";
-        add_header X-Frame-Options "SAMEORIGIN" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php${PHP_VER}-fpm.sock;
+        fastcgi_read_timeout ${EXEC_TIME}s;
+        fastcgi_send_timeout ${EXEC_TIME}s;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
     }
 
-    # Bloquear visualização de diretórios e arquivos ocultos (.git, .env, etc)
+    # Bloqueio de arquivos ocultos (.env, .git, .htaccess)
     location ~ /\. {
         deny all;
         access_log off;
         log_not_found off;
     }
-
-    # Bloquear acesso direto a arquivos de configuração e logs sensíveis
-    location ~* \.(env|git|log|sh|sql|bak|swp|yml|yaml)\$ {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-
-    # Processamento de arquivos PHP via FastCGI
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php${PHP_VER}-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi_params;
-    }
 }
 EOF
 
-# Ativar o site no Nginx
-ln -sf "$NGINX_CONF" "/etc/nginx/sites-enabled/${DOMAIN_NAME}"
-rm -f /etc/nginx/sites-enabled/default
+ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default > /dev/null 2>&1
 
-log_info "Testando sintaxe das configurações do Nginx..."
-nginx -t > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-    log_success "Sintaxe do Nginx validada sem erros."
+log_info "Testando sintaxe das configurações do Nginx (nginx -t)..."
+if nginx -t > /dev/null 2>&1; then
+    log_success "Sintaxe do Nginx validada."
     systemctl restart nginx > /dev/null 2>&1
-    log_success "Nginx reiniciado com sucesso."
+    log_success "Serviço Nginx reiniciado com sucesso."
 else
-    log_error "Erro nas configurações do Nginx!"
+    log_error "Erro na validação do Nginx. Verifique com 'nginx -t'."
 fi
 
-# ------------------------------------------------------------------------------
-# 7. CRIAÇÃO DE ARQUIVO DE TESTE PHP
-# ------------------------------------------------------------------------------
-cat <<'EOF' > "${WEB_ROOT}/index.php"
+# ==============================================================================
+# 7. CONFIGURAÇÃO DE PERMISSÕES E POSIX ACLs
+# ==============================================================================
+print_header "CONFIGURAÇÃO DE PERMISSÕES (POSIX ACLs)"
+log_info "Aplicando herança de permissões automática com POSIX ACLs (setfacl) em ${WEB_ROOT}..."
+setfacl -R -m u:www-data:rwx,g:www-data:rwx "$WEB_ROOT" > /dev/null 2>&1 || true
+setfacl -R -d -m u:www-data:rwx,g:www-data:rwx "$WEB_ROOT" > /dev/null 2>&1 || true
+log_success "Diretório preparado e ACLs ativas: Novos arquivos em ${WEB_ROOT} herdarão acesso total para www-data."
+
+# ==============================================================================
+# 8. DIAGNÓSTICO DO PHP (info.php)
+# ==============================================================================
+log_info "Criando arquivo de teste phpinfo em ${WEB_ROOT}/info.php..."
+cat <<'EOF' > "${WEB_ROOT}/info.php"
 <?php
-// Teste de ambiente preparado para o Gerenciador de Downloads
-$host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_ADDR'] ?? 'Localhost';
-echo "<h1>Servidor Otimizado - " . htmlspecialchars((string)$host) . "</h1>";
-echo "<p>PHP Version: " . phpversion() . "</p>";
-echo "<p>Upload Max Filesize: " . ini_get('upload_max_filesize') . "</p>";
-echo "<p>Post Max Size: " . ini_get('post_max_size') . "</p>";
+phpinfo();
+?>
 EOF
-chown www-data:www-data "${WEB_ROOT}/index.php"
+chown www-data:www-data "${WEB_ROOT}/info.php"
+log_success "Arquivo ${WEB_ROOT}/info.php criado."
 
-# ------------------------------------------------------------------------------
-# 8. AJUSTE DE FIREWALL LOCAL (UFW)
-# ------------------------------------------------------------------------------
-print_header "CONFIGURAÇÃO DO FIREWALL LOCAL (UFW)"
-log_info "Garantindo acesso via HTTP (80), HTTPS (443) e SSH (22)..."
-ufw allow 80/tcp > /dev/null 2>&1
-ufw allow 443/tcp > /dev/null 2>&1
-ufw allow 22/tcp > /dev/null 2>&1
-ufw --force enable > /dev/null 2>&1
-log_success "Firewall UFW configurado e ativado (Portas 80, 443, 22)."
+# ==============================================================================
+# 9. CONFIGURAÇÃO DE SEGURANÇA (FIREWALL UFW & FAIL2BAN)
+# ==============================================================================
+print_header "CONFIGURAÇÃO DE SEGURANÇA E FIREWALL"
 
-# ------------------------------------------------------------------------------
-# 9. CONFIGURAÇÃO DO FAIL2BAN (PROTEÇÃO SSH E NGINX)
-# ------------------------------------------------------------------------------
-print_header "CONFIGURAÇÃO DO FAIL2BAN"
-log_info "Garantindo existência dos arquivos de log do Nginx..."
-mkdir -p /var/log/nginx
-touch /var/log/nginx/error.log /var/log/nginx/access.log
-chown -R www-data:adm /var/log/nginx > /dev/null 2>&1 || true
+log_info "Configurando regras no Firewall UFW..."
+if command -v ufw > /dev/null 2>&1; then
+    ufw allow 80/tcp > /dev/null 2>&1
+    ufw allow 443/tcp > /dev/null 2>&1
+    ufw allow 22/tcp > /dev/null 2>&1
+    ufw --force enable > /dev/null 2>&1
+    log_success "Portas 80 (HTTP), 443 (HTTPS) e 22 (SSH) liberadas no UFW."
+fi
 
-log_info "Criando arquivo de configuração em /etc/fail2ban/jail.local..."
-
-cat <<EOF > /etc/fail2ban/jail.local
+log_info "Configurando regras no Fail2Ban..."
+mkdir -p /etc/fail2ban/jail.d
+cat <<EOF > /etc/fail2ban/jail.d/nginx.local
 [DEFAULT]
 backend = systemd
 bantime  = 1h
@@ -406,42 +425,39 @@ maxretry = 5
 enabled = true
 port    = ssh
 
-[nginx-http-auth]
-enabled = true
-port    = http,https
-logpath = /var/log/nginx/error.log
-
 [nginx-botsearch]
 enabled  = true
 port     = http,https
-logpath  = /var/log/nginx/error.log
-maxretry = 3
-bantime  = 2h
+logpath  = /var/log/nginx/*error.log
+maxretry = 2
+bantime  = 24h
 EOF
 
-log_info "Ativando e iniciando o serviço Fail2Ban..."
 systemctl enable --now fail2ban > /dev/null 2>&1
 systemctl restart fail2ban > /dev/null 2>&1
-log_success "Fail2Ban configurado e ativo com regras para SSH, Nginx Auth e BotSearch."
+log_success "Fail2Ban configurado para SSH e proteção contra bots maliciosos no Nginx."
 
-# ------------------------------------------------------------------------------
-# 10. RESUMO DO SISTEMA E ARQUIVOS DE CONFIGURAÇÃO
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 10. RESUMO FINAL DO SISTEMA
+# ==============================================================================
+SERVER_IP=$(hostname -I | awk '{print $1}')
+[ -z "$SERVER_IP" ] && SERVER_IP="localhost"
+
 print_header "RESUMO DO SISTEMA - INSTALAÇÃO CONCLUÍDA"
 
-echo -e "  ${FG_GREEN}${BOLD}✔ INSTALAÇÃO NGINX + PHP-FPM + MARIADB FINALIZADA COM SUCESSO!${NC}\n"
+echo -e "  ${FG_GREEN}${BOLD}✔ INSTALAÇÃO DA PILHA LEMP FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
 echo -e "  ${BOLD}Servidor Web:${NC}          Nginx ($(systemctl is-active nginx 2>/dev/null || echo "active")) [server_tokens off]"
+echo -e "  ${BOLD}Processador PHP:${NC}       PHP-FPM ${PHP_VER} [Upload: ${UPLOAD_MAX} | Timeout: ${EXEC_TIME}s]"
 echo -e "  ${BOLD}Banco de Dados:${NC}        MariaDB Server [Seguro: Sem 'test' e sem usuár. anônimos]"
-echo -e "  ${BOLD}Linguagem de Script:${NC}   PHP ${PHP_VER} (FPM) [disable_functions ativas]"
-echo -e "  ${BOLD}Permissões POSIX ACL:${NC}  ${FG_GREEN}Ativo e Herdando (/var/www)${NC}"
-echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo (SSH, Nginx Auth & BotSearch)${NC}" || echo "Não instalado")"
+echo -e "  ${BOLD}Permissões POSIX ACL:${NC}  ${FG_GREEN}Ativo e Herdando (${WEB_ROOT})${NC}"
+echo -e "  ${BOLD}Proteção Fail2Ban:${NC}     $(systemctl is-active fail2ban >/dev/null 2>&1 && echo -e "${FG_GREEN}Ativo (SSH & Nginx-BotSearch)${NC}" || echo "Não instalado")"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Domínio Configurado:${NC}   ${FG_CYAN}${DOMAIN_NAME}${NC}"
-echo -e "  ${BOLD}Diretório Web (Root):${NC}  ${FG_CYAN}${WEB_ROOT}${NC}"
-echo -e "  ${BOLD}Limite Upload/Download:${NC}${FG_CYAN}${UPLOAD_MAX}${NC}"
-echo -e "  ${BOLD}Timeout de Execução:${NC}   ${FG_CYAN}${EXEC_TIME} segundos${NC}"
+echo -e "  ${BOLD}Diretório Raiz (Web):${NC}  ${FG_CYAN}${WEB_ROOT}${NC}"
+echo -e "  ${BOLD}Acesso Web Principal:${NC}  ${FG_CYAN}http://${DOMAIN_NAME}/${NC} ou ${FG_CYAN}http://${SERVER_IP}/${NC}"
+echo -e "  ${BOLD}Diagnóstico PHP:${NC}      ${FG_CYAN}http://${SERVER_IP}/info.php${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Credenciais MariaDB Root:${NC}"
 echo -e "    Usuário: ${FG_CYAN}root${NC}"
@@ -449,16 +465,38 @@ echo -e "    Senha:   ${FG_YELLOW}${DB_ROOT_PASS}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
 echo -e "\n  ${BOLD}📁 LEMBRETES DE ARQUIVOS DE CONFIGURAÇÃO:${NC}"
-echo -e "  ${FG_YELLOW}• VirtualHost Nginx:${NC}       /etc/nginx/sites-available/${DOMAIN_NAME}"
-echo -e "  ${FG_YELLOW}• Nginx Geral:${NC}             /etc/nginx/nginx.conf"
-echo -e "  ${FG_YELLOW}• Config PHP-FPM (php.ini):${NC}  /etc/php/${PHP_VER}/fpm/php.ini"
-echo -e "  ${FG_YELLOW}• Pool PHP-FPM (www.conf):${NC}  /etc/php/${PHP_VER}/fpm/pool.d/www.conf"
-echo -e "  ${FG_YELLOW}• Config MariaDB:${NC}          /etc/mysql/mariadb.conf.d/50-server.cnf"
-echo -e "  ${FG_YELLOW}• Socket do PHP-FPM:${NC}       /run/php/php${PHP_VER}-fpm.sock"
-if systemctl is-active fail2ban >/dev/null 2>&1; then
-    echo -e "  ${FG_YELLOW}• Config Fail2Ban:${NC}         /etc/fail2ban/jail.local"
-fi
+echo -e "  ${FG_YELLOW}• Configuração Nginx:${NC}     /etc/nginx/sites-available/${DOMAIN_NAME}"
+echo -e "  ${FG_YELLOW}• Config PHP-FPM:${NC}         /etc/php/${PHP_VER}/fpm/php.ini"
+echo -e "  ${FG_YELLOW}• Config MariaDB:${NC}         /etc/mysql/mariadb.conf.d/50-server.cnf"
+echo -e "  ${FG_YELLOW}• Config Fail2Ban:${NC}        /etc/fail2ban/jail.local"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
+log_warning "Por razões de segurança, lembre-se de remover ou restringir o acesso ao arquivo ${WEB_ROOT}/info.php após a validação."
+
+# ==============================================================================
+# 11. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# ==============================================================================
+print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
+
+# Salva cópias no diretório /root
+cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
+cp "$LOG_TMP" "/root/install_lemp_ubuntu_latest.log" 2>/dev/null || true
+log_success "Log salvo em: /root/${LOG_FILENAME}"
+log_success "Atalho do último log: /root/install_lemp_ubuntu_latest.log"
+
+# Se executado via sudo, salva também na pasta home do usuário real
+if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+    REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    if [ -d "$REAL_USER_HOME" ]; then
+        cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
+        cp "$LOG_TMP" "${REAL_USER_HOME}/install_lemp_ubuntu_latest.log" 2>/dev/null || true
+        chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/install_lemp_ubuntu_latest.log" 2>/dev/null || true
+        log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
+    fi
+fi
+
+rm -f "$LOG_TMP" 2>/dev/null || true
+
 draw_separator
+echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 echo -e "${FG_GREEN}${BOLD}❯ Instalação concluída com sucesso!${NC}\n"
