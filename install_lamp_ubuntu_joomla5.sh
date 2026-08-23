@@ -365,6 +365,23 @@ if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
     done
 fi
 
+# Garante a comutação para a versão solicitada no CLI e no Apache
+if command -v "php${PHP_VER}" > /dev/null 2>&1; then
+    log_info "Ativando PHP ${PHP_VER} como padrão no sistema (CLI e Apache)..."
+    update-alternatives --set php "/usr/bin/php${PHP_VER}" > /dev/null 2>&1 || true
+    
+    # Desativa outros módulos de PHP no Apache e ativa a versão solicitada
+    for old_mod in /etc/apache2/mods-enabled/php*.load; do
+        if [ -f "$old_mod" ]; then
+            mod_name=$(basename "$old_mod" .load)
+            a2dismod "$mod_name" > /dev/null 2>&1 || true
+        fi
+    done
+    a2enmod "php${PHP_VER}" > /dev/null 2>&1 || true
+    systemctl restart apache2 > /dev/null 2>&1 || true
+    log_success "PHP ${PHP_VER} definido e ativado como padrão."
+fi
+
 # Detecta a versão real ativa instalada do PHP no sistema para os passos seguintes
 DETECTED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
 if [ -n "$DETECTED_PHP_VER" ]; then
