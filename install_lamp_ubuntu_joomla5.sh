@@ -217,7 +217,7 @@ else
 fi
 
 log_info "Habilitando módulos obrigatórios e recomendados para Joomla 5 no Apache..."
-APACHE_MODULES=("rewrite" "ssl" "headers" "deflate" "expires" "http2" "remoteip")
+APACHE_MODULES=("rewrite" "ssl" "headers" "deflate" "expires" "http2" "remoteip" "env" "dir" "mime" "setenvif")
 for mod in "${APACHE_MODULES[@]}"; do
     a2enmod "$mod" > /dev/null 2>&1
     log_success "Módulo Apache '$mod' habilitado."

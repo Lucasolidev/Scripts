@@ -199,8 +199,8 @@ else
     exit 1
 fi
 
-log_info "Habilitando módulos essenciais no Apache (rewrite, headers, ssl, deflate)..."
-for mod in rewrite headers ssl deflate expires; do
+log_info "Habilitando módulos essenciais no Apache (rewrite, headers, ssl, deflate, env, dir, mime, setenvif)..."
+for mod in rewrite headers ssl deflate expires env dir mime setenvif http2 remoteip; do
     a2enmod "$mod" > /dev/null 2>&1
 done
 log_success "Módulos do Apache habilitados."
