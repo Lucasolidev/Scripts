@@ -442,6 +442,10 @@ cat <<EOF > /etc/apache2/sites-available/${DOMAIN_NAME}.conf
         Require all granted
     </Directory>
 
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php${PHP_VER}-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
     # Bloqueio de Segurança: Arquivos Ocultos (.git, .env, etc.)
     <FilesMatch "^\.">
         Require all denied
@@ -476,6 +480,10 @@ cat <<EOF > /etc/apache2/sites-available/000-default.conf
         AllowOverride All
         Require all granted
     </Directory>
+
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php${PHP_VER}-fpm.sock|fcgi://localhost"
+    </FilesMatch>
 
     # Headers de Segurança
     Header always set X-Content-Type-Options "nosniff"
