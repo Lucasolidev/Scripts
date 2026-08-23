@@ -136,15 +136,19 @@ fi
 DEFAULT_DB_NAME="joomla_${CLEAN_DOMAIN_ID:0:15}_db"
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Nome do Banco de Dados [Padrão: ${DEFAULT_DB_NAME}]: ${NC}")" JOOMLA_DB_NAME
 JOOMLA_DB_NAME=${JOOMLA_DB_NAME:-$DEFAULT_DB_NAME}
+log_info "Nome do Banco definido: ${FG_GREEN}${JOOMLA_DB_NAME}${NC}"
 
 DEFAULT_DB_USER="joomla_${CLEAN_DOMAIN_ID:0:15}_usr"
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuário do Banco [Padrão: ${DEFAULT_DB_USER}]: ${NC}")" JOOMLA_DB_USER
 JOOMLA_DB_USER=${JOOMLA_DB_USER:-$DEFAULT_DB_USER}
+log_info "Usuário do Banco definido: ${FG_GREEN}${JOOMLA_DB_USER}${NC}"
 
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do Usuário do Joomla DB (deixe vazio para gerar aleatória): ${NC}")" JOOMLA_DB_PASS
 if [ -z "$JOOMLA_DB_PASS" ]; then
     JOOMLA_DB_PASS=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 18)
     log_info "Senha gerada para o Usuário Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
+else
+    log_info "Senha definida para o Usuário Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
 fi
 
 echo -e "\n  ${FG_CYAN}[i]${NC} Versão do PHP (Recomendado oficial Joomla 5: 8.3)."
