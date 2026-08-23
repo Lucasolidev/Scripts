@@ -190,6 +190,11 @@ fi
 print_header "INSTALAÇÃO DE UTILITÁRIOS"
 print_alert_box "Pacotes do sistema (qemu-guest-agent, open-vm-tools, fail2ban, htop, tmux, etc) serão instalados agora."
 
+log_info "Garantindo repositório 'universe' habilitado e atualizando lista do APT..."
+apt-get install -y software-properties-common > /dev/null 2>&1 || true
+add-apt-repository -y universe > /dev/null 2>&1 || true
+apt-get update -y > /dev/null 2>&1
+
 PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw)
 PACOTES_INSTALADOS=()
 for pacote in "${PACOTES[@]}"; do
