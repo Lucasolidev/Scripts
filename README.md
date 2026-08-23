@@ -67,6 +67,12 @@ Instala e configura a pilha LAMP genérica e reutilizável para qualquer domíni
 wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu_joomla5.sh -O install_lamp_ubuntu_joomla5.sh && chmod +x install_lamp_ubuntu_joomla5.sh && sudo ./install_lamp_ubuntu_joomla5.sh
 ```
 
+### 6. Auditoria e Inventário do Servidor Linux (`auditoria_servidor_inventario.sh`)
+Script não-invasivo de diagnóstico e varredura completa pré-migração. Mapeia versão do SO, hardware, **todas as portas em escuta e seus processos/aplicações**, servidores web (Apache/Nginx) e VirtualHosts, versões do PHP/módulos, bancos de dados (MariaDB/MySQL/Postgres), **detecção automática de CMSs no disco (Joomla, WordPress, Laravel)**, regras de firewall, crontabs e contêineres Docker. Gera relatório estruturado salvo automaticamente na pasta **Home do usuário** e em `/root`:
+```bash
+wget https://raw.githubusercontent.com/lucasolidev/scripts/main/auditoria_servidor_inventario.sh -O auditoria_servidor_inventario.sh && chmod +x auditoria_servidor_inventario.sh && sudo ./auditoria_servidor_inventario.sh
+```
+
 
 ---
 
