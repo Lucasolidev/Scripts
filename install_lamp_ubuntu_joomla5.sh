@@ -300,62 +300,47 @@ EOF
 log_success "Banco '${JOOMLA_DB_NAME}' e usuário '${JOOMLA_DB_USER}' criados com permissões completas em UTF8MB4."
 
 # ==============================================================================
-# 6. INSTALAÇÃO DO PHP 8.x E MÓDULOS DO JOOMLA 5
+# 6. INSTALAÇÃO DO PHP E MÓDULOS DO JOOMLA 5
 # ==============================================================================
-print_header "INSTALAÇÃO DO PHP ${PHP_VER} (RECOMENDADO JOOMLA 5)"
+print_header "INSTALAÇÃO DO PHP (RECOMENDADO JOOMLA 5)"
 
-log_info "Configurando repositório PPA ondrej/php..."
+# Tenta configurar o PPA ondrej/php se a versão solicitada for específica (ex: 8.3 no Ubuntu LTS)
+log_info "Configurando repositórios de pacotes do PHP..."
 LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
-
-# Caso o codinome do Ubuntu não tenha pacotes no PPA (ex: Ubuntu 26.04 em desenvolvimento), mapeia para a base LTS estável (noble)
-UBUNTU_CODENAME=$(lsb_release -cs 2>/dev/null || echo "noble")
-if [ ! -f /etc/apt/sources.list.d/ondrej-ubuntu-php-*.list ] && [ ! -f /etc/apt/sources.list.d/ondrej-php.list ]; then
-    echo "deb [signed-by=/etc/apt/trusted.gpg.d/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu noble main" > /etc/apt/sources.list.d/ondrej-php.list
-    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC0831756756D7F66C4F4EA0AAE5267A6C" | gpg --dearmor -o /etc/apt/trusted.gpg.d/ondrej-php.gpg > /dev/null 2>&1 || true
-fi
-# Se o arquivo do PPA existir mas falhou no update por codinome não suportado, ajusta para noble
-for f in /etc/apt/sources.list.d/*ondrej*php*.list /etc/apt/sources.list.d/*ondrej*php*.sources; do
-    if [ -f "$f" ]; then
-        sed -i 's/devel/noble/g; s/resolute/noble/g; s/plucky/noble/g' "$f" 2>/dev/null || true
-    fi
-done
 apt update -y > /dev/null 2>&1 || true
 
-PHP_MAIN_PKG="php${PHP_VER}"
-APACHE_MOD_PKG="libapache2-mod-php${PHP_VER}"
-PKG_PREFIX="php${PHP_VER}-"
-
-JOOMLA_PHP_PACKAGES=(
-    "${PHP_MAIN_PKG}"
-    "${APACHE_MOD_PKG}"
-    "${PKG_PREFIX}cli"
-    "${PKG_PREFIX}common"
-    "${PKG_PREFIX}mysql"
-    "${PKG_PREFIX}curl"
-    "${PKG_PREFIX}gd"
-    "${PKG_PREFIX}mbstring"
-    "${PKG_PREFIX}xml"
-    "${PKG_PREFIX}zip"
-    "${PKG_PREFIX}opcache"
-    "${PKG_PREFIX}intl"
-    "${PKG_PREFIX}bcmath"
-    "${PKG_PREFIX}imagick"
-    "${PKG_PREFIX}soap"
-    "${PKG_PREFIX}readline"
-)
-
-log_info "Instalando PHP ${PHP_VER} e módulos requeridos pelo Joomla 5..."
-PHP_INSTALLED_COUNT=0
-for pkg in "${JOOMLA_PHP_PACKAGES[@]}"; do
-    if apt install -y "$pkg" > /dev/null 2>&1; then
-        log_success "Módulo '$pkg' instalado com sucesso."
-        ((PHP_INSTALLED_COUNT++))
+# Testa se os pacotes específicos da versão solicitada (ex: php8.3) estão disponíveis
+PHP_INSTALLED=false
+if apt-cache show "php${PHP_VER}-cli" > /dev/null 2>&1; then
+    log_info "Instalando PHP ${PHP_VER} e extensões via repositório PPA..."
+    JOOMLA_PHP_PACKAGES=(
+        "php${PHP_VER}"
+        "libapache2-mod-php${PHP_VER}"
+        "php${PHP_VER}-cli"
+        "php${PHP_VER}-common"
+        "php${PHP_VER}-mysql"
+        "php${PHP_VER}-curl"
+        "php${PHP_VER}-gd"
+        "php${PHP_VER}-mbstring"
+        "php${PHP_VER}-xml"
+        "php${PHP_VER}-zip"
+        "php${PHP_VER}-opcache"
+        "php${PHP_VER}-intl"
+        "php${PHP_VER}-bcmath"
+        "php${PHP_VER}-imagick"
+        "php${PHP_VER}-soap"
+        "php${PHP_VER}-readline"
+    )
+    apt install -y "${JOOMLA_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
+    if command -v "php${PHP_VER}" > /dev/null 2>&1 || [ -f "/usr/bin/php${PHP_VER}" ]; then
+        PHP_INSTALLED=true
+        log_success "PHP ${PHP_VER} instalado com sucesso via PPA."
     fi
-done
+fi
 
-# Fallback para pacotes nativos do sistema caso o PPA não tenha o prefixo específico
-if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
-    log_warning "Repositório PPA não respondeu para php${PHP_VER}-*. Instalando versão nativa do repositório Ubuntu..."
+# Se não conseguiu instalar via PPA (ex: versão do Ubuntu não mapeada no PPA como 26.04), instala a suíte padrão oficial do Ubuntu
+if [ "$PHP_INSTALLED" = false ]; then
+    log_info "Instalando suíte oficial do PHP e extensões do repositório Ubuntu..."
     FALLBACK_PHP_PACKAGES=(
         "php"
         "libapache2-mod-php"
@@ -374,47 +359,36 @@ if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
         "php-soap"
         "php-readline"
     )
-    for pkg in "${FALLBACK_PHP_PACKAGES[@]}"; do
-        if apt install -y "$pkg" > /dev/null 2>&1; then
-            log_success "Módulo nativo '$pkg' instalado com sucesso."
-        elif [ "$pkg" = "php-opcache" ] && php -m 2>/dev/null | grep -qi "Zend OPcache\|opcache"; then
-            log_success "Módulo nativo 'php-opcache' (embutido no core do PHP) ativo."
-        else
-            log_warning "Aviso/Não necessário no pacote '$pkg'."
-        fi
-    done
+    apt install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
 fi
 
-# Garante a comutação e ativação do PHP no CLI e no Apache
-log_info "Garantindo ativação do módulo PHP no Apache e no CLI..."
+# Garante a comutação e ativação do módulo PHP no Apache
+log_info "Garantindo ativação do módulo PHP no Apache..."
 a2dismod mpm_event > /dev/null 2>&1 || true
+a2dismod mpm_worker > /dev/null 2>&1 || true
 a2enmod mpm_prefork > /dev/null 2>&1 || true
 
-# Ativa o módulo específico ou genérico do PHP no Apache
-if [ -f "/etc/apache2/mods-available/php${PHP_VER}.load" ]; then
-    a2enmod "php${PHP_VER}" > /dev/null 2>&1 || true
-else
-    for php_load in /etc/apache2/mods-available/php*.load; do
-        if [ -f "$php_load" ]; then
-            mod_name=$(basename "$php_load" .load)
-            a2enmod "$mod_name" > /dev/null 2>&1 || true
-        fi
-    done
-fi
-
-if [ -f "/usr/bin/php${PHP_VER}" ]; then
-    update-alternatives --install /usr/bin/php php "/usr/bin/php${PHP_VER}" 100 > /dev/null 2>&1 || true
-    update-alternatives --set php "/usr/bin/php${PHP_VER}" > /dev/null 2>&1 || true
-fi
-
-systemctl restart apache2 > /dev/null 2>&1 || true
-log_success "Módulo PHP ativado no Apache e serviço reiniciado."
+# Ativa qualquer módulo PHP disponível no Apache
+PHP_MOD_ACTIVATED=false
+for mod_file in /etc/apache2/mods-available/php*.load; do
+    if [ -f "$mod_file" ]; then
+        mod_name=$(basename "$mod_file" .load)
+        a2enmod "$mod_name" > /dev/null 2>&1 || true
+        PHP_MOD_ACTIVATED=true
+        log_success "Módulo Apache '$mod_name' ativado."
+    fi
+done
 
 # Detecta a versão real ativa instalada do PHP no sistema para os passos seguintes
 DETECTED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
 if [ -n "$DETECTED_PHP_VER" ]; then
     PHP_VER="$DETECTED_PHP_VER"
+    log_success "PHP ${PHP_VER} ativo e operacional no sistema."
+else
+    log_warning "Versão PHP detectada: ${PHP_VER}"
 fi
+
+systemctl restart apache2 > /dev/null 2>&1 || true
 
 # ==============================================================================
 # 7. AJUSTES DE PERFORMANCE E HARDENING NO PHP.INI
