@@ -281,12 +281,10 @@ systemctl restart mariadb > /dev/null 2>&1
 
 log_info "Aplicando endurecimento de segurança no MariaDB e criando banco de dados do Joomla 5..."
 
-# Define a senha do root caso ainda não esteja definida
-mariadb-admin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1 || true
-
-# Prepara script SQL temporário com escape perfeito para evitar falhas de sintaxe do heredoc no Bash
+# Tenta alterar/atualizar a senha do root do MariaDB tanto em instalação limpa quanto em reexecução
 TMP_SQL=$(mktemp)
 cat <<EOF > "$TMP_SQL"
+ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('${DB_ROOT_PASS}');
 DELETE FROM mysql.user WHERE User='';
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
@@ -303,7 +301,8 @@ GRANT ALL PRIVILEGES ON \`${JOOMLA_DB_NAME}\`.* TO '${JOOMLA_DB_USER}'@'%' WITH 
 FLUSH PRIVILEGES;
 EOF
 
-mariadb < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" < "$TMP_SQL" > /dev/null 2>&1 || true
+# Tenta executar primeiro via Unix Socket (sem senha no sudo), depois com a nova senha, depois sem senha
+mariadb < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root < "$TMP_SQL" > /dev/null 2>&1 || mysqladmin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1 || true
 rm -f "$TMP_SQL"
 
 log_success "Banco '${JOOMLA_DB_NAME}' e usuário '${JOOMLA_DB_USER}' criados com permissões completas em UTF8MB4."
