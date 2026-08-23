@@ -356,10 +356,12 @@ fi
 # ==============================================================================
 print_header "INTEGRAÇÃO DO PHP-FPM NO APACHE (FASTCGI)"
 
+INSTALLED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
+
 log_info "Integrando PHP-FPM ao Apache 2.4 (proxy_fcgi)..."
 a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
-a2enconf php*-fpm > /dev/null 2>&1 || true
-systemctl enable --now php*-fpm > /dev/null 2>&1 || true
+a2enconf "php${INSTALLED_PHP_VER}-fpm" > /dev/null 2>&1 || a2enconf php-fpm > /dev/null 2>&1 || true
+systemctl enable --now "php${INSTALLED_PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable --now php-fpm > /dev/null 2>&1 || true
 systemctl restart apache2 > /dev/null 2>&1
 log_success "Apache 2.4 integrado com sucesso ao PHP-FPM."
 
@@ -376,7 +378,7 @@ for ini in /etc/php/*/fpm/php.ini /etc/php/*/apache2/php.ini /etc/php/*/cli/php.
 done
 
 log_info "Reiniciando Apache2 e PHP-FPM..."
-systemctl restart php*-fpm > /dev/null 2>&1 || true
+systemctl restart "php${INSTALLED_PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
 systemctl restart apache2 > /dev/null 2>&1
 log_success "Serviços reiniciados com suporte a PHP-FPM, versão ocultada e funções de risco desativadas."
 
