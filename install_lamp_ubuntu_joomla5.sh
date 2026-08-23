@@ -312,102 +312,80 @@ print_header "INSTALAÇÃO DO PHP (RECOMENDADO JOOMLA 5)"
 # Detecta a distribuição Ubuntu
 UBUNTU_RELEASE=$(lsb_release -rs 2>/dev/null || echo "24.04")
 
-# No Ubuntu LTS (22.04 / 24.04), adiciona o PPA oficial ondrej/php para garantir a versão 8.3
 if [[ "$UBUNTU_RELEASE" == "22.04" || "$UBUNTU_RELEASE" == "24.04" ]]; then
-    log_info "Configurando PPA ondrej/php para Ubuntu ${UBUNTU_RELEASE} (PHP ${PHP_VER})..."
+    # ==========================================================================
+    # FLUXO UBUNTU 22.04 / 24.04 LTS (PHP 8.3 VIA PPA OFICIAL)
+    # ==========================================================================
+    log_info "Ubuntu ${UBUNTU_RELEASE} LTS detectado: Instalando PHP 8.3 via PPA ondrej/php..."
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
     apt-get update -y > /dev/null 2>&1 || true
-fi
 
-PHP_INSTALLED=false
-if apt-cache show "php${PHP_VER}-fpm" > /dev/null 2>&1; then
-    log_info "Instalando PHP ${PHP_VER} (FPM e Módulos)..."
     JOOMLA_PHP_PACKAGES=(
-        "php${PHP_VER}"
-        "php${PHP_VER}-fpm"
-        "php${PHP_VER}-cli"
-        "php${PHP_VER}-common"
-        "php${PHP_VER}-mysql"
-        "php${PHP_VER}-curl"
-        "php${PHP_VER}-gd"
-        "php${PHP_VER}-mbstring"
-        "php${PHP_VER}-xml"
-        "php${PHP_VER}-zip"
-        "php${PHP_VER}-opcache"
-        "php${PHP_VER}-intl"
-        "php${PHP_VER}-bcmath"
-        "php${PHP_VER}-imagick"
-        "php${PHP_VER}-soap"
-        "php${PHP_VER}-readline"
+        "php8.3"
+        "php8.3-fpm"
+        "php8.3-cli"
+        "php8.3-common"
+        "php8.3-mysql"
+        "php8.3-curl"
+        "php8.3-gd"
+        "php8.3-mbstring"
+        "php8.3-xml"
+        "php8.3-zip"
+        "php8.3-opcache"
+        "php8.3-intl"
+        "php8.3-bcmath"
+        "php8.3-imagick"
+        "php8.3-soap"
+        "php8.3-readline"
     )
     DEBIAN_FRONTEND=noninteractive apt-get install -y "${JOOMLA_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
     
-    if [ -f "/usr/bin/php${PHP_VER}" ]; then
-        update-alternatives --install /usr/bin/php php "/usr/bin/php${PHP_VER}" 100 > /dev/null 2>&1 || true
-        update-alternatives --set php "/usr/bin/php${PHP_VER}" > /dev/null 2>&1 || true
-        PHP_INSTALLED=true
-        log_success "PHP ${PHP_VER} instalado e definido como padrão no sistema."
-    fi
-fi
+    update-alternatives --install /usr/bin/php php /usr/bin/php8.3 100 > /dev/null 2>&1 || true
+    update-alternatives --set php /usr/bin/php8.3 > /dev/null 2>&1 || true
+    PHP_VER="8.3"
+    log_success "PHP 8.3 instalado e configurado como padrão no Ubuntu ${UBUNTU_RELEASE}."
 
-# Fallback para pacotes nativos do sistema
-if [ "$PHP_INSTALLED" = false ]; then
-    log_info "Instalando suíte oficial do PHP e FPM do repositório Ubuntu..."
+else
+    # ==========================================================================
+    # FLUXO UBUNTU 26.04 DEV (PHP NATIVO 8.5)
+    # ==========================================================================
+    log_info "Ubuntu ${UBUNTU_RELEASE} detectado: Instalando suíte nativa do PHP do repositório Ubuntu..."
     
-    # Descobre a versão exata do PHP nativo no apt do Ubuntu (ex: 8.5)
     NAT_VER=$(apt-cache search -n "^php[0-9.]*-cli$" | head -n 1 | sed 's/[^0-9.]//g')
-    
-    if [ -n "$NAT_VER" ]; then
-        FALLBACK_PHP_PACKAGES=(
-            "php${NAT_VER}"
-            "php${NAT_VER}-fpm"
-            "php${NAT_VER}-cli"
-            "php${NAT_VER}-common"
-            "php${NAT_VER}-mysql"
-            "php${NAT_VER}-curl"
-            "php${NAT_VER}-gd"
-            "php${NAT_VER}-mbstring"
-            "php${NAT_VER}-xml"
-            "php${NAT_VER}-zip"
-            "php${NAT_VER}-opcache"
-            "php${NAT_VER}-intl"
-            "php${NAT_VER}-bcmath"
-            "php${NAT_VER}-imagick"
-            "php${NAT_VER}-soap"
-            "php${NAT_VER}-readline"
-        )
-    else
-        FALLBACK_PHP_PACKAGES=(
-            "php"
-            "php-fpm"
-            "php-cli"
-            "php-common"
-            "php-mysql"
-            "php-curl"
-            "php-gd"
-            "php-mbstring"
-            "php-xml"
-            "php-zip"
-            "php-opcache"
-            "php-intl"
-            "php-bcmath"
-            "php-imagick"
-            "php-soap"
-            "php-readline"
-        )
-    fi
+    [ -z "$NAT_VER" ] && NAT_VER="8.5"
+
+    FALLBACK_PHP_PACKAGES=(
+        "php${NAT_VER}"
+        "php${NAT_VER}-fpm"
+        "php${NAT_VER}-cli"
+        "php${NAT_VER}-common"
+        "php${NAT_VER}-mysql"
+        "php${NAT_VER}-curl"
+        "php${NAT_VER}-gd"
+        "php${NAT_VER}-mbstring"
+        "php${NAT_VER}-xml"
+        "php${NAT_VER}-zip"
+        "php${NAT_VER}-opcache"
+        "php${NAT_VER}-intl"
+        "php${NAT_VER}-bcmath"
+        "php${NAT_VER}-imagick"
+        "php${NAT_VER}-soap"
+        "php${NAT_VER}-readline"
+    )
     DEBIAN_FRONTEND=noninteractive apt-get install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
     
-    # Registra o atalho /usr/bin/php caso o pacote instale php8.5-cli sem o meta pacote php-cli
-    INST_PHP_BIN=$(ls /usr/bin/php[0-9.]* 2>/dev/null | head -n 1)
-    if [ -n "$INST_PHP_BIN" ] && [ ! -f /usr/bin/php ]; then
+    INST_PHP_BIN=$(ls /usr/bin/php${NAT_VER} /usr/bin/php[0-9.]* 2>/dev/null | head -n 1)
+    if [ -n "$INST_PHP_BIN" ]; then
         update-alternatives --install /usr/bin/php php "$INST_PHP_BIN" 100 > /dev/null 2>&1 || true
         update-alternatives --set php "$INST_PHP_BIN" > /dev/null 2>&1 || true
     fi
+    PHP_VER="${NAT_VER}"
+    log_success "PHP ${PHP_VER} nativo instalado e configurado no Ubuntu 26.04."
 fi
 
 # Detecta a versão real ativa instalada do PHP no sistema
 DETECTED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
+[ -n "$DETECTED_PHP_VER" ] && PHP_VER="$DETECTED_PHP_VER"
 if [ -n "$DETECTED_PHP_VER" ]; then
     PHP_VER="$DETECTED_PHP_VER"
     log_success "PHP ${PHP_VER} ativo e operacional no sistema."
