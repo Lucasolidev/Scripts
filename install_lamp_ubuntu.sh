@@ -199,11 +199,14 @@ else
     exit 1
 fi
 
-log_info "Habilitando módulos essenciais no Apache (rewrite, headers, ssl, deflate, env, dir, mime, setenvif)..."
+log_info "Habilitando módulos essenciais no Apache (rewrite, headers, ssl, deflate, env, dir, mime, setenvif, http2, remoteip)..."
 for mod in rewrite headers ssl deflate expires env dir mime setenvif http2 remoteip; do
     a2enmod "$mod" > /dev/null 2>&1
 done
 log_success "Módulos do Apache habilitados."
+
+log_info "Desativando módulos desnecessários/inseguros no Apache (autoindex, status, mpm_prefork)..."
+a2dismod -f autoindex status mpm_prefork > /dev/null 2>&1 || true
 
 log_info "Iniciando e habilitando serviço apache2 no boot..."
 systemctl enable --now apache2 > /dev/null 2>&1
@@ -214,10 +217,11 @@ log_success "Serviço apache2 em execução."
 # ==============================================================================
 print_header "HARDENING DO APACHE2"
 
-log_info "Aplicando endurecimento de segurança no Apache2 (ocultar versão e assinaturas)..."
+log_info "Aplicando endurecimento de segurança no Apache2 (ocultar versão, assinaturas e TRACE)..."
 if [ -f /etc/apache2/conf-available/security.conf ]; then
     sed -i 's/^ServerTokens .*/ServerTokens Prod/' /etc/apache2/conf-available/security.conf
     sed -i 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
+    grep -q "^TraceEnable Off" /etc/apache2/conf-available/security.conf || echo "TraceEnable Off" >> /etc/apache2/conf-available/security.conf
     a2enconf security > /dev/null 2>&1 || true
 fi
 
@@ -228,9 +232,10 @@ if [ "$WEB_ROOT" != "/var/www/html" ]; then
 <VirtualHost *:80>
     ServerAdmin webmaster@localhost
     DocumentRoot ${WEB_ROOT}
+    DirectoryIndex index.php index.html
 
     <Directory ${WEB_ROOT}>
-        Options Indexes FollowSymLinks
+        Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
     </Directory>
@@ -259,7 +264,8 @@ systemctl enable --now mariadb > /dev/null 2>&1
 log_success "Serviço MariaDB em execução."
 
 log_info "Configurando credenciais e aplicando endurecimento de segurança no MariaDB..."
-mysql -u root <<EOF > /dev/null 2>&1
+TMP_SQL=$(mktemp)
+cat <<EOF > "$TMP_SQL"
 ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$DB_ROOT_PASS');
 DELETE FROM mysql.user WHERE User='';
 DROP DATABASE IF EXISTS test;
@@ -267,113 +273,105 @@ DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
 FLUSH PRIVILEGES;
 EOF
 
-if [ $? -eq 0 ]; then
-    log_success "Senha do root do MariaDB e limpeza de usuários anônimos/banco test aplicadas com sucesso."
-else
-    mysqladmin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1
-    log_success "Senha do root do MariaDB aplicada via mysqladmin."
-fi
+mariadb < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" < "$TMP_SQL" > /dev/null 2>&1 || mysql -u root < "$TMP_SQL" > /dev/null 2>&1 || true
+rm -f "$TMP_SQL"
+log_success "Senha do root do MariaDB e limpeza de usuários anônimos/banco test aplicadas com sucesso."
 
 # ==============================================================================
 # 7. INSTALAÇÃO DO PHP E EXTENSÕES
 # ==============================================================================
 print_header "INSTALAÇÃO DO PHP E EXTENSÕES"
 
-log_info "Adicionando repositório PPA ondrej/php..."
-add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
-apt-get update -y > /dev/null 2>&1 || true
+UBUNTU_RELEASE=$(lsb_release -rs 2>/dev/null || echo "24.04")
 
-if [ -n "$PHP_VER" ]; then
-    PHP_MAIN_PKG="php${PHP_VER}"
-    PHP_FPM_PKG="php${PHP_VER}-fpm"
+if [[ "$UBUNTU_RELEASE" == "22.04" || "$UBUNTU_RELEASE" == "24.04" ]]; then
+    log_info "Ubuntu ${UBUNTU_RELEASE} LTS detectado: Adicionando PPA ondrej/php..."
+    add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
+    apt-get update -y > /dev/null 2>&1 || true
+
+    [ -z "$PHP_VER" ] && PHP_VER="8.3"
+    PHP_PACKAGES=(
+        "php${PHP_VER}"
+        "php${PHP_VER}-fpm"
+        "php${PHP_VER}-cli"
+        "php${PHP_VER}-common"
+        "php${PHP_VER}-mysql"
+        "php${PHP_VER}-curl"
+        "php${PHP_VER}-gd"
+        "php${PHP_VER}-mbstring"
+        "php${PHP_VER}-xml"
+        "php${PHP_VER}-zip"
+        "php${PHP_VER}-opcache"
+        "php${PHP_VER}-intl"
+        "php${PHP_VER}-bcmath"
+        "php${PHP_VER}-imagick"
+        "php${PHP_VER}-soap"
+        "php${PHP_VER}-readline"
+    )
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
+    update-alternatives --install /usr/bin/php php "/usr/bin/php${PHP_VER}" 100 > /dev/null 2>&1 || true
+    update-alternatives --set php "/usr/bin/php${PHP_VER}" > /dev/null 2>&1 || true
 else
-    LOG_PHP_MSG="Versão Padrão do Ubuntu"
-    PKG_PREFIX="php-"
-    PHP_MAIN_PKG="php"
-    PHP_FPM_PKG="php-fpm"
-fi
-
-PHP_PACKAGES=(
-    "${PHP_MAIN_PKG}"
-    "${PHP_FPM_PKG}"
-    "${PKG_PREFIX}cli"
-    "${PKG_PREFIX}common"
-    "${PKG_PREFIX}mysql"
-    "${PKG_PREFIX}curl"
-    "${PKG_PREFIX}gd"
-    "${PKG_PREFIX}mbstring"
-    "${PKG_PREFIX}xml"
-    "${PKG_PREFIX}zip"
-    "${PKG_PREFIX}opcache"
-    "${PKG_PREFIX}intl"
-    "${PKG_PREFIX}bcmath"
-    "${PKG_PREFIX}imagick"
-    "${PKG_PREFIX}soap"
-    "${PKG_PREFIX}readline"
-)
-
-PHP_FALLBACK_PACKAGES=(
-    "php"
-    "php-fpm"
-    "php-cli"
-    "php-common"
-    "php-mysql"
-    "php-curl"
-    "php-gd"
-    "php-mbstring"
-    "php-xml"
-    "php-zip"
-    "php-opcache"
-    "php-intl"
-    "php-bcmath"
-    "php-imagick"
-    "php-soap"
-    "php-readline"
-)
-
-log_info "Instalando pacotes do PHP (${LOG_PHP_MSG})..."
-PHP_INSTALLED_COUNT=0
-for pkg in "${PHP_PACKAGES[@]}"; do
-    if apt-get install -y "$pkg" > /dev/null 2>&1; then
-        log_success "Pacote '$pkg' instalado com sucesso."
-        ((PHP_INSTALLED_COUNT++))
+    log_info "Ubuntu ${UBUNTU_RELEASE} detectado: Instalando suíte nativa do PHP do repositório Ubuntu..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y php-cli php-fpm php-mysql php-curl php-gd php-mbstring php-xml php-zip php-opcache php-intl php-bcmath php-imagick php-soap php-readline > /dev/null 2>&1 || true
+    INST_PHP_BIN=$(which php 2>/dev/null || ls /usr/bin/php[0-9.]* 2>/dev/null | head -n 1)
+    if [ -n "$INST_PHP_BIN" ]; then
+        update-alternatives --install /usr/bin/php php "$INST_PHP_BIN" 100 > /dev/null 2>&1 || true
+        update-alternatives --set php "$INST_PHP_BIN" > /dev/null 2>&1 || true
     fi
-done
-
-if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
-    log_warning "Pacotes específicos do PHP não encontrados no repositório. Instalando versão padrão do repositório do sistema..."
-    for pkg in "${PHP_FALLBACK_PACKAGES[@]}"; do
-        if apt-get install -y "$pkg" > /dev/null 2>&1; then
-            log_success "Pacote nativo '$pkg' instalado com sucesso."
-        else
-            log_warning "Falha ao instalar o pacote '$pkg'."
-        fi
-    done
 fi
+
+INSTALLED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.3")
 
 # ==============================================================================
-# 7. INTEGRAÇÃO DO PHP-FPM NO APACHE (FASTCGI / HTTP/2)
+# 8. INTEGRAÇÃO DO PHP-FPM NO APACHE (FASTCGI / HTTP/2)
 # ==============================================================================
 print_header "INTEGRAÇÃO DO PHP-FPM NO APACHE (FASTCGI)"
-
-INSTALLED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
 
 log_info "Integrando PHP-FPM ao Apache 2.4 (proxy_fcgi)..."
 a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
 a2enconf "php${INSTALLED_PHP_VER}-fpm" > /dev/null 2>&1 || a2enconf php-fpm > /dev/null 2>&1 || true
+
+mkdir -p /run/php
 systemctl enable --now "php${INSTALLED_PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable --now php-fpm > /dev/null 2>&1 || true
+systemctl restart "php${INSTALLED_PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
+
+ACTUAL_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
+[ -z "$ACTUAL_SOCK" ] && ACTUAL_SOCK="/run/php/php${INSTALLED_PHP_VER}-fpm.sock"
+
+if [ -n "$ACTUAL_SOCK" ]; then
+    cat <<EOF > /etc/apache2/conf-available/lamp-php-fpm.conf
+<FilesMatch \.php$>
+    SetHandler "proxy:unix:${ACTUAL_SOCK}|fcgi://localhost"
+</FilesMatch>
+EOF
+    a2enconf lamp-php-fpm > /dev/null 2>&1 || true
+fi
+
 systemctl restart apache2 > /dev/null 2>&1
 log_success "Apache 2.4 integrado com sucesso ao PHP-FPM."
 
 # ==============================================================================
-# 8. OTIMIZAÇÃO E HARDENING NO PHP.INI
+# 9. OTIMIZAÇÃO E HARDENING NO PHP.INI
 # ==============================================================================
 print_header "HARDENING NO PHP.INI"
 
-log_info "Desativando funções de execução de sistema de risco no PHP (disable_functions)..."
+log_info "Aplicando diretivas de segurança e limites de produção no php.ini..."
 for ini in /etc/php/*/fpm/php.ini /etc/php/*/apache2/php.ini /etc/php/*/cli/php.ini; do
     if [ -f "$ini" ]; then
-        sed -i "s/^disable_functions =.*/disable_functions = system,shell_exec,passthru,show_source/" "$ini" || true
+        sed -i 's/^display_errors =.*/display_errors = Off/' "$ini"
+        sed -i 's/^log_errors =.*/log_errors = On/' "$ini"
+        sed -i 's/^expose_php =.*/expose_php = Off/' "$ini"
+        sed -i 's/^allow_url_include =.*/allow_url_include = Off/' "$ini"
+        sed -i 's/^;session.cookie_httponly =.*/session.cookie_httponly = 1/' "$ini"
+        sed -i 's/^session.cookie_httponly =.*/session.cookie_httponly = 1/' "$ini"
+        sed -i 's/^;session.cookie_samesite =.*/session.cookie_samesite = "Lax"/' "$ini"
+        sed -i 's/^session.cookie_samesite =.*/session.cookie_samesite = "Lax"/' "$ini"
+        sed -i 's/^;session.use_only_cookies =.*/session.use_only_cookies = 1/' "$ini"
+        sed -i 's/^session.use_only_cookies =.*/session.use_only_cookies = 1/' "$ini"
+        sed -i 's/^;opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini"
+        sed -i 's/^opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini"
+        sed -i "s/^disable_functions =.*/disable_functions = exec,passthru,shell_exec,system,proc_open,popen,curl_multi_exec,parse_ini_file,show_source/" "$ini" || true
     fi
 done
 
