@@ -354,29 +354,56 @@ fi
 if [ "$PHP_INSTALLED" = false ]; then
     log_info "Instalando suíte oficial do PHP e FPM do repositório Ubuntu..."
     
-    # Descobre o nome do pacote FPM nativo no Ubuntu (ex: php8.5-fpm ou php-fpm)
-    NATIVE_FPM_PKG=$(apt-cache search -n "^php[0-9.]*-fpm$" | head -n 1 | awk '{print $1}')
-    [ -z "$NATIVE_FPM_PKG" ] && NATIVE_FPM_PKG="php-fpm"
-
-    FALLBACK_PHP_PACKAGES=(
-        "php"
-        "$NATIVE_FPM_PKG"
-        "php-cli"
-        "php-common"
-        "php-mysql"
-        "php-curl"
-        "php-gd"
-        "php-mbstring"
-        "php-xml"
-        "php-zip"
-        "php-opcache"
-        "php-intl"
-        "php-bcmath"
-        "php-imagick"
-        "php-soap"
-        "php-readline"
-    )
+    # Descobre a versão exata do PHP nativo no apt do Ubuntu (ex: 8.5)
+    NAT_VER=$(apt-cache search -n "^php[0-9.]*-cli$" | head -n 1 | sed 's/[^0-9.]//g')
+    
+    if [ -n "$NAT_VER" ]; then
+        FALLBACK_PHP_PACKAGES=(
+            "php${NAT_VER}"
+            "php${NAT_VER}-fpm"
+            "php${NAT_VER}-cli"
+            "php${NAT_VER}-common"
+            "php${NAT_VER}-mysql"
+            "php${NAT_VER}-curl"
+            "php${NAT_VER}-gd"
+            "php${NAT_VER}-mbstring"
+            "php${NAT_VER}-xml"
+            "php${NAT_VER}-zip"
+            "php${NAT_VER}-opcache"
+            "php${NAT_VER}-intl"
+            "php${NAT_VER}-bcmath"
+            "php${NAT_VER}-imagick"
+            "php${NAT_VER}-soap"
+            "php${NAT_VER}-readline"
+        )
+    else
+        FALLBACK_PHP_PACKAGES=(
+            "php"
+            "php-fpm"
+            "php-cli"
+            "php-common"
+            "php-mysql"
+            "php-curl"
+            "php-gd"
+            "php-mbstring"
+            "php-xml"
+            "php-zip"
+            "php-opcache"
+            "php-intl"
+            "php-bcmath"
+            "php-imagick"
+            "php-soap"
+            "php-readline"
+        )
+    fi
     DEBIAN_FRONTEND=noninteractive apt-get install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
+    
+    # Registra o atalho /usr/bin/php caso o pacote instale php8.5-cli sem o meta pacote php-cli
+    INST_PHP_BIN=$(ls /usr/bin/php[0-9.]* 2>/dev/null | head -n 1)
+    if [ -n "$INST_PHP_BIN" ] && [ ! -f /usr/bin/php ]; then
+        update-alternatives --install /usr/bin/php php "$INST_PHP_BIN" 100 > /dev/null 2>&1 || true
+        update-alternatives --set php "$INST_PHP_BIN" > /dev/null 2>&1 || true
+    fi
 fi
 
 # Detecta a versão real ativa instalada do PHP no sistema
