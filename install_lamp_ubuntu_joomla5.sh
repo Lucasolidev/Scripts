@@ -151,12 +151,15 @@ else
     log_info "Senha definida para o Usuário Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
 fi
 
-echo -e "\n  ${FG_CYAN}[i]${NC} Versão do PHP (Recomendado oficial Joomla 5: 8.3 para Ubuntu 22.04/24.04)."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar [Padrão: 8.3 | ou 8.5]: ${NC}")" PHP_INPUT
-PHP_INPUT=${PHP_INPUT:-8.3}
-CLEAN_PHP_VER=$(echo "$PHP_INPUT" | sed 's/[^0-9.]//g')
-PHP_VER="${CLEAN_PHP_VER:-8.3}"
-log_info "Versão do PHP selecionada: ${FG_GREEN}PHP ${PHP_VER}${NC}"
+# Detecta a versão do Ubuntu para definir a versão ideal do PHP automaticamente
+UBUNTU_VER=$(lsb_release -rs 2>/dev/null || echo "24.04")
+if [[ "$UBUNTU_VER" == "26.04" ]]; then
+    PHP_VER="8.5"
+    log_info "Ubuntu 26.04 detectado: Versão do PHP configurada automaticamente: ${FG_GREEN}PHP 8.5${NC}"
+else
+    PHP_VER="8.3"
+    log_info "Ubuntu ${UBUNTU_VER} LTS detectado: Versão do PHP configurada automaticamente: ${FG_GREEN}PHP 8.3 (Recomendado Joomla 5)${NC}"
+fi
 
 DOWNLOAD_JOOMLA="s"
 
