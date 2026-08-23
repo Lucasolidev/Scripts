@@ -239,31 +239,38 @@ done
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO PHP-FPM"
 
-INSTALLED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
-if [ -n "$INSTALLED_PHP_VER" ]; then
-    PHP_VER="$INSTALLED_PHP_VER"
-fi
+INSTALLED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.3")
+[ -n "$INSTALLED_PHP_VER" ] && PHP_VER="$INSTALLED_PHP_VER"
 
-PHP_INI="/etc/php/${PHP_VER}/fpm/php.ini"
+mkdir -p /run/php
+systemctl enable --now "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable --now php-fpm > /dev/null 2>&1 || true
 
-if [ -f "$PHP_INI" ]; then
-    log_info "Aplicando otimizações no ${PHP_INI} (PHP ${PHP_VER})..."
-    
-    sed -i "s/upload_max_filesize = .*/upload_max_filesize = ${UPLOAD_MAX}/" "$PHP_INI"
-    sed -i "s/post_max_size = .*/post_max_size = ${UPLOAD_MAX}/" "$PHP_INI"
-    sed -i "s/max_execution_time = .*/max_execution_time = ${EXEC_TIME}/" "$PHP_INI"
-    sed -i "s/max_input_time = .*/max_input_time = ${EXEC_TIME}/" "$PHP_INI"
-    sed -i "s/memory_limit = .*/memory_limit = 512M/" "$PHP_INI"
-    sed -i "s/^disable_functions =.*/disable_functions = system,shell_exec,passthru,show_source/" "$PHP_INI" || true
-    
-    log_success "Parâmetros do PHP-FPM e desativação de funções de risco ajustados com sucesso."
-    
-    log_info "Reiniciando serviço php${PHP_VER}-fpm..."
-    systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1
-    log_success "Serviço php${PHP_VER}-fpm reiniciado."
-else
-    log_error "Arquivo de configuração do PHP-FPM (${PHP_INI}) não encontrado."
-fi
+for ini in /etc/php/*/fpm/php.ini /etc/php/*/cli/php.ini; do
+    if [ -f "$ini" ]; then
+        log_info "Aplicando otimizações e hardening no ${ini}..."
+        sed -i "s/upload_max_filesize = .*/upload_max_filesize = ${UPLOAD_MAX}/" "$ini"
+        sed -i "s/post_max_size = .*/post_max_size = ${UPLOAD_MAX}/" "$ini"
+        sed -i "s/max_execution_time = .*/max_execution_time = ${EXEC_TIME}/" "$ini"
+        sed -i "s/max_input_time = .*/max_input_time = ${EXEC_TIME}/" "$ini"
+        sed -i "s/memory_limit = .*/memory_limit = 512M/" "$ini"
+        sed -i 's/^display_errors =.*/display_errors = Off/' "$ini"
+        sed -i 's/^log_errors =.*/log_errors = On/' "$ini"
+        sed -i 's/^expose_php =.*/expose_php = Off/' "$ini"
+        sed -i 's/^allow_url_include =.*/allow_url_include = Off/' "$ini"
+        sed -i 's/^;session.cookie_httponly =.*/session.cookie_httponly = 1/' "$ini"
+        sed -i 's/^session.cookie_httponly =.*/session.cookie_httponly = 1/' "$ini"
+        sed -i 's/^;session.cookie_samesite =.*/session.cookie_samesite = "Lax"/' "$ini"
+        sed -i 's/^session.cookie_samesite =.*/session.cookie_samesite = "Lax"/' "$ini"
+        sed -i 's/^;session.use_only_cookies =.*/session.use_only_cookies = 1/' "$ini"
+        sed -i 's/^session.use_only_cookies =.*/session.use_only_cookies = 1/' "$ini"
+        sed -i 's/^;opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini"
+        sed -i 's/^opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini"
+        sed -i "s/^disable_functions =.*/disable_functions = exec,passthru,shell_exec,system,proc_open,popen,curl_multi_exec,parse_ini_file,show_source/" "$ini" || true
+    fi
+done
+
+systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
+log_success "Parâmetros do PHP-FPM e desativação de funções de risco ajustados com sucesso."
 
 # ==============================================================================
 # 5. CONFIGURAÇÃO E HARDENING DO BANCO DE DADOS (MARIADB SERVER)
@@ -275,7 +282,8 @@ systemctl enable --now mariadb > /dev/null 2>&1
 log_success "Serviço MariaDB em execução."
 
 log_info "Configurando credenciais e aplicando endurecimento de segurança no MariaDB..."
-mysql -u root <<EOF > /dev/null 2>&1
+TMP_SQL=$(mktemp)
+cat <<EOF > "$TMP_SQL"
 ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('$DB_ROOT_PASS');
 DELETE FROM mysql.user WHERE User='';
 DROP DATABASE IF EXISTS test;
@@ -283,12 +291,9 @@ DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
 FLUSH PRIVILEGES;
 EOF
 
-if [ $? -eq 0 ]; then
-    log_success "Senha do root do MariaDB e limpeza de usuários anônimos/banco test aplicadas com sucesso."
-else
-    mysqladmin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1 || true
-    log_success "Senha do root do MariaDB aplicada."
-fi
+mariadb < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" < "$TMP_SQL" > /dev/null 2>&1 || mysql -u root < "$TMP_SQL" > /dev/null 2>&1 || true
+rm -f "$TMP_SQL"
+log_success "Senha do root do MariaDB e limpeza de usuários anônimos/banco test aplicadas com sucesso."
 
 # ==============================================================================
 # 6. CONFIGURAÇÃO E HARDENING DO NGINX
@@ -317,6 +322,10 @@ map \$http_upgrade \$connection_upgrade {
 }
 EOF
 
+# Descobre o socket exato do PHP-FPM
+FPM_SOCK=$(ls /run/php/php*-fpm.sock /var/run/php/php*-fpm.sock 2>/dev/null | head -n 1)
+[ -z "$FPM_SOCK" ] && FPM_SOCK="/var/run/php/php${PHP_VER}-fpm.sock"
+
 NGINX_CONF="/etc/nginx/sites-available/${DOMAIN_NAME}"
 
 log_info "Criando arquivo de VirtualHost no Nginx..."
@@ -342,6 +351,12 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # SEGURANÇA: Bloqueia métodos HTTP não permitidos
+    if (\$request_method !~ ^(GET|POST|HEAD)\$ ) {
+        return 405;
+    }
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
@@ -349,7 +364,7 @@ server {
 
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php${PHP_VER}-fpm.sock;
+        fastcgi_pass unix:${FPM_SOCK};
         fastcgi_read_timeout ${EXEC_TIME}s;
         fastcgi_send_timeout ${EXEC_TIME}s;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
