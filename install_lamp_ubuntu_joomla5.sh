@@ -388,7 +388,7 @@ a2enconf "php${PHP_VER}-fpm" > /dev/null 2>&1 || a2enconf php-fpm > /dev/null 2>
 PHP_SOCK="/run/php/php${PHP_VER}-fpm.sock"
 if [ -S "$PHP_SOCK" ] || [ -d "/run/php" ]; then
     cat <<EOF > /etc/apache2/conf-available/joomla-php-fpm.conf
-<FilesMatch \.php$>
+<FilesMatch \\.php\$>
     SetHandler "proxy:unix:${PHP_SOCK}|fcgi://localhost"
 </FilesMatch>
 EOF
