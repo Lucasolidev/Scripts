@@ -358,7 +358,7 @@ if [ "$PHP_INSTALLED" = false ]; then
         "php-soap"
         "php-readline"
     )
-    apt-get install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
 fi
 
 # Detecta a versão real ativa instalada do PHP no sistema
@@ -376,7 +376,7 @@ systemctl enable --now "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable 
 # Configura o Apache para processar PHP via FastCGI / PHP-FPM (Padrão ouro moderno)
 log_info "Integrando PHP-FPM ao Apache 2.4 (proxy_fcgi)..."
 a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
-a2enconf "php${PHP_VER}-fpm" > /dev/null 2>&1 || true
+a2enconf "php${PHP_VER}-fpm" > /dev/null 2>&1 || a2enconf php-fpm > /dev/null 2>&1 || true
 
 # ==============================================================================
 # 7. AJUSTES DE PERFORMANCE E HARDENING NO PHP.INI
