@@ -309,13 +309,12 @@ log_info "Configurando repositórios de pacotes do PHP..."
 LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
 apt update -y > /dev/null 2>&1 || true
 
-# Testa se os pacotes específicos da versão solicitada (ex: php8.3) estão disponíveis
 PHP_INSTALLED=false
-if apt-cache show "php${PHP_VER}-cli" > /dev/null 2>&1; then
-    log_info "Instalando PHP ${PHP_VER} e extensões via repositório PPA..."
+if apt-cache show "php${PHP_VER}-fpm" > /dev/null 2>&1; then
+    log_info "Instalando PHP ${PHP_VER} (FPM e Módulos)..."
     JOOMLA_PHP_PACKAGES=(
         "php${PHP_VER}"
-        "libapache2-mod-php${PHP_VER}"
+        "php${PHP_VER}-fpm"
         "php${PHP_VER}-cli"
         "php${PHP_VER}-common"
         "php${PHP_VER}-mysql"
@@ -338,12 +337,12 @@ if apt-cache show "php${PHP_VER}-cli" > /dev/null 2>&1; then
     fi
 fi
 
-# Se não conseguiu instalar via PPA (ex: versão do Ubuntu não mapeada no PPA como 26.04), instala a suíte padrão oficial do Ubuntu
+# Fallback para pacotes nativos do sistema
 if [ "$PHP_INSTALLED" = false ]; then
-    log_info "Instalando suíte oficial do PHP e extensões do repositório Ubuntu..."
+    log_info "Instalando suíte oficial do PHP e FPM do repositório Ubuntu..."
     FALLBACK_PHP_PACKAGES=(
         "php"
-        "libapache2-mod-php"
+        "php-fpm"
         "php-cli"
         "php-common"
         "php-mysql"
@@ -362,24 +361,7 @@ if [ "$PHP_INSTALLED" = false ]; then
     apt install -y "${FALLBACK_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
 fi
 
-# Garante a comutação e ativação do módulo PHP no Apache
-log_info "Garantindo ativação do módulo PHP no Apache..."
-a2dismod mpm_event > /dev/null 2>&1 || true
-a2dismod mpm_worker > /dev/null 2>&1 || true
-a2enmod mpm_prefork > /dev/null 2>&1 || true
-
-# Ativa qualquer módulo PHP disponível no Apache
-PHP_MOD_ACTIVATED=false
-for mod_file in /etc/apache2/mods-available/php*.load; do
-    if [ -f "$mod_file" ]; then
-        mod_name=$(basename "$mod_file" .load)
-        a2enmod "$mod_name" > /dev/null 2>&1 || true
-        PHP_MOD_ACTIVATED=true
-        log_success "Módulo Apache '$mod_name' ativado."
-    fi
-done
-
-# Detecta a versão real ativa instalada do PHP no sistema para os passos seguintes
+# Detecta a versão real ativa instalada do PHP no sistema
 DETECTED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
 if [ -n "$DETECTED_PHP_VER" ]; then
     PHP_VER="$DETECTED_PHP_VER"
@@ -388,7 +370,13 @@ else
     log_warning "Versão PHP detectada: ${PHP_VER}"
 fi
 
-systemctl restart apache2 > /dev/null 2>&1 || true
+# Garante o serviço PHP-FPM ativo
+systemctl enable --now "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable --now php-fpm > /dev/null 2>&1 || true
+
+# Configura o Apache para processar PHP via FastCGI / PHP-FPM (Padrão ouro moderno)
+log_info "Integrando PHP-FPM ao Apache 2.4 (proxy_fcgi)..."
+a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
+a2enconf "php${PHP_VER}-fpm" > /dev/null 2>&1 || true
 
 # ==============================================================================
 # 7. AJUSTES DE PERFORMANCE E HARDENING NO PHP.INI
@@ -396,7 +384,7 @@ systemctl restart apache2 > /dev/null 2>&1 || true
 print_header "OTIMIZAÇÃO DO PHP.INI PARA JOOMLA 5"
 
 log_info "Configurando diretivas de performance e limites no php.ini..."
-for ini_file in "/etc/php/${PHP_VER}/apache2/php.ini" "/etc/php/${PHP_VER}/cli/php.ini"; do
+for ini_file in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/apache2/php.ini" "/etc/php/${PHP_VER}/cli/php.ini"; do
     if [ -f "$ini_file" ]; then
         # Memória e Uploads (Requisitos oficiais Joomla 5: memory_limit >= 256MB)
         sed -i 's/^memory_limit =.*/memory_limit = 512M/' "$ini_file"
@@ -429,6 +417,7 @@ for ini_file in "/etc/php/${PHP_VER}/apache2/php.ini" "/etc/php/${PHP_VER}/cli/p
         sed -i "s/^disable_functions =.*/disable_functions = show_source,system,shell_exec,passthru,proc_open,popen/" "$ini_file" || true
     fi
 done
+systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || true
 log_success "php.ini ajustado: memory_limit=512M, cookies HttpOnly/SameSite, allow_url_include=Off e opcache ativo."
 
 # ==============================================================================
