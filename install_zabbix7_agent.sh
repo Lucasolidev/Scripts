@@ -167,7 +167,7 @@ echo -e "\n  ${FG_CYAN}${BOLD}Status do Serviço:${NC}"
 echo -e "  ${DIM}────────────────────────────────────────${NC}"
 echo -e "  ${FG_WHITE}Zabbix Agent : ${NC}$(systemctl is-active zabbix-agent 2>/dev/null)"
 echo -e "  ${FG_WHITE}Log Recente  : ${NC}"
-sleep 3
+sleep 10
 tail -n 5 /var/log/zabbix/zabbix_agentd.log 2>/dev/null | sed 's/^/    /' || echo "    (Sem logs gerados no momento)"
 
 echo ""
