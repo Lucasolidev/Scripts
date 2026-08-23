@@ -151,16 +151,14 @@ else
     log_info "Senha definida para o Usuário Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
 fi
 
-echo -e "\n  ${FG_CYAN}[i]${NC} Versão do PHP (Recomendado oficial Joomla 5: 8.3)."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar [Padrão: 8.3 | ou 8.2]: ${NC}")" PHP_INPUT
+echo -e "\n  ${FG_CYAN}[i]${NC} Versão do PHP (Recomendado oficial Joomla 5: 8.3 para Ubuntu 22.04/24.04)."
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Versão do PHP a instalar [Padrão: 8.3 | ou 8.5]: ${NC}")" PHP_INPUT
 PHP_INPUT=${PHP_INPUT:-8.3}
 CLEAN_PHP_VER=$(echo "$PHP_INPUT" | sed 's/[^0-9.]//g')
 PHP_VER="${CLEAN_PHP_VER:-8.3}"
 log_info "Versão do PHP selecionada: ${FG_GREEN}PHP ${PHP_VER}${NC}"
 
-echo -e "\n  ${FG_CYAN}[i]${NC} Download e Extração Automática do Joomla 5."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja baixar a versão mais recente estável do Joomla 5.x automaticamente? (S/n): ${NC}")" DOWNLOAD_JOOMLA
-DOWNLOAD_JOOMLA=$(echo "$DOWNLOAD_JOOMLA" | tr '[:upper:]' '[:lower:]')
+DOWNLOAD_JOOMLA="s"
 
 draw_separator
 
