@@ -298,7 +298,7 @@ fi
 print_header "INSTALAÇÃO DO PHP ${PHP_VER} (RECOMENDADO JOOMLA 5)"
 
 log_info "Configurando repositório PPA ondrej/php..."
-add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
+LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
 apt update -y > /dev/null 2>&1 || true
 
 PHP_MAIN_PKG="php${PHP_VER}"
@@ -325,13 +325,49 @@ JOOMLA_PHP_PACKAGES=(
 )
 
 log_info "Instalando PHP ${PHP_VER} e módulos requeridos pelo Joomla 5..."
+PHP_INSTALLED_COUNT=0
 for pkg in "${JOOMLA_PHP_PACKAGES[@]}"; do
     if apt install -y "$pkg" > /dev/null 2>&1; then
         log_success "Módulo '$pkg' instalado com sucesso."
-    else
-        log_warning "Falha/Aviso no pacote '$pkg'. Tentando versão padrão do repositório..."
+        ((PHP_INSTALLED_COUNT++))
     fi
 done
+
+# Fallback para pacotes nativos do sistema caso o PPA não tenha o prefixo específico
+if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
+    log_warning "Repositório PPA não respondeu para php${PHP_VER}-*. Instalando versão nativa do repositório Ubuntu..."
+    FALLBACK_PHP_PACKAGES=(
+        "php"
+        "libapache2-mod-php"
+        "php-cli"
+        "php-common"
+        "php-mysql"
+        "php-curl"
+        "php-gd"
+        "php-mbstring"
+        "php-xml"
+        "php-zip"
+        "php-opcache"
+        "php-intl"
+        "php-bcmath"
+        "php-imagick"
+        "php-soap"
+        "php-readline"
+    )
+    for pkg in "${FALLBACK_PHP_PACKAGES[@]}"; do
+        if apt install -y "$pkg" > /dev/null 2>&1; then
+            log_success "Módulo nativo '$pkg' instalado com sucesso."
+        else
+            log_warning "Falha/Aviso no pacote '$pkg'."
+        fi
+    done
+fi
+
+# Detecta a versão real ativa instalada do PHP no sistema para os passos seguintes
+DETECTED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
+if [ -n "$DETECTED_PHP_VER" ]; then
+    PHP_VER="$DETECTED_PHP_VER"
+fi
 
 # ==============================================================================
 # 7. AJUSTES DE PERFORMANCE E HARDENING NO PHP.INI
