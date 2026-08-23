@@ -224,10 +224,14 @@ for mod in "${APACHE_MODULES[@]}"; do
     log_success "Módulo Apache '$mod' habilitado."
 done
 
-log_info "Aplicando endurecimento de segurança no Apache (ocultação de banners)..."
+log_info "Desativando módulos desnecessários/inseguros no Apache (autoindex, status, mpm_prefork)..."
+a2dismod -f autoindex status mpm_prefork > /dev/null 2>&1 || true
+
+log_info "Aplicando endurecimento de segurança no Apache (ocultação de banners e desativação de TRACE)..."
 if [ -f /etc/apache2/conf-available/security.conf ]; then
     sed -i 's/^ServerTokens .*/ServerTokens Prod/' /etc/apache2/conf-available/security.conf
     sed -i 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
+    grep -q "^TraceEnable Off" /etc/apache2/conf-available/security.conf || echo "TraceEnable Off" >> /etc/apache2/conf-available/security.conf
     a2enconf security > /dev/null 2>&1 || true
 fi
 
@@ -428,6 +432,8 @@ for ini_file in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/apache2/p
 
         # Otimização OPcache para Joomla 5
         sed -i 's/^;opcache.enable=.*/opcache.enable=1/' "$ini_file"
+        sed -i 's/^;opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini_file"
+        sed -i 's/^opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini_file"
         sed -i 's/^;opcache.memory_consumption=.*/opcache.memory_consumption=128/' "$ini_file"
         sed -i 's/^;opcache.interned_strings_buffer=.*/opcache.interned_strings_buffer=16/' "$ini_file"
         sed -i 's/^;opcache.max_accelerated_files=.*/opcache.max_accelerated_files=10000/' "$ini_file"
@@ -440,14 +446,18 @@ for ini_file in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/apache2/p
         sed -i 's/^session.cookie_samesite =.*/session.cookie_samesite = "Lax"/' "$ini_file"
         sed -i 's/^;session.use_strict_mode =.*/session.use_strict_mode = 1/' "$ini_file"
         sed -i 's/^session.use_strict_mode =.*/session.use_strict_mode = 1/' "$ini_file"
+        sed -i 's/^;session.use_only_cookies =.*/session.use_only_cookies = 1/' "$ini_file"
+        sed -i 's/^session.use_only_cookies =.*/session.use_only_cookies = 1/' "$ini_file"
+        sed -i 's/^display_errors =.*/display_errors = Off/' "$ini_file"
+        sed -i 's/^log_errors =.*/log_errors = On/' "$ini_file"
         sed -i 's/^allow_url_include =.*/allow_url_include = Off/' "$ini_file"
 
         # Hardening de funções inseguras mantendo compatibilidade
-        sed -i "s/^disable_functions =.*/disable_functions = show_source,system,shell_exec,passthru,proc_open,popen/" "$ini_file" || true
+        sed -i "s/^disable_functions =.*/disable_functions = exec,passthru,shell_exec,system,proc_open,popen,curl_multi_exec,parse_ini_file,show_source/" "$ini_file" || true
     fi
 done
-systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || true
-log_success "php.ini ajustado: memory_limit=512M, cookies HttpOnly/SameSite, allow_url_include=Off e opcache ativo."
+systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
+log_success "php.ini ajustado: memory_limit=512M, opcache.enable_cli=1, display_errors=Off, cookies HttpOnly/SameSite/Strict, allow_url_include=Off e disable_functions ativado."
 
 # ==============================================================================
 # 8. ESTRUTURA DO DIRETÓRIO E VIRTUALHOST APACHE
@@ -668,13 +678,15 @@ echo -e "\n  ${BOLD}🔒 MEDIDAS DE SEGURANÇA E HARDENING APLICADAS:${NC}"
 echo -e "  ${FG_YELLOW}1. Proteção contra Injeção e Vazamento de Cookies e Sessão (PHP):${NC}"
 echo -e "     • ${BOLD}session.cookie_httponly = 1${NC} (Impede roubo de cookies via scripts XSS)"
 echo -e "     • ${BOLD}session.cookie_samesite = 'Lax'${NC} (Mitiga ataques CSRF / Cross-Site Request Forgery)"
-echo -e "     • ${BOLD}session.use_strict_mode = 1${NC} (Evita ataques de fixação de sessão)"
-echo -e "     • ${BOLD}allow_url_include = Off${NC} (Impede inclusão e execução remota de arquivos maliciosos)"
-echo -e "     • ${BOLD}expose_php = Off${NC} (Oculta assinatura da versão do PHP nos cabeçalhos)"
-echo -e "  ${FG_YELLOW}2. Bloqueio de Acesso a Arquivos Sensíveis no Apache:${NC}"
-echo -e "     • Bloqueio direto a arquivos ocultos (.git, .env, .htaccess)"
-echo -e "     • Bloqueio de visualização direta a arquivos .log, .sql, .bak, .old, .sh e .ini"
-echo -e "     • Injeção de cabeçalhos de proteção (X-Content-Type-Options, X-Frame-Options, XSS-Protection)"
+echo -e "     • ${BOLD}session.use_strict_mode = 1 / session.use_only_cookies = 1${NC} (Evita fixação e sequestro de sessão)"
+echo -e "     • ${BOLD}display_errors = Off / log_errors = On${NC} (Oculta caminhos internos do servidor e registra erros em log privado)"
+echo -e "     • ${BOLD}allow_url_include = Off / expose_php = Off${NC} (Impede RFI e oculta versão do PHP nos cabeçalhos)"
+echo -e "     • ${BOLD}disable_functions expandido${NC} (Desativa exec, shell_exec, system, proc_open, popen, curl_multi_exec)"
+echo -e "  ${FG_YELLOW}2. Endurecimento de Segurança e Módulos no Apache:${NC}"
+echo -e "     • ${BOLD}Módulos Inseguros Desativados:${NC} autoindex (impede navegação por pastas) e status (oculta telemetria)"
+echo -e "     • ${BOLD}Proteção contra XST:${NC} TraceEnable Off (Bloqueia requisições do método HTTP TRACE)"
+echo -e "     • ${BOLD}Bloqueio de Arquivos Sensíveis:${NC} Impede acesso direto a .git, .env, .htaccess, .log, .sql, .bak, .sh e .ini"
+echo -e "     • ${BOLD}Injeção de Cabeçalhos:${NC} X-Content-Type-Options (nosniff), X-Frame-Options (SAMEORIGIN), XSS-Protection"
 echo -e "  ${FG_YELLOW}3. Permissões Granulares e Isolamento:${NC}"
 echo -e "     • Herança contínua via POSIX ACLs restrita ao usuário www-data"
 echo -e "     • Banco de dados dedicado com privilégios limitados estritamente ao banco do Joomla"
