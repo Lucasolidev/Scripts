@@ -285,15 +285,17 @@ apt update -y > /dev/null 2>&1 || true
 
 if [ -n "$PHP_VER" ]; then
     PHP_MAIN_PKG="php${PHP_VER}"
-    APACHE_MOD_PKG="libapache2-mod-php${PHP_VER}"
+    PHP_FPM_PKG="php${PHP_VER}-fpm"
 else
+    LOG_PHP_MSG="Versão Padrão do Ubuntu"
+    PKG_PREFIX="php-"
     PHP_MAIN_PKG="php"
-    APACHE_MOD_PKG="libapache2-mod-php"
+    PHP_FPM_PKG="php-fpm"
 fi
 
 PHP_PACKAGES=(
     "${PHP_MAIN_PKG}"
-    "${APACHE_MOD_PKG}"
+    "${PHP_FPM_PKG}"
     "${PKG_PREFIX}cli"
     "${PKG_PREFIX}common"
     "${PKG_PREFIX}mysql"
@@ -312,7 +314,7 @@ PHP_PACKAGES=(
 
 PHP_FALLBACK_PACKAGES=(
     "php"
-    "libapache2-mod-php"
+    "php-fpm"
     "php-cli"
     "php-common"
     "php-mysql"
@@ -350,20 +352,33 @@ if [ "$PHP_INSTALLED_COUNT" -eq 0 ]; then
 fi
 
 # ==============================================================================
+# 7. INTEGRAÇÃO DO PHP-FPM NO APACHE (FASTCGI / HTTP/2)
+# ==============================================================================
+print_header "INTEGRAÇÃO DO PHP-FPM NO APACHE (FASTCGI)"
+
+log_info "Integrando PHP-FPM ao Apache 2.4 (proxy_fcgi)..."
+a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
+a2enconf php*-fpm > /dev/null 2>&1 || true
+systemctl enable --now php*-fpm > /dev/null 2>&1 || true
+systemctl restart apache2 > /dev/null 2>&1
+log_success "Apache 2.4 integrado com sucesso ao PHP-FPM."
+
+# ==============================================================================
 # 8. OTIMIZAÇÃO E HARDENING NO PHP.INI
 # ==============================================================================
 print_header "HARDENING NO PHP.INI"
 
 log_info "Desativando funções de execução de sistema de risco no PHP (disable_functions)..."
-for ini in /etc/php/*/apache2/php.ini /etc/php/*/cli/php.ini; do
+for ini in /etc/php/*/fpm/php.ini /etc/php/*/apache2/php.ini /etc/php/*/cli/php.ini; do
     if [ -f "$ini" ]; then
         sed -i "s/^disable_functions =.*/disable_functions = system,shell_exec,passthru,show_source/" "$ini" || true
     fi
 done
 
-log_info "Reiniciando Apache2 para carregar as configurações de segurança e módulos do PHP..."
+log_info "Reiniciando Apache2 e PHP-FPM..."
+systemctl restart php*-fpm > /dev/null 2>&1 || true
 systemctl restart apache2 > /dev/null 2>&1
-log_success "Apache2 reiniciado com suporte a PHP, versão ocultada e funções de risco desativadas."
+log_success "Serviços reiniciados com suporte a PHP-FPM, versão ocultada e funções de risco desativadas."
 
 # ==============================================================================
 # 9. CONFIGURAÇÃO DE PERMISSÕES (POSIX ACLs)
