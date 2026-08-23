@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.3
+# Version: 1.4
 # ------------------------------------------------
-VERSION="1.3"
+VERSION="1.4"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
@@ -15,10 +15,11 @@ VERSION="1.3"
 # 6. Configura aliases de produtividade e segurança no Shell (ll='ls -alFh', rm, cp, mv, df, free, ports, myip, update, clean, reload).
 # 7. Endurece o SSH (Hardening): Desabilita login de Root (opcional), impede senhas em branco e aplica timeout de ociosidade de 10 min.
 # 8. Configura a jaula do Fail2Ban (força bruta SSH) e ativa atualizações automáticas de segurança (unattended-upgrades).
-# 9. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset'.
+# 9. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset' (sudo).
 # 10. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
 # 11. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH (22/tcp) e Zabbix Agent (10050/tcp).
-# 12. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
+# 12. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, IP, Uptime, RAM e Disco.
+# 13. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh -O pos_install_server.sh && chmod +x pos_install_server.sh && sudo ./pos_install_server.sh
@@ -98,6 +99,23 @@ print_alert_box() {
     echo -e ""
 }
 
+garantir_home() {
+    local usuario="$1"
+    if id "$usuario" &>/dev/null; then
+        local home_dir
+        home_dir=$(getent passwd "$usuario" | cut -d: -f6)
+        if [ -n "$home_dir" ] && [ ! -d "$home_dir" ]; then
+            log_warning "Diretório home '$home_dir' do usuário '$usuario' não existia. Criando..."
+            mkhomedir_helper "$usuario" 2>/dev/null || {
+                mkdir -p "$home_dir"
+                cp -r /etc/skel/. "$home_dir/" 2>/dev/null || true
+                chown -R "$usuario:$usuario" "$home_dir"
+            }
+            log_success "Diretório home '$home_dir' criado com sucesso para '$usuario'."
+        fi
+    fi
+}
+
 # ==============================================================================
 # INÍCIO DO SCRIPT
 # ==============================================================================
@@ -129,7 +147,7 @@ print_header "COLETA DE PARÂMETROS"
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/N): ${NC}")" PERMITIR_ROOT_SSH
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset'? (s/N): ${NC}")" CRIAR_GESET
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset' (sudo)? (s/N): ${NC}")" CRIAR_GESET
 read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO
 
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
@@ -333,19 +351,21 @@ if [[ "$CRIAR_ADMIN" =~ ^[Ss]$ ]]; then
   else
     log_success "Usuário 'administrador' já existe."
   fi
+  garantir_home "administrador"
 else
   log_skipped "Criação do usuário 'administrador' pulada."
 fi
 
 if [[ "$CRIAR_GESET" =~ ^[Ss]$ ]]; then
   if ! id "geset" &>/dev/null; then
-    log_warning "Usuário 'geset' não encontrado. Criando..."
-    useradd -m -s /bin/bash geset
+    log_warning "Usuário 'geset' não encontrado. Criando com acesso Sudo..."
+    useradd -m -s /bin/bash -G sudo geset
     echo -e "  ${FG_YELLOW}${ARROW} Defina a senha para o usuário 'geset':${NC}"
     passwd geset
   else
     log_success "Usuário 'geset' já existe."
   fi
+  garantir_home "geset"
 else
   log_skipped "Criação do usuário 'geset' pulada."
 fi
@@ -371,6 +391,7 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   fi
 
   usermod -aG "$NOME_GRUPO" "$NOVO_USER"
+  garantir_home "$NOVO_USER"
   log_success "Usuário '$NOVO_USER' configurado e adicionado ao grupo $NOME_GRUPO."
 
   log_info "Auditando existência do usuário 'geset' para regras do Sudoers..."
@@ -422,7 +443,43 @@ else
 fi
 
 # ==============================================================================
-# 10. RESUMO DA INSTALAÇÃO
+# 10. BANNER DINÂMICO DE BOAS-VINDAS NO LOGIN (/etc/profile.d/motd_banner.sh)
+# ==============================================================================
+print_header "BANNER DE BOAS-VINDAS NO LOGIN"
+log_info "Configurando banner de boas-vindas dinâmico em /etc/profile.d/motd_banner.sh..."
+
+cat << 'EOF' > /etc/profile.d/motd_banner.sh
+#!/bin/bash
+# ==============================================================================
+# Banner Dinâmico de Boas-Vindas e Diagnóstico do Servidor
+# Exibido automaticamente em sessões interativas de shell (SSH / Console)
+# ==============================================================================
+if [ -n "$PS1" ]; then
+  HOSTNAME=$(hostname 2>/dev/null || uname -n)
+  SISTEMA=$(lsb_release -ds 2>/dev/null || grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || echo "Linux")
+  KERNEL=$(uname -r)
+  IP_LOCAL=$(hostname -I 2>/dev/null | awk '{print $1}')
+  UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
+  RAM_USO=$(free -h 2>/dev/null | awk '/^Mem:/ {print $3 " / " $2}')
+  DISCO_USO=$(df -h / 2>/dev/null | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')
+
+  echo -e "\033[1;36m================================================================\033[0m"
+  echo -e "  \033[1;32m📌 VOCÊ CONECTOU EM:\033[0m"
+  echo -e "     \033[1mHostname:\033[0m     \033[36m${HOSTNAME}\033[0m"
+  echo -e "     \033[1mSistema:\033[0m      \033[36m${SISTEMA}\033[0m \033[2m(Kernel ${KERNEL})\033[0m"
+  echo -e "     \033[1mIP Local:\033[0m     \033[36m${IP_LOCAL:-N/A}\033[0m"
+  echo -e "     \033[1mUptime:\033[0m       \033[36m${UPTIME}\033[0m"
+  echo -e "     \033[1mMemória RAM:\033[0m  \033[36m${RAM_USO}\033[0m"
+  echo -e "     \033[1mDisco (/):\033[0m    \033[36m${DISCO_USO}\033[0m"
+  echo -e "\033[1;36m================================================================\033[0m\n"
+fi
+EOF
+
+chmod +x /etc/profile.d/motd_banner.sh
+log_success "Banner dinâmico configurado com sucesso em /etc/profile.d/motd_banner.sh."
+
+# ==============================================================================
+# 11. RESUMO DA INSTALAÇÃO
 # ==============================================================================
 print_header "RESUMO DA INSTALAÇÃO"
 
@@ -452,6 +509,7 @@ echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools
 echo -e "  ${BOLD}Fail2Ban (Brute-Force):${NC}$(get_service_status fail2ban)"
 echo -e "  ${BOLD}Atualizações Automát.:${NC} $(get_service_status unattended-upgrades)"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
+echo -e "  ${BOLD}Banner no Login:${NC}       $( [ -f /etc/profile.d/motd_banner.sh ] && echo -e "${FG_GREEN}Ativo (/etc/profile.d/motd_banner.sh)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
 if command -v ufw >/dev/null 2>&1; then
   if ufw status 2>/dev/null | grep -q "active"; then
     PORTAS_RAW=$(ufw status 2>/dev/null | grep -i "ALLOW" | awk '{print $1}' | sort -u)
@@ -485,7 +543,7 @@ if [[ "$CRIAR_ADMIN" =~ ^[Ss]$ ]]; then
   echo -e "  ${BOLD}Usuário Administrador:${NC}  ${FG_CYAN}administrador${NC} (Sudo Ativo)"
 fi
 if [[ "$CRIAR_GESET" =~ ^[Ss]$ ]]; then
-  echo -e "  ${BOLD}Usuário Geset:${NC}          ${FG_CYAN}geset${NC}"
+  echo -e "  ${BOLD}Usuário Geset:${NC}          ${FG_CYAN}geset${NC} (Sudo Ativo)"
 fi
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   echo -e "  ${BOLD}Usuário Customizado:${NC}    ${FG_CYAN}${NOVO_USER}${NC} (Grupo: ${NOME_GRUPO})"
@@ -495,7 +553,7 @@ echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}$
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 # ==============================================================================
-# 11. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# 12. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
 # ==============================================================================
 print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 

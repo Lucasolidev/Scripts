@@ -99,11 +99,20 @@ wsl --shutdown
 ```
 
 ### Encerrar uma distribuição específica
+Para parar uma distribuição específica sem desligar as outras, use o comando `--terminate` (ou `-t`):
 ```powershell
-wsl --terminate Ubuntu
-# ou
-wsl -t Ubuntu
+wsl --terminate NomeDaDistro
 ```
+
+**Exemplos:**
+* Parar apenas o Ubuntu-24.04:
+  ```powershell
+  wsl -t Ubuntu-24.04
+  ```
+* Parar apenas o Ubuntu-26.04:
+  ```powershell
+  wsl -t Ubuntu-26.04
+  ```
 
 ### Verificar o status global do WSL
 ```powershell
