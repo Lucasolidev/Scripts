@@ -353,9 +353,14 @@ fi
 # Fallback para pacotes nativos do sistema
 if [ "$PHP_INSTALLED" = false ]; then
     log_info "Instalando suíte oficial do PHP e FPM do repositório Ubuntu..."
+    
+    # Descobre o nome do pacote FPM nativo no Ubuntu (ex: php8.5-fpm ou php-fpm)
+    NATIVE_FPM_PKG=$(apt-cache search -n "^php[0-9.]*-fpm$" | head -n 1 | awk '{print $1}')
+    [ -z "$NATIVE_FPM_PKG" ] && NATIVE_FPM_PKG="php-fpm"
+
     FALLBACK_PHP_PACKAGES=(
         "php"
-        "php-fpm"
+        "$NATIVE_FPM_PKG"
         "php-cli"
         "php-common"
         "php-mysql"
