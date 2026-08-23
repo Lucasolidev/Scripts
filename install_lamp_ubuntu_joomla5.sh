@@ -316,9 +316,12 @@ for f in /etc/apt/sources.list.d/*ondrej*php*.list /etc/apt/sources.list.d/*ondr
     fi
 done
 
+# Importa as chaves GPG oficiais do repositório ondrej/php (evita erro NO_PUBKEY)
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4F4EA0AAE5267A6C 71DAEAAB4AD4CAB6 > /dev/null 2>&1 || true
+curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x4F4EA0AAE5267A6C" | gpg --dearmor -o /etc/apt/trusted.gpg.d/ondrej-php.gpg 2>/dev/null || true
+
 if [ ! -f /etc/apt/sources.list.d/ondrej-ubuntu-php-*.list ] && [ ! -f /etc/apt/sources.list.d/ondrej-php.list ]; then
     echo "deb [signed-by=/etc/apt/trusted.gpg.d/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu noble main" > /etc/apt/sources.list.d/ondrej-php.list
-    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC0831756756D7F66C4F4EA0AAE5267A6C" | gpg --dearmor -o /etc/apt/trusted.gpg.d/ondrej-php.gpg > /dev/null 2>&1 || true
 fi
 apt-get update -y > /dev/null 2>&1 || true
 
