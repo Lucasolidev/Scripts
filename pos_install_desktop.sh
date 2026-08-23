@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.1
+# Version: 1.2
 # ------------------------------------------------
-VERSION="1.1"
+VERSION="1.2"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU DESKTOP 26.04
 # ==============================================================================
@@ -264,51 +264,59 @@ log_success "Hack Nerd Font instalada com sucesso."
 # ==============================================================================
 # 9. EDITOR VIM E PERSONALIZAÇÃO DE PLUGINS
 # ==============================================================================
-print_header "CONFIGURAÇÃO DO EDITOR VIM"
+print_header "CONFIGURAÇÃO DO EDITOR VIM (PLUGINS & TEMA SONOKAI)"
 
-log_info "Instalando Vim, Python3-pip e Vim-Plug..."
-sudo nala install -y vim python3-pip > /dev/null 2>&1
-curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
-    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim > /dev/null 2>&1
+log_info "Instalando Vim, Python3-pip e configurando plugins..."
+sudo nala install -y vim python3-pip > /dev/null 2>&1 || sudo apt-get install -y vim python3-pip > /dev/null 2>&1
 
-cat << 'EOF' > ~/.vimrc
+sudo mkdir -p /root/.vim/autoload /root/.vim/plugged /etc/skel/.vim/autoload /etc/skel/.vim/plugged
+
+if [ ! -f /root/.vim/autoload/plug.vim ]; then
+  log_info "Baixando o gerenciador de plugins 'vim-plug'..."
+  sudo curl -fLo /root/.vim/autoload/plug.vim --create-dirs \
+      https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim > /dev/null 2>&1 || true
+fi
+
+sudo cat << 'EOF' | sudo tee /root/.vimrc > /dev/null
 " Seção de Plugins (vim-plug) """""""""""""""""""""""""""""""""""""""""""""""""
 call plug#begin('~/.vim/plugged')
+
 Plug 'sainnhe/sonokai'
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'ryanoasis/vim-devicons'
 Plug 'sheerun/vim-polyglot'
+
 call plug#end()
 
 " Global Sets """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-syntax on
-set nu
-set tabstop=4
-set softtabstop=4
-set shiftwidth=4
-set expandtab
-set smarttab
-set smartindent
-set hidden
-set incsearch
-set ignorecase
-set smartcase
-set scrolloff=8
-set colorcolumn=100
-set signcolumn=yes
-set cmdheight=2
-set updatetime=100
-set encoding=utf-8
-set nobackup
-set nowritebackup
-set splitright
-set splitbelow
-set autoread
-set mouse=a
-filetype on
-filetype plugin on
-filetype indent on
+syntax on            " Enable syntax highlight
+set nu               " Enable line numbers
+set tabstop=4        " Show existing tab with 4 spaces width
+set softtabstop=4    " Show existing tab with 4 spaces width
+set shiftwidth=4     " When indenting with '>', use 4 spaces width
+set expandtab        " On pressing tab, insert 4 spaces
+set smarttab         " insert tabs on the start of a line according to shiftwidth
+set smartindent      " Automatically inserts one extra level of indentation in some cases
+set hidden           " Hides the current buffer when a new file is openned
+set incsearch        " Incremental search
+set ignorecase       " Ingore case in search
+set smartcase        " Consider case if there is a upper case character
+set scrolloff=8      " Minimum number of lines to keep above and below the cursor
+set colorcolumn=100  " Draws a line at the given line to keep aware of the line size
+set signcolumn=yes   " Add a column on the left. Useful for linting
+set cmdheight=2      " Give more space for displaying messages
+set updatetime=100   " Time in miliseconds to consider the changes
+set encoding=utf-8   " The encoding should be utf-8 to activate the font icons
+set nobackup         " No backup files
+set nowritebackup    " No backup files
+set splitright       " Create the vertical splits to the right
+set splitbelow       " Create the horizontal splits below
+set autoread         " Update vim after file update from outside
+set mouse=a          " Enable mouse support
+filetype on          " Detect and set the filetype option and trigger the FileType Event
+filetype plugin on   " Load the plugin file for the file type, if any
+filetype indent on   " Load the indent file for the file type, if any
 
 " Themes """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 if exists('+termguicolors')
@@ -335,9 +343,25 @@ let g:airline#extensions#tabline#enabled = 1
 let g:airline_powerline_fonts = 1
 EOF
 
-log_info "Instalando plugins do Vim..."
-vim -u NONE -N -e -s -c "source ~/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1
-log_success "Editor Vim e plugins configurados com sucesso."
+if command -v vim >/dev/null 2>&1 && [ -f /root/.vim/autoload/plug.vim ]; then
+  log_info "Instalando plugins do Vim via vim-plug..."
+  sudo vim -u NONE -N -e -s -c "source /root/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1 || true
+fi
+
+# Replica a configuração do Vim para o /etc/skel e para todos os usuários em /home
+sudo cp /root/.vimrc /etc/skel/.vimrc 2>/dev/null || true
+sudo cp -r /root/.vim /etc/skel/ 2>/dev/null || true
+
+for user_home in /home/*; do
+  if [ -d "$user_home" ]; then
+    user_name=$(basename "$user_home")
+    sudo cp /root/.vimrc "$user_home/.vimrc" 2>/dev/null || true
+    sudo cp -r /root/.vim "$user_home/" 2>/dev/null || true
+    sudo chown -R "$user_name:$user_name" "$user_home/.vimrc" "$user_home/.vim" 2>/dev/null || true
+  fi
+done
+
+log_success "Editor Vim configurado com plugins (Sonokai/Airline) em /root, /etc/skel e /home."
 
 # ==============================================================================
 # 10. CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH
@@ -449,6 +473,7 @@ echo -e "  ${BOLD}OpenSSH Server:${NC}        $(get_service_status ssh)"
 echo -e "  ${BOLD}Shell Padrão:${NC}          ${FG_CYAN}Zsh + Oh My Zsh (Tema Agnoster)${NC}"
 echo -e "  ${BOLD}Flatpak / Flathub:${NC}     ${FG_GREEN}Ativo e Integrado${NC}"
 echo -e "  ${BOLD}Google Chrome:${NC}         ${FG_GREEN}Instalado${NC}"
+echo -e "  ${BOLD}Editor Vim:${NC}            $( [ -f /root/.vimrc ] && echo -e "${FG_GREEN}Configurado (Tema Sonokai / Airline)${NC}" || echo -e "${FG_YELLOW}Padrão${NC}")"
 echo -e "  ${BOLD}Comando GitHub:${NC}        ${FG_CYAN}lucasolidev <script.sh>${NC}"
 echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
