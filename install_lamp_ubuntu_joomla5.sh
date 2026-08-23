@@ -299,6 +299,19 @@ print_header "INSTALAÇÃO DO PHP ${PHP_VER} (RECOMENDADO JOOMLA 5)"
 
 log_info "Configurando repositório PPA ondrej/php..."
 LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
+
+# Caso o codinome do Ubuntu não tenha pacotes no PPA (ex: Ubuntu 26.04 em desenvolvimento), mapeia para a base LTS estável (noble)
+UBUNTU_CODENAME=$(lsb_release -cs 2>/dev/null || echo "noble")
+if [ ! -f /etc/apt/sources.list.d/ondrej-ubuntu-php-*.list ] && [ ! -f /etc/apt/sources.list.d/ondrej-php.list ]; then
+    echo "deb [signed-by=/etc/apt/trusted.gpg.d/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu noble main" > /etc/apt/sources.list.d/ondrej-php.list
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC0831756756D7F66C4F4EA0AAE5267A6C" | gpg --dearmor -o /etc/apt/trusted.gpg.d/ondrej-php.gpg > /dev/null 2>&1 || true
+fi
+# Se o arquivo do PPA existir mas falhou no update por codinome não suportado, ajusta para noble
+for f in /etc/apt/sources.list.d/*ondrej*php*.list /etc/apt/sources.list.d/*ondrej*php*.sources; do
+    if [ -f "$f" ]; then
+        sed -i 's/devel/noble/g; s/resolute/noble/g; s/plucky/noble/g' "$f" 2>/dev/null || true
+    fi
+done
 apt update -y > /dev/null 2>&1 || true
 
 PHP_MAIN_PKG="php${PHP_VER}"
