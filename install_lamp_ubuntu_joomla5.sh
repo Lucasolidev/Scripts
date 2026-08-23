@@ -336,10 +336,13 @@ if apt-cache show "php${PHP_VER}-fpm" > /dev/null 2>&1; then
         "php${PHP_VER}-soap"
         "php${PHP_VER}-readline"
     )
-    apt-get install -y "${JOOMLA_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
-    if command -v "php${PHP_VER}" > /dev/null 2>&1 || [ -f "/usr/bin/php${PHP_VER}" ]; then
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${JOOMLA_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
+    
+    if [ -f "/usr/bin/php${PHP_VER}" ]; then
+        update-alternatives --install /usr/bin/php php "/usr/bin/php${PHP_VER}" 100 > /dev/null 2>&1 || true
+        update-alternatives --set php "/usr/bin/php${PHP_VER}" > /dev/null 2>&1 || true
         PHP_INSTALLED=true
-        log_success "PHP ${PHP_VER} instalado com sucesso via PPA."
+        log_success "PHP ${PHP_VER} instalado e definido como padrão no sistema."
     fi
 fi
 
