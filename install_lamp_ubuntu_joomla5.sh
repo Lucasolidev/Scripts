@@ -280,23 +280,27 @@ log_info "Aplicando endurecimento de segurança no MariaDB e criando banco de da
 # Define a senha do root caso ainda não esteja definida
 mariadb-admin -u root password "$DB_ROOT_PASS" > /dev/null 2>&1 || true
 
-# Aplica as configurações do banco e usuário com suporte a socket local, localhost e 127.0.0.1
-mariadb <<EOF > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" <<EOF > /dev/null 2>&1
+# Prepara script SQL temporário com escape perfeito para evitar falhas de sintaxe do heredoc no Bash
+TMP_SQL=$(mktemp)
+cat <<EOF > "$TMP_SQL"
 DELETE FROM mysql.user WHERE User='';
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
-CREATE DATABASE IF NOT EXISTS \`$JOOMLA_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-DROP USER IF EXISTS '$JOOMLA_DB_USER'@'localhost';
-DROP USER IF EXISTS '$JOOMLA_DB_USER'@'127.0.0.1';
-DROP USER IF EXISTS '$JOOMLA_DB_USER'@'%';
-CREATE USER '$JOOMLA_DB_USER'@'localhost' IDENTIFIED BY '$JOOMLA_DB_PASS';
-CREATE USER '$JOOMLA_DB_USER'@'127.0.0.1' IDENTIFIED BY '$JOOMLA_DB_PASS';
-CREATE USER '$JOOMLA_DB_USER'@'%' IDENTIFIED BY '$JOOMLA_DB_PASS';
-GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'localhost' WITH GRANT OPTION;
-GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'127.0.0.1' WITH GRANT OPTION;
-GRANT ALL PRIVILEGES ON \`$JOOMLA_DB_NAME\`.* TO '$JOOMLA_DB_USER'@'%' WITH GRANT OPTION;
+CREATE DATABASE IF NOT EXISTS \`${JOOMLA_DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP USER IF EXISTS '${JOOMLA_DB_USER}'@'localhost';
+DROP USER IF EXISTS '${JOOMLA_DB_USER}'@'127.0.0.1';
+DROP USER IF EXISTS '${JOOMLA_DB_USER}'@'%';
+CREATE USER '${JOOMLA_DB_USER}'@'localhost' IDENTIFIED BY '${JOOMLA_DB_PASS}';
+CREATE USER '${JOOMLA_DB_USER}'@'127.0.0.1' IDENTIFIED BY '${JOOMLA_DB_PASS}';
+CREATE USER '${JOOMLA_DB_USER}'@'%' IDENTIFIED BY '${JOOMLA_DB_PASS}';
+GRANT ALL PRIVILEGES ON \`${JOOMLA_DB_NAME}\`.* TO '${JOOMLA_DB_USER}'@'localhost' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON \`${JOOMLA_DB_NAME}\`.* TO '${JOOMLA_DB_USER}'@'127.0.0.1' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON \`${JOOMLA_DB_NAME}\`.* TO '${JOOMLA_DB_USER}'@'%' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 EOF
+
+mariadb < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" < "$TMP_SQL" > /dev/null 2>&1 || true
+rm -f "$TMP_SQL"
 
 log_success "Banco '${JOOMLA_DB_NAME}' e usuário '${JOOMLA_DB_USER}' criados com permissões completas em UTF8MB4."
 
