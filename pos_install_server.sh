@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.6
+# Version: 1.7
 # ------------------------------------------------
-VERSION="1.6"
+VERSION="1.7"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
@@ -61,7 +61,7 @@ print_header() {
     local title="$1"
     echo -e ""
     echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
-    draw_separato
+    draw_separator
 }
 
 get_service_status() {
@@ -103,7 +103,7 @@ print_alert_box() {
 garantir_home() {
     local usuario="$1"
     if id "$usuario" &>/dev/null; then
-        local home_di
+        local home_dir
         home_dir=$(getent passwd "$usuario" | cut -d: -f6)
         if [ -n "$home_dir" ] && [ ! -d "$home_dir" ]; then
             log_warning "Diretório home '$home_dir' do usuário '$usuario' não existia. Criando..."
@@ -121,7 +121,7 @@ garantir_home() {
 # INÍCIO DO SCRIPT
 # ==============================================================================
 
-clea
+clear
 
 # Verificar se o script está rodando como root
 if [ "$(id -u)" -ne 0 ]; then 
@@ -165,7 +165,7 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   done
 fi
 
-draw_separato
+draw_separator
 log_info "Configurações coletadas. Iniciando os procedimentos..."
 
 # ==============================================================================
@@ -376,9 +376,9 @@ log_info "Verificando usuários padrão (administrador e geset)..."
 if [[ "$CRIAR_ADMIN" =~ ^[Ss]$ ]]; then
   if ! id "administrador" &>/dev/null; then
     log_warning "Usuário 'administrador' não encontrado. Criando com acesso Sudo..."
-    useradd -m -s /bin/bash -G sudo administrado
+    useradd -m -s /bin/bash -G sudo administrador
     echo -e "  ${FG_YELLOW}${ARROW} Defina a senha para o usuário 'administrador':${NC}"
-    passwd administrado
+    passwd administrador
   else
     log_success "Usuário 'administrador' já existe."
   fi
@@ -515,8 +515,8 @@ set smartindent      " Automatically inserts one extra level of indentation in s
 set hidden           " Hides the current buffer when a new file is openned
 set incsearch        " Incremental search
 set ignorecase       " Ingore case in search
-set smartcase        " Consider case if there is a upper case characte
-set scrolloff=8      " Minimum number of lines to keep above and below the curso
+set smartcase        " Consider case if there is a upper case character
+set scrolloff=8      " Minimum number of lines to keep above and below the cursor
 set colorcolumn=100  " Draws a line at the given line to keep aware of the line size
 set signcolumn=yes   " Add a column on the left. Useful for linting
 set cmdheight=2      " Give more space for displaying messages
@@ -586,26 +586,53 @@ log_info "Configurando banner de boas-vindas dinâmico em /etc/profile.d/motd_ba
 cat << 'EOF' > /etc/profile.d/motd_banner.sh
 #!/bin/bash
 # ==============================================================================
-# Banner Dinâmico de Boas-Vindas e Diagnóstico do Servido
+# Banner Dinâmico de Boas-Vindas e Diagnóstico do Servidor
 # Exibido automaticamente em sessões interativas de shell (SSH / Console)
 # ==============================================================================
 if [ -n "$PS1" ]; then
   HOSTNAME=$(hostname 2>/dev/null || uname -n)
   SISTEMA=$(lsb_release -ds 2>/dev/null || grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || echo "Linux")
   KERNEL=$(uname -r)
-  IP_LOCAL=$(hostname -I 2>/dev/null | awk '{print $1}')
   UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
-  RAM_USO=$(free -h 2>/dev/null | awk '/^Mem:/ {print $3 " / " $2}')
-  DISCO_USO=$(df -h / 2>/dev/null | awk 'NR==2 {print $3 " / " $2 " (" $5 ")"}')
+  RAM_USO=$(free -h 2>/dev/null | awk '/^Mem:/ {print "Usado: " $3 " / Total: " $2 " (Livre: " $7 ")"}')
 
   echo -e "\033[1;36m================================================================\033[0m"
   echo -e "  \033[1;32m📌 VOCÊ CONECTOU EM:\033[0m"
-  echo -e "     \033[1mHostname:\033[0m     \033[36m${HOSTNAME}\033[0m"
-  echo -e "     \033[1mSistema:\033[0m      \033[36m${SISTEMA}\033[0m \033[2m(Kernel ${KERNEL})\033[0m"
-  echo -e "     \033[1mIP Local:\033[0m     \033[36m${IP_LOCAL:-N/A}\033[0m"
-  echo -e "     \033[1mUptime:\033[0m       \033[36m${UPTIME}\033[0m"
-  echo -e "     \033[1mMemória RAM:\033[0m  \033[36m${RAM_USO}\033[0m"
-  echo -e "     \033[1mDisco (/):\033[0m    \033[36m${DISCO_USO}\033[0m"
+  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Hostname:" "${HOSTNAME}"
+  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m \033[2m(Kernel %s)\033[0m\n" "Sistema:" "${SISTEMA}" "${KERNEL}"
+  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Uptime:" "${UPTIME}"
+  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória RAM:" "${RAM_USO}"
+
+  # Partições / Discos Físicos Montados
+  DISCOS_ENCONTRADOS=0
+  while read -r mountpoint used total free perc; do
+    if [ -n "$mountpoint" ]; then
+      DISCOS_ENCONTRADOS=1
+      lbl="Disco (${mountpoint}):"
+      printf "     \033[1m%-18s\033[0m \033[36mUsado: %s / Total: %s (Livre: %s | %s)\033[0m\n" "$lbl" "$used" "$total" "$free" "$perc"
+    fi
+  done < <(df -hP -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs -x iso9660 -x rootfs 2>/dev/null | awk 'NR>1 && ($1 ~ /^\/dev/ || $1 ~ /:/) && $6 !~ /^\/boot/ {print $6, $3, $2, $4, $5}')
+
+  if [ "$DISCOS_ENCONTRADOS" -eq 0 ]; then
+    ROOT_DF=$(df -h / 2>/dev/null | awk 'NR==2 {print "Usado: " $3 " / Total: " $2 " (Livre: " $4 " | " $5 ")"}')
+    printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Disco (/):" "${ROOT_DF}"
+  fi
+
+  # Interfaces de Rede e Endereços IPv4 (por último, abaixo dos discos)
+  IPS_ENCONTRADOS=0
+  while read -r iface ip_addr; do
+    if [ -n "$iface" ] && [ -n "$ip_addr" ]; then
+      IPS_ENCONTRADOS=1
+      lbl="IP (${iface}):"
+      printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "$lbl" "$ip_addr"
+    fi
+  done < <(ip -4 -o addr show scope global 2>/dev/null | awk '$2 != "lo" {split($4, a, "/"); print $2, a[1]}')
+
+  if [ "$IPS_ENCONTRADOS" -eq 0 ]; then
+    IP_FALLBACK=$(hostname -I 2>/dev/null | awk '{print $1}')
+    printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "IP Local:" "${IP_FALLBACK:-N/A}"
+  fi
+
   echo -e "\033[1;36m================================================================\033[0m\n"
 fi
 EOF
@@ -714,5 +741,5 @@ fi
 
 rm -f "$LOG_TMP" 2>/dev/null || true
 
-draw_separato
+draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
