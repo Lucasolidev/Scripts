@@ -572,6 +572,7 @@ if [ -n "$PS1" ]; then
   KERNEL=$(uname -r)
   UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
   RAM_USO=$(free -h 2>/dev/null | awk '/^Mem:/ {print "Usado: " $3 " / Total: " $2 " (Livre: " $7 ")"}')
+  SWAP_USO=$(free -h 2>/dev/null | awk '/^Swap:/ { if ($2 == "0B" || $2 == "0" || $2 == "") print "Desativada (0B)"; else print "Usado: " $3 " / Total: " $2 " (Livre: " $4 ")" }')
 
   echo -e "\033[1;36m================================================================\033[0m"
   echo -e "  \033[1;32m📌 VOCÊ CONECTOU EM:\033[0m"
@@ -579,6 +580,7 @@ if [ -n "$PS1" ]; then
   printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m \033[2m(Kernel %s)\033[0m\n" "Sistema:" "${SISTEMA}" "${KERNEL}"
   printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Uptime:" "${UPTIME}"
   printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória RAM:" "${RAM_USO}"
+  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória SWAP:" "${SWAP_USO:-Desativada (0B)}"
 
   # Partições / Discos Físicos Montados
   DISCOS_ENCONTRADOS=0
