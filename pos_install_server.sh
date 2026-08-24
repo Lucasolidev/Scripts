@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.8
+# Version: 1.9
 # ------------------------------------------------
-VERSION="1.8"
+VERSION="1.9"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
@@ -199,27 +199,24 @@ apt-get update -y > /dev/null 2>&1
 # Detecta a plataforma de virtualização (KVM/Proxmox, VMware, WSL, Físico)
 VIRT_TYPE=$(systemd-detect-virt 2>/dev/null || echo "none")
 
-PACOTES=(curl qemu-guest-agent open-vm-tools ncdu btop locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw vim)
+# Lista base de utilitários
+PACOTES=(curl ncdu btop locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw vim)
+
+# Instala apenas o agente de VM compatível com o hipervisor em execução
+if [[ "$VIRT_TYPE" =~ ^(kvm|qemu|bochs)$ ]]; then
+  PACOTES+=(qemu-guest-agent)
+elif [[ "$VIRT_TYPE" == "vmware" ]]; then
+  PACOTES+=(open-vm-tools)
+fi
+
 PACOTES_INSTALADOS=()
 for pacote in "${PACOTES[@]}"; do
   log_info "Instalando o pacote: $pacote..."
   if apt-get install -y "$pacote" > /dev/null 2>&1; then
     log_success "Pacote $pacote instalado com sucesso."
     PACOTES_INSTALADOS+=("$pacote")
-    if [[ "$pacote" == "qemu-guest-agent" ]]; then
-      if [[ "$VIRT_TYPE" =~ ^(kvm|qemu|bochs)$ ]]; then
-        systemctl enable --now qemu-guest-agent > /dev/null 2>&1
-      else
-        systemctl enable qemu-guest-agent > /dev/null 2>&1
-      fi
-    elif [[ "$pacote" == "open-vm-tools" ]]; then
-      if [[ "$VIRT_TYPE" == "vmware" ]]; then
-        systemctl enable --now open-vm-tools > /dev/null 2>&1
-      else
-        systemctl enable open-vm-tools > /dev/null 2>&1
-      fi
-    elif [[ "$pacote" == "fail2ban" ]]; then
-      systemctl enable --now fail2ban > /dev/null 2>&1
+    if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" || "$pacote" == "fail2ban" ]]; then
+      systemctl enable --now "$pacote" > /dev/null 2>&1
     fi
   else
     log_warning "Não foi possível instalar o pacote: $pacote (pode não estar disponível)."
@@ -660,10 +657,15 @@ echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}ABNT2 (br)${NC}"
 echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo (NTP Ativo)${NC}"
 echo -e "  ${BOLD}Proteção /dev/shm (RAM):${NC}$(grep -qs "/dev/shm" /etc/fstab && echo -e "${FG_GREEN}Ativo (noexec,nosuid,nodev)${NC}" || echo -e "${FG_YELLOW}Padrão${NC}")"
-echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
-echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
+if [[ "$VIRT_TYPE" =~ ^(kvm|qemu|bochs)$ ]]; then
+  echo -e "  ${BOLD}QEMU Guest Agent:${NC}      $(get_service_status qemu-guest-agent)"
+elif [[ "$VIRT_TYPE" == "vmware" ]]; then
+  echo -e "  ${BOLD}Open VM Tools:${NC}         $(get_service_status open-vm-tools)"
+else
+  echo -e "  ${BOLD}Agente de VM:${NC}          ${FG_YELLOW}N/A (Ambiente Físico/WSL)${NC}"
+fi
 echo -e "  ${BOLD}Fail2Ban (Brute-Force):${NC}$(get_service_status fail2ban)"
-echo -e "  ${BOLD}Atualizações Automát.:${NC} $(get_service_status unattended-upgrades)"
+echo -e "  ${BOLD}Atualiz. de Segurança:${NC} $(get_service_status unattended-upgrades)"
 echo -e "  ${BOLD}Editor Vim:${NC}            $( [ -f /root/.vimrc ] && echo -e "${FG_GREEN}Configurado (Tema Sonokai / Airline)${NC}" || echo -e "${FG_YELLOW}Padrão${NC}")"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
 echo -e "  ${BOLD}Banner no Login:${NC}       $( [ -f /etc/profile.d/motd_banner.sh ] && echo -e "${FG_GREEN}Ativo (/etc/profile.d/motd_banner.sh)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
