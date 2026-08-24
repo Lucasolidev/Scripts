@@ -219,11 +219,11 @@ sudo lynis audit system
 # Executa a auditoria completa de forma direta (Modo Rápido / Relatório)
 sudo lynis audit system -Q
 
-# Exibe apenas as SUGESTÕES de melhorias encontradas na última auditoria
-sudo lynis show suggestions
+# Consultar todos os AVISOS (Warnings) e SUGESTÕES (Suggestions) gerados
+sudo grep -E "^warning\[\]|^suggestion\[\]" /var/log/lynis-report.dat
 
-# Exibe apenas os AVISOS / ALERTAS críticos de segurança
-sudo lynis show warnings
+# Ver detalhes e solução recomendada de um item específico (ex: NETW-2705 ou AUTH-9230)
+sudo lynis show details NETW-2705
 ```
 
 ---
