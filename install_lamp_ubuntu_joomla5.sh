@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.5
+# Version: 1.6
 # ------------------------------------------------
-VERSION="1.5"
+VERSION="1.6"
 # ==============================================================================
 # SCRIPT DE INSTALAÇÃO DA PILHA LAMP AUTOMÁTICO E ENDURECIDO - JOOMLA 5.x
 # UBUNTU SERVER (22.04 / 24.04 / 26.04 LTS)
@@ -218,7 +218,7 @@ else
 fi
 
 log_info "Habilitando módulos obrigatórios e recomendados para Joomla 5 no Apache..."
-APACHE_MODULES=("rewrite" "ssl" "headers" "deflate" "expires" "http2" "remoteip" "env" "dir" "mime" "setenvif")
+APACHE_MODULES=("rewrite" "ssl" "headers" "deflate" "expires" "http2" "remoteip" "env" "dir" "mime" "setenvif" "filter" "fcgid")
 for mod in "${APACHE_MODULES[@]}"; do
     a2enmod "$mod" > /dev/null 2>&1
     log_success "Módulo Apache '$mod' habilitado."
@@ -339,13 +339,16 @@ if [[ "$UBUNTU_RELEASE" == "22.04" || "$UBUNTU_RELEASE" == "24.04" ]]; then
         "php8.3-imagick"
         "php8.3-soap"
         "php8.3-readline"
+        "php8.3-apcu"
+        "php8.3-redis"
+        "php8.3-igbinary"
     )
     DEBIAN_FRONTEND=noninteractive apt-get install -y "${JOOMLA_PHP_PACKAGES[@]}" > /dev/null 2>&1 || true
     
     update-alternatives --install /usr/bin/php php /usr/bin/php8.3 100 > /dev/null 2>&1 || true
     update-alternatives --set php /usr/bin/php8.3 > /dev/null 2>&1 || true
     PHP_VER="8.3"
-    log_success "PHP 8.3 instalado e configurado como padrão no Ubuntu ${UBUNTU_RELEASE}."
+    log_success "PHP 8.3 com APCu e Redis instalado e configurado no Ubuntu ${UBUNTU_RELEASE}."
 
 else
     # ==========================================================================
@@ -354,7 +357,7 @@ else
     log_info "Ubuntu ${UBUNTU_RELEASE} detectado: Instalando suíte nativa do PHP do repositório Ubuntu..."
     
     # Atualiza lista de pacotes e instala o PHP nativo do repositório do sistema
-    DEBIAN_FRONTEND=noninteractive apt-get install -y php-cli php-fpm php-mysql php-curl php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-imagick php-soap php-readline || true
+    DEBIAN_FRONTEND=noninteractive apt-get install -y php-cli php-fpm php-mysql php-curl php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-imagick php-soap php-readline php-apcu php-redis php-igbinary || true
     
     # Caso os meta-pacotes falhem no Ubuntu 26, descobre a versão exata (ex: 8.5)
     NAT_FPM=$(apt-cache search -n "^php[0-9.]*-fpm$" | head -n 1 | awk '{print $1}')
@@ -428,7 +431,7 @@ for ini_file in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/apache2/p
         sed -i 's/^expose_php =.*/expose_php = Off/' "$ini_file"
         sed -i 's/^;date.timezone =.*/date.timezone = America\/Sao_Paulo/' "$ini_file"
 
-        # Otimização OPcache para Joomla 5
+        # Otimização OPcache e APCu para Joomla 5
         sed -i 's/^;opcache.enable=.*/opcache.enable=1/' "$ini_file"
         sed -i 's/^;opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini_file"
         sed -i 's/^opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini_file"
@@ -436,6 +439,7 @@ for ini_file in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/apache2/p
         sed -i 's/^;opcache.interned_strings_buffer=.*/opcache.interned_strings_buffer=16/' "$ini_file"
         sed -i 's/^;opcache.max_accelerated_files=.*/opcache.max_accelerated_files=10000/' "$ini_file"
         sed -i 's/^;opcache.revalidate_freq=.*/opcache.revalidate_freq=2/' "$ini_file"
+        grep -q "^apc.enabled=1" "$ini_file" || echo -e "\n[apcu]\napc.enabled=1\napc.shm_size=64M\napc.enable_cli=1" >> "$ini_file"
 
         # Diretivas de Segurança e Proteção de Sessão / Cookies
         sed -i 's/^;session.cookie_httponly =.*/session.cookie_httponly = 1/' "$ini_file"
@@ -660,9 +664,9 @@ echo -e "  ${FG_GREEN}${BOLD}✔ AMBIENTE JOOMLA 5 INSTALADO E ENDURECIDO COM SU
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Domínio Configurado:${NC}     ${FG_CYAN}${DOMAIN_NAME}${NC}"
 echo -e "  ${BOLD}Diretório Raiz (Web):${NC}    ${FG_CYAN}${JOOMLA_ROOT}${NC}"
-echo -e "  ${BOLD}Servidor Web:${NC}            Apache 2.4.x [Rewrite, HTTP/2, Headers de Segurança]"
+echo -e "  ${BOLD}Servidor Web:${NC}            Apache 2.4.x [Rewrite, HTTP/2, FastCGI, Headers de Segurança]"
 echo -e "  ${BOLD}Banco de Dados:${NC}          MariaDB Server [UTF8MB4 / Collation Unicode CI]"
-echo -e "  ${BOLD}Versão do PHP:${NC}           PHP ${PHP_VER} (memory_limit = 512M, opcache ativo)"
+echo -e "  ${BOLD}Versão do PHP:${NC}           PHP ${PHP_VER} (memory_limit = 512M, OPcache, APCu e Redis ativos)"
 echo -e "  ${BOLD}Permissões POSIX ACL:${NC}    ${FG_GREEN}Ativo e Herdando (${JOOMLA_ROOT})${NC}"
 echo -e "  ${BOLD}Tarefas Agendadas (Cron):${NC} ${FG_GREEN}Ativo (cli/joomla.php a cada 5min)${NC}"
 echo -e "  ${BOLD}Firewall UFW & Fail2Ban:${NC}  ${FG_GREEN}Portas 80/443 liberadas e Jails Web ativas${NC}"
