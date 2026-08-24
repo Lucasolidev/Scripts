@@ -17,6 +17,7 @@ Repositório centralizado de scripts de automação, ferramentas de pós-instala
 Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e utilitários:
 
 * 🐧 **[Guia de Ajuda Linux](Ajuda/ajuda_linux.md)** — Atalhos, manipulação de arquivos, permissões, POSIX ACLs, rsync/scp, usuários e comandos essenciais do Ubuntu Server.
+* ⚙️ **[Guia de Pós-Instalação & Utilitários](Ajuda/ajuda_pos_install_server.md)** — Manual de uso de todos os utilitários instalados (`btop`, `iotop`, `sysstat`, `lynis`, `mtr`, `iperf3`, `nmap`, `jq`, `ufw`, `fail2ban`, `tmux`, etc.) e configurações do servidor.
 * 🐳 **[Guia de Ajuda Docker & Compose](Ajuda/ajuda_docker.md)** — Comandos de contêineres, imagens, volumes, redes e orquestração com Docker Compose.
 * 📊 **[Guia de Ajuda Zabbix](Ajuda/ajuda_zabbix.md)** — Monitoramento, `zabbix_get`, `zabbix_sender`, `zabbix_proxy`, agente 2 e `UserParameter`.
 * 🛢️ **[Guia de Ajuda MariaDB & MySQL](Ajuda/ajuda_mariadb_mysql.md)** — Administração SQL, permissões, backups (`mariadb-dump`), restore, otimização e reset de root.
