@@ -38,7 +38,7 @@ Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e ut
 ## 🛠️ Principais Scripts de Instalação e Automação
 
 ### 1. Pós-Instalação do Ubuntu Server (`pos_install_server.sh`)
-Prepara um novo servidor Ubuntu Server aplicando atualizações, instalando utilitários essenciais (`curl`, `vim`, `ncdu`, `btop`, `qemu-guest-agent`, `htop`, `tmux`, `dnsutils`, `net-tools`), fuso horário `America/Sao_Paulo` (NTP), layout dual de teclado (ABNT2 + US-Intl), hardening no SSH, proteção RAM `/dev/shm` (noexec), proteção Fail2Ban, UFW IPv4/IPv6 e gerenciamento de usuários com Visudo:
+Prepara um novo servidor Ubuntu Server aplicando atualizações, instalando utilitários essenciais (`curl`, `vim`, `ncdu`, `btop`, `htop`, `tmux`, `fail2ban`, `dnsutils`, `net-tools`, `mtr`, `iperf3`, `nmap`, `tcpdump`, `iotop`, `jq`, `tree`, `rsync`, `unzip`, `p7zip`, `sysstat`, `lynis`), fuso horário `America/Sao_Paulo` (NTP), layout dual de teclado (ABNT2 + US-Intl), hardening no SSH, proteção RAM `/dev/shm` (noexec), proteção Fail2Ban, UFW IPv4/IPv6 e gerenciamento de usuários com Visudo:
 ```bash
 wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh -O pos_install_server.sh && chmod +x pos_install_server.sh && sudo ./pos_install_server.sh
 ```

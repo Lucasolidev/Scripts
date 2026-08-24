@@ -1,15 +1,15 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.9
+# Version: 2.0
 # ------------------------------------------------
-VERSION="1.9"
+VERSION="2.0"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (exige Root/Sudo) e captura logs de auditoria em /root e na Home.
 # 2. Atualiza os espelhos do APT e aplica patches de segurança do sistema (opcional).
-# 3. Instala utilitários vitais (curl, vim, qemu-guest-agent, open-vm-tools, ncdu, btop, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades).
+# 3. Instala utilitários vitais (curl, vim, ncdu, btop, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades, mtr, iperf3, nmap, tcpdump, iotop, jq, tree, rsync, unzip, p7zip, sysstat, lynis).
 # 4. Ajusta locales (en_US/pt_BR UTF-8), fuso horário (America/Sao_Paulo + NTP) e layout de teclado (ABNT2 + US-Intl).
 # 5. Aplica proteção de memória compartilhada em RAM (/dev/shm) montada com 'noexec,nosuid,nodev' no /etc/fstab contra botnets/webshells.
 # 6. Configura aliases de produtividade e segurança no Shell (ll='ls -alFh', rm, cp, mv, df, free, ports, myip, update, clean, reload).
@@ -200,7 +200,7 @@ apt-get update -y > /dev/null 2>&1
 VIRT_TYPE=$(systemd-detect-virt 2>/dev/null || echo "none")
 
 # Lista base de utilitários
-PACOTES=(curl ncdu btop locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw vim)
+PACOTES=(curl ncdu btop locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw vim mtr-tiny iperf3 nmap tcpdump iotop jq tree rsync unzip p7zip-full sysstat lynis)
 
 # Instala apenas o agente de VM compatível com o hipervisor em execução
 if [[ "$VIRT_TYPE" =~ ^(kvm|qemu|bochs)$ ]]; then
@@ -215,7 +215,10 @@ for pacote in "${PACOTES[@]}"; do
   if apt-get install -y "$pacote" > /dev/null 2>&1; then
     log_success "Pacote $pacote instalado com sucesso."
     PACOTES_INSTALADOS+=("$pacote")
-    if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" || "$pacote" == "fail2ban" ]]; then
+    if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" || "$pacote" == "fail2ban" || "$pacote" == "sysstat" ]]; then
+      if [[ "$pacote" == "sysstat" ]]; then
+        sed -i 's/ENABLED="false"/ENABLED="true"/' /etc/default/sysstat 2>/dev/null || true
+      fi
       systemctl enable --now "$pacote" > /dev/null 2>&1
     fi
   else
