@@ -196,6 +196,9 @@ apt-get install -y software-properties-common > /dev/null 2>&1 || true
 add-apt-repository -y universe > /dev/null 2>&1 || true
 apt-get update -y > /dev/null 2>&1
 
+# Detecta a plataforma de virtualização (KVM/Proxmox, VMware, WSL, Físico)
+VIRT_TYPE=$(systemd-detect-virt 2>/dev/null || echo "none")
+
 PACOTES=(curl qemu-guest-agent open-vm-tools ncdu btop locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw vim)
 PACOTES_INSTALADOS=()
 for pacote in "${PACOTES[@]}"; do
@@ -203,8 +206,20 @@ for pacote in "${PACOTES[@]}"; do
   if apt-get install -y "$pacote" > /dev/null 2>&1; then
     log_success "Pacote $pacote instalado com sucesso."
     PACOTES_INSTALADOS+=("$pacote")
-    if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" || "$pacote" == "fail2ban" ]]; then
-      systemctl enable --now "$pacote" > /dev/null 2>&1
+    if [[ "$pacote" == "qemu-guest-agent" ]]; then
+      if [[ "$VIRT_TYPE" =~ ^(kvm|qemu|bochs)$ ]]; then
+        systemctl enable --now qemu-guest-agent > /dev/null 2>&1
+      else
+        systemctl enable qemu-guest-agent > /dev/null 2>&1
+      fi
+    elif [[ "$pacote" == "open-vm-tools" ]]; then
+      if [[ "$VIRT_TYPE" == "vmware" ]]; then
+        systemctl enable --now open-vm-tools > /dev/null 2>&1
+      else
+        systemctl enable open-vm-tools > /dev/null 2>&1
+      fi
+    elif [[ "$pacote" == "fail2ban" ]]; then
+      systemctl enable --now fail2ban > /dev/null 2>&1
     fi
   else
     log_warning "Não foi possível instalar o pacote: $pacote (pode não estar disponível)."
