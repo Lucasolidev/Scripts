@@ -35,6 +35,12 @@ wsl --install -d Ubuntu-24.04
 wsl --install -d Debian
 ```
 
+### Criar uma SEGUNDA instância com outro nome (ex: Ubuntu-26-Dev)
+Nas versões recentes do WSL, você pode passar a flag `--name` diretamente no comando:
+```powershell
+wsl --install -d Ubuntu-26.04 --name Ubuntu-26-Dev
+```
+
 ### Atualizar o Kernel e o componente do WSL
 ```powershell
 wsl --update
@@ -155,6 +161,13 @@ wsl --import Ubuntu_Dev "D:\WSL\Ubuntu_Dev" "D:\Backups\Ubuntu_Backup.tar" --ver
 
 # Importar a partir de um disco .vhdx (usando a flag --vhd)
 wsl --import Ubuntu_Dev "D:\WSL\Ubuntu_Dev" "D:\Backups\Ubuntu_Backup.vhdx" --vhd
+```
+
+### Clonar ou Importar com outro nome usando seu backup
+Se quiser clonar ou importar com outro nome usando seu backup:
+```powershell
+mkdir "D:\Backups\Temp\Ubuntu26-Custom"
+wsl --import Ubuntu-26-Custom "D:\Backups\Temp\Ubuntu26-Custom" "D:\Backups\Ubuntu26.04_Backup.vhdx" --vhd
 ```
 
 ### Excluir / Desinstalar uma distribuição (⚠️ Ação Irreversível)

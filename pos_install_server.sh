@@ -1,15 +1,15 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.7
+# Version: 1.8
 # ------------------------------------------------
-VERSION="1.7"
+VERSION="1.8"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (exige Root/Sudo) e captura logs de auditoria em /root e na Home.
 # 2. Atualiza os espelhos do APT e aplica patches de segurança do sistema (opcional).
-# 3. Instala utilitários vitais (curl, vim, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades).
+# 3. Instala utilitários vitais (curl, vim, qemu-guest-agent, open-vm-tools, ncdu, btop, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades).
 # 4. Ajusta locales (en_US/pt_BR UTF-8), fuso horário (America/Sao_Paulo + NTP) e layout de teclado (ABNT2 + US-Intl).
 # 5. Aplica proteção de memória compartilhada em RAM (/dev/shm) montada com 'noexec,nosuid,nodev' no /etc/fstab contra botnets/webshells.
 # 6. Configura aliases de produtividade e segurança no Shell (ll='ls -alFh', rm, cp, mv, df, free, ports, myip, update, clean, reload).
@@ -196,7 +196,7 @@ apt-get install -y software-properties-common > /dev/null 2>&1 || true
 add-apt-repository -y universe > /dev/null 2>&1 || true
 apt-get update -y > /dev/null 2>&1
 
-PACOTES=(curl qemu-guest-agent open-vm-tools ncdu fastfetch locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw)
+PACOTES=(curl qemu-guest-agent open-vm-tools ncdu btop locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw vim)
 PACOTES_INSTALADOS=()
 for pacote in "${PACOTES[@]}"; do
   log_info "Instalando o pacote: $pacote..."
@@ -205,29 +205,6 @@ for pacote in "${PACOTES[@]}"; do
     PACOTES_INSTALADOS+=("$pacote")
     if [[ "$pacote" == "qemu-guest-agent" || "$pacote" == "open-vm-tools" || "$pacote" == "fail2ban" ]]; then
       systemctl enable --now "$pacote" > /dev/null 2>&1
-    fi
-  elif [[ "$pacote" == "fastfetch" ]]; then
-    log_info "Fastfetch não encontrado nos repositórios padrão. Tentando via PPA/GitHub..."
-    apt-get install -y software-properties-common > /dev/null 2>&1
-    add-apt-repository -y ppa:zhangsongcui3371/fastfetch > /dev/null 2>&1
-    apt-get update -y > /dev/null 2>&1
-    if apt-get install -y fastfetch > /dev/null 2>&1; then
-      log_success "Pacote fastfetch instalado via PPA com sucesso."
-      PACOTES_INSTALADOS+=("fastfetch")
-    else
-      FASTFETCH_DEB_URL=$(curl -s https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | grep -o 'https://[^"]*linux-amd64.deb' | head -n1)
-      if [ -n "$FASTFETCH_DEB_URL" ] && curl -sL "$FASTFETCH_DEB_URL" -o /tmp/fastfetch.deb; then
-        dpkg -i /tmp/fastfetch.deb > /dev/null 2>&1 || apt-get install -f -y > /dev/null 2>&1
-        rm -f /tmp/fastfetch.deb
-        if command -v fastfetch >/dev/null 2>&1; then
-          log_success "Pacote fastfetch instalado via .deb do GitHub com sucesso."
-          PACOTES_INSTALADOS+=("fastfetch")
-        else
-          log_warning "Não foi possível instalar o pacote: fastfetch."
-        fi
-      else
-        log_warning "Não foi possível instalar o pacote: fastfetch."
-      fi
     fi
   else
     log_warning "Não foi possível instalar o pacote: $pacote (pode não estar disponível)."
@@ -660,7 +637,7 @@ LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU SERVER FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Servidor:${NC}    ${FG_GREEN}Operacional e Endurecido${NC}"
-echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, fastfetch, locales, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades, ufw, vim}${NC}"
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-curl, qemu-guest-agent, open-vm-tools, ncdu, btop, locales, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades, ufw, vim}${NC}"
 echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}en_US.UTF-8 (Padrão Inglês) / pt_BR.UTF-8${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}ABNT2 (br)${NC}"
