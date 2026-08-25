@@ -506,9 +506,13 @@ Guia passo a passo para inicializar, particionar, formatar e configurar montagem
 # Lista discos, partições, sistemas de arquivo e pontos de montagem
 lsblk -f
 
-# Exibe detalhes de tamanho e modelos dos blocos
+# Exibe árvore básica com tamanho e tipo
 lsblk
+
+# Exibe relatório completo customizado com colunas essenciais para diagnóstico
+lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINTS,UUID,LABEL,MODEL
 ```
+> 💡 *Dica sobre a flag `-o` (`--output`): Ela permite escolher exatamente as colunas que você quer ver. Se usada sem argumentos ela dará erro. Para listar todas as colunas disponíveis execute `lsblk --help`.*
 
 ---
 
