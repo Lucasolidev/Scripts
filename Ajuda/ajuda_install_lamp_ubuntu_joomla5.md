@@ -15,8 +15,8 @@ Guia operacional rápido, referência técnica e *cheat sheet* para o ambiente d
 
 | Caminho / Arquivo | Descrição |
 | :--- | :--- |
-| `/root/install_lamp_ubuntu_joomla5_*.log` | Log timestamped com a saída completa da instalação do ambiente Joomla 5. |
-| `/root/install_lamp_ubuntu_joomla5_latest.log` | Atalho fixo apontando para o último log gerado. |
+| `/root/relatorio_install_lamp_ubuntu_joomla5_*.log` | Log timestamped com a saída completa da instalação do ambiente Joomla 5. |
+| `/root/relatorio_install_lamp_ubuntu_joomla5_latest.log` | Atalho fixo apontando para o último log gerado. |
 | `/etc/apache2/sites-available/<dominio>.conf` | VirtualHost otimizado para o Joomla 5 (SEF URLs, bloqueio de arquivos sensíveis e headers de segurança). |
 | `/etc/apache2/conf-available/joomla-php-fpm.conf` | Ponte FastCGI com `SetHandler` apontando para o socket do PHP-FPM ativo. |
 | `/etc/mysql/mariadb.conf.d/99-joomla5-utf8mb4.cnf` | Tuning do MariaDB (UTF8MB4, `innodb_buffer_pool_size = 256M`, `max_allowed_packet = 64M`). |

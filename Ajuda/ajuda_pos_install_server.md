@@ -14,8 +14,8 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 
 | Caminho / Arquivo | Descrição |
 | :--- | :--- |
-| `/root/pos_install_server_*.log` | Log completo e detalhado com timestamp da execução do script pós-instalação. |
-| `/root/pos_install_server_latest.log` | Atalho fixo apontando para o último log gerado de pós-instalação. |
+| `/root/relatorio_pos_install_server_*.log` | Log completo e detalhado com timestamp da execução do script pós-instalação. |
+| `/root/relatorio_pos_install_server_latest.log` | Atalho fixo apontando para o último log gerado de pós-instalação. |
 | `/etc/profile.d/motd_banner.sh` | Script do banner dinâmico de boas-vindas exibido após o login via SSH ou console. |
 | `/etc/fail2ban/jail.local` | Configuração local da jaula de proteção contra força bruta no SSH. |
 | `/etc/default/ufw` | Configurações do firewall UFW (incluindo suporte a IPv6 ativo `IPV6=yes`). |

@@ -117,15 +117,17 @@
 >    - **Regra Arquitetural Obrigatória:** Quando houver diferenças de repositórios, versões de pacotes ou comportamentos entre versões de SO (ex: Ubuntu 22.04 / 24.04 LTS vs Ubuntu 26.04 Dev), **SEPARE RIGOROSAMENTE** os blocos de código em condicionais explícitas baseadas em `lsb_release -rs` ou `/etc/os-release`.
 >    - **Proteção do Ambiente Estável de Produção:** Mudanças ou adaptações para versões em desenvolvimento (ex: Ubuntu 26.04) **JAMAIS** devem alterar, sobrescrever ou arriscar o fluxo de versões LTS estáveis de produção (ex: Ubuntu 22.04 / 24.04). Mantenha fluxos de código isolados e dedicados por ramo de distribuição.
 > 
-> 11. **Registro e Salvamento de Logs (Etapa Final Obrigatória)**:
+> 11. **Registro e Salvamento de Logs Padronizados (`relatorio_*`) (Etapa Final Obrigatória)**:
+>    - **Regra Arquitetural de Nomenclatura:** Todos os logs gerados pelos scripts devem obrigatoriamente iniciar com o prefixo **`relatorio_`** e utilizar a formatação de data/hora no padrão brasileiro **`DDMMYYYY_HHMM`** (ex: `relatorio_install_lamp_ubuntu_joomla5_25082026_2015.log`). Isso facilita a busca e auto-complete no terminal (`ls /root/relatorio_*`).
 >    - No início da execução (logo após validação de privilégios), inicialize a captura do console e arquivo temporário:
 >      ```bash
->      LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
->      LOG_FILENAME="nome_do_script_${LOG_TIMESTAMP}.log"
+>      LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
+>      LOG_FILENAME="relatorio_nome_do_script_${LOG_TIMESTAMP}.log"
+>      LOG_LATEST="relatorio_nome_do_script_latest.log"
 >      LOG_TMP="/tmp/${LOG_FILENAME}"
 >      exec > >(tee -a "$LOG_TMP") 2>&1
 >      ```
->    - Na **última etapa numerada do script**, salve automaticamente cópias timestamped e um atalho `<nome_do_script>_latest.log` no diretório `/root` e na Home do usuário real que executou o comando via `sudo`:
+>    - Na **última etapa numerada do script**, salve automaticamente cópias com timestamp e o atalho padronizado `relatorio_<nome_do_script>_latest.log` no diretório `/root` e na Home do usuário real que executou o comando via `sudo`:
 >      ```bash
 >      # ==============================================================================
 >      # [NÚMERO_ETAPA]. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
@@ -134,17 +136,17 @@
 >
 >      # Salva cópias no diretório /root
 >      cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
->      cp "$LOG_TMP" "/root/nome_do_script_latest.log" 2>/dev/null || true
+>      cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
 >      log_success "Log salvo em: /root/${LOG_FILENAME}"
->      log_success "Atalho do último log: /root/nome_do_script_latest.log"
+>      log_success "Atalho do último log: /root/${LOG_LATEST}"
 >
 >      # Se executado via sudo, salva também na pasta home do usuário real
 >      if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
 >        REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
 >        if [ -d "$REAL_USER_HOME" ]; then
 >          cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
->          cp "$LOG_TMP" "${REAL_USER_HOME}/nome_do_script_latest.log" 2>/dev/null || true
->          chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/nome_do_script_latest.log" 2>/dev/null || true
+>          cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
+>          chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
 >          log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
 >        fi
 >      fi

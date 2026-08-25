@@ -136,8 +136,9 @@ echo -e "${FG_CYAN}${BOLD}======================================================
 # ==============================================================================
 # BLOCO DE INTERATIVIDADE E COLETAS DE PARÂMETROS
 # ==============================================================================
-LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
-LOG_FILENAME="pos_install_server_${LOG_TIMESTAMP}.log"
+LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
+LOG_FILENAME="relatorio_pos_install_server_${LOG_TIMESTAMP}.log"
+LOG_LATEST="relatorio_pos_install_server_latest.log"
 LOG_TMP="/tmp/${LOG_FILENAME}"
 
 # Redireciona a saída do script para o terminal e grava no log simultaneamente
@@ -723,17 +724,17 @@ print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 
 # Salva cópias no diretório /root
 cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
-cp "$LOG_TMP" "/root/pos_install_server_latest.log" 2>/dev/null || true
+cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
 log_success "Log salvo em: /root/${LOG_FILENAME}"
-log_success "Atalho do último log: /root/pos_install_server_latest.log"
+log_success "Atalho do último log: /root/${LOG_LATEST}"
 
 # Se executado via sudo, salva também na pasta home do usuário real
 if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
   REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
   if [ -d "$REAL_USER_HOME" ]; then
     cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
-    cp "$LOG_TMP" "${REAL_USER_HOME}/pos_install_server_latest.log" 2>/dev/null || true
-    chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/pos_install_server_latest.log" 2>/dev/null || true
+    cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
+    chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
     log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
   fi
 fi

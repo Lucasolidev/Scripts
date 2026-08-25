@@ -106,8 +106,9 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
-LOG_FILENAME="install_lamp_ubuntu_${LOG_TIMESTAMP}.log"
+LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
+LOG_FILENAME="relatorio_install_lamp_ubuntu_${LOG_TIMESTAMP}.log"
+LOG_LATEST="relatorio_install_lamp_ubuntu_latest.log"
 LOG_TMP="/tmp/${LOG_FILENAME}"
 exec > >(tee -a "$LOG_TMP") 2>&1
 
@@ -555,17 +556,17 @@ print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 
 # Salva cópias no diretório /root
 cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
-cp "$LOG_TMP" "/root/install_lamp_ubuntu_latest.log" 2>/dev/null || true
+cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
 log_success "Log salvo em: /root/${LOG_FILENAME}"
-log_success "Atalho do último log: /root/install_lamp_ubuntu_latest.log"
+log_success "Atalho do último log: /root/${LOG_LATEST}"
 
 # Se executado via sudo, salva também na pasta home do usuário real
 if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
     REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
     if [ -d "$REAL_USER_HOME" ]; then
         cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
-        cp "$LOG_TMP" "${REAL_USER_HOME}/install_lamp_ubuntu_latest.log" 2>/dev/null || true
-        chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/install_lamp_ubuntu_latest.log" 2>/dev/null || true
+        cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
+        chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
         log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
     fi
 fi

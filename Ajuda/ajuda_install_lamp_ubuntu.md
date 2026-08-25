@@ -14,8 +14,8 @@ Guia operacional rápido, referência de configurações e *cheat sheet* para a 
 
 | Caminho / Arquivo | Descrição |
 | :--- | :--- |
-| `/root/install_lamp_ubuntu_*.log` | Log timestamped com a saída completa da instalação da pilha LAMP. |
-| `/root/install_lamp_ubuntu_latest.log` | Atalho para o último log gerado da instalação LAMP. |
+| `/root/relatorio_install_lamp_ubuntu_*.log` | Log timestamped com a saída completa da instalação da pilha LAMP. |
+| `/root/relatorio_install_lamp_ubuntu_latest.log` | Atalho para o último log gerado da instalação LAMP. |
 | `/etc/apache2/apache2.conf` | Arquivo mestre de configuração global do Apache 2.4. |
 | `/etc/apache2/conf-available/security.conf` | Diretivas de segurança global (`ServerTokens Prod`, `ServerSignature Off`, `TraceEnable Off`). |
 | `/etc/apache2/conf-available/lamp-php-fpm.conf` | Ponte FastCGI universal com `SetHandler` apontando para o socket do PHP-FPM. |

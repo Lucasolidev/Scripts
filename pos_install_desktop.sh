@@ -94,8 +94,9 @@ echo -e "\n${FG_CYAN}${BOLD}====================================================
 echo -e "${FG_CYAN}${BOLD}           PÓS-INSTALAÇÃO DO UBUNTU DESKTOP                     ${NC}"
 echo -e "${FG_CYAN}${BOLD}================================================================${NC}"
 
-LOG_TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
-LOG_FILENAME="pos_install_desktop_${LOG_TIMESTAMP}.log"
+LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
+LOG_FILENAME="relatorio_pos_install_desktop_${LOG_TIMESTAMP}.log"
+LOG_LATEST="relatorio_pos_install_desktop_latest.log"
 LOG_TMP="/tmp/${LOG_FILENAME}"
 
 # Redireciona a saída do script para o terminal e grava no log simultaneamente
@@ -485,12 +486,13 @@ print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 
 # Salva cópias no diretório /root
 sudo cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
-sudo cp "$LOG_TMP" "/root/pos_install_desktop_latest.log" 2>/dev/null || true
+sudo cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
 log_success "Log salvo em: /root/${LOG_FILENAME}"
+log_success "Atalho do último log: /root/${LOG_LATEST}"
 
 # Salva também na pasta HOME do usuário
 cp "$LOG_TMP" "$HOME/${LOG_FILENAME}" 2>/dev/null || true
-cp "$LOG_TMP" "$HOME/pos_install_desktop_latest.log" 2>/dev/null || true
+cp "$LOG_TMP" "$HOME/${LOG_LATEST}" 2>/dev/null || true
 log_success "Log salvo na sua Home ($HOME): $HOME/${LOG_FILENAME}"
 
 rm -f "$LOG_TMP" 2>/dev/null || true

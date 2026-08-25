@@ -14,8 +14,8 @@ Guia operacional rápido, referência de configurações e *cheat sheet* para a 
 
 | Caminho / Arquivo | Descrição |
 | :--- | :--- |
-| `/root/install_lemp_ubuntu_*.log` | Log timestamped com a saída completa da instalação da pilha LEMP. |
-| `/root/install_lemp_ubuntu_latest.log` | Atalho para o último log gerado da instalação LEMP. |
+| `/root/relatorio_install_lemp_ubuntu_*.log` | Log timestamped com a saída completa da instalação da pilha LEMP. |
+| `/root/relatorio_install_lemp_ubuntu_latest.log` | Atalho para o último log gerado da instalação LEMP. |
 | `/etc/nginx/nginx.conf` | Arquivo principal de configuração global do Nginx. |
 | `/etc/nginx/conf.d/tuning.conf` | Ajustes de alta performance (`worker_rlimit_nofile 65535`) e ocultação de versão (`server_tokens off`). |
 | `/etc/nginx/conf.d/websocket.conf` | Mapeamento dinâmico para suporte a WebSockets sem interrupção de Keep-Alive HTTP. |
