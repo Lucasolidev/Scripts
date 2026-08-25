@@ -28,6 +28,9 @@ Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e ut
 * 🗂️ **[Guia de Ajuda LDAP / OpenLDAP](Ajuda/ajuda_ldap.md)** — Estrutura DIT, consultas com `ldapsearch`, inclusões com `ldapadd`, alterações com `ldapmodify`, `ldappasswd` e arquivos LDIF.
 * 🚀 **[Guia de Ajuda Nginx + PHP-FPM](Ajuda/ajuda_nginx.md)** — Estrutura de diretórios, blocos `server`, Reverse Proxy, PHP-FPM, timeouts e solução de erros (413, 502, 504).
 * 🌐 **[Guia de Ajuda Apache2](Ajuda/ajuda_apache2.md)** — Estrutura de diretórios, `a2enmod`, `a2ensite`, suporte a `.htaccess`, POSIX ACLs, VirtualHosts e diagnóstico.
+* 🏮 **[Guia de Ajuda Pilha LAMP](Ajuda/ajuda_install_lamp_ubuntu.md)** — Manual de operação do servidor LAMP (Apache 2.4, MariaDB 11.4 LTS, PHP-FPM, POSIX ACLs e diagnóstico).
+* ⚡ **[Guia de Ajuda Pilha LEMP](Ajuda/ajuda_install_lemp_ubuntu.md)** — Manual de operação do servidor LEMP (Nginx, MariaDB, PHP-FPM, WebSockets e headers de segurança).
+* 🇯 **[Guia de Ajuda Joomla 5 LAMP](Ajuda/ajuda_install_lamp_ubuntu_joomla5.md)** — Manual completo do ambiente Joomla 5 (Apache HTTP/2, FastCGI, OPcache/APCu/Redis, Cron CLI e POSIX ACLs).
 * 🖥️ **[Guia de Ajuda Tmux](Ajuda/ajuda_tmux.md)** — Gerenciamento de sessões, navegação de abas, divisão de painéis e rolagem de histórico no terminal.
 * 💻 **[Guia de Ajuda WSL 2](Ajuda/ajuda_wsl.md)** — Instalação, gerenciamento de distros, backups (`.tar`), limites do `.wslconfig` e integração Windows/Linux.
 * 🪟 **[Guia de Ajuda Windows](Ajuda/ajuda_windows.md)** — Comandos essenciais de PowerShell, CMD, redes e administração de sistemas Windows.
