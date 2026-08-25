@@ -497,6 +497,102 @@ sudo ufw allow 22/tcp comment 'Acesso SSH principal'
 sudo ufw status verbose
 ```
 
+## 💽 Inicialização, Particionamento e Montagem de Novo Disco (EXT4 / FSTAB)
+
+Guia passo a passo para inicializar, particionar, formatar e configurar montagem automática persistente de um novo disco rígido / SSD adicionado ao servidor (ex: `/dev/sdb` montado em `/arquivos`):
+
+### 1. Identificar o novo disco e status atual
+```bash
+# Lista discos, partições, sistemas de arquivo e pontos de montagem
+lsblk -f
+
+# Exibe detalhes de tamanho e modelos dos blocos
+lsblk
+```
+
+---
+
+### 2. Criar a Tabela de Partição (GPT) e Partição Primária (`parted`)
+A tabela de partição **GPT** suporta discos superiores a 2TB e maior resiliência de dados:
+```bash
+# Cria tabela GPT e cria a partição 1 ocupando 100% do disco
+sudo parted /dev/sdb --script mklabel gpt mkpart primary ext4 0% 100%
+
+# Atualiza a tabela de partições no Kernel imediatamente
+sudo partprobe /dev/sdb
+```
+
+---
+
+### 3. Formatar a Nova Partição em EXT4 (`mkfs.ext4`)
+```bash
+# Formata a partição /dev/sdb1 com o sistema de arquivos ext4
+sudo mkfs.ext4 -F /dev/sdb1
+```
+> 💡 *Dica de Otimização: Em discos muito grandes dedicados a arquivos (ex: > 500GB), você pode usar `mkfs.ext4 -m 1 /dev/sdb1` para reduzir o espaço reservado para o root de 5% padrão para apenas 1%, liberando dezenas de gigabytes.*
+
+---
+
+### 4. Obter o UUID Único da Nova Partição (`blkid`)
+Sempre monte discos no Linux usando o **UUID** (identificador único universal) em vez de `/dev/sdb1`, pois os nomes de dispositivos (`sdb`, `sdc`) podem mudar de ordem após uma reinicialização física ou troca de portas SAS/SATA:
+```bash
+# Exibe o UUID gerado para a partição
+sudo blkid /dev/sdb1
+# Exemplo de saída: /dev/sdb1: UUID="7a538120-d763-4af0-8b9b-a353b0fa9efc" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="primary"
+```
+
+---
+
+### 5. Criar o Diretório Ponto de Montagem
+```bash
+# Cria o diretório onde o disco será acessado (ex: /arquivos)
+sudo mkdir -p /arquivos
+```
+
+---
+
+### 6. Configurar Montagem Persistente no `/etc/fstab` (com proteção contra travamento no boot)
+Adicione a linha no `/etc/fstab` com a flag de segurança **`nofail`** (evita que o servidor trave em modo de recuperação se o disco secundário falhar ou for removido):
+
+```bash
+# Opção A: Inserir automaticamente via comando no terminal (Substitua o UUID):
+UUID_VALOR=$(sudo blkid -s UUID -o value /dev/sdb1)
+echo "UUID=${UUID_VALOR}  /arquivos  ext4  defaults,nofail  0  2" | sudo tee -a /etc/fstab
+
+# Opção B: Editar manualmente via nano:
+# sudo nano /etc/fstab
+# Adicione ao final:
+# UUID=7a538120-d763-4af0-8b9b-a353b0fa9efc  /arquivos  ext4  defaults,nofail  0  2
+```
+
+---
+
+### 7. Testar a Montagem sem Reiniciar e Validar
+```bash
+# Monta todas as entradas configuradas no fstab
+sudo mount -a
+
+# Valida se a montagem foi realizada com sucesso e confira o espaço
+df -h /arquivos
+lsblk -f
+```
+
+---
+
+### 8. Aplicar Permissões Iniciais no Novo Disco
+Por padrão, um disco recém-formatado pertence ao usuário `root:root` com permissão restrita. Ajuste conforme a finalidade:
+```bash
+# Para permitir que o servidor Web e usuários gravem (usando ACLs):
+sudo chown -R www-data:www-data /arquivos
+sudo chmod -R 775 /arquivos
+
+# Conceder acesso a um desenvolvedor específico (ex: zelio_dev) com POSIX ACLs:
+sudo setfacl -R -m u:www-data:rwx,g:www-data:rwx,u:zelio_dev:rwx,g:zelio_dev:rwx /arquivos
+sudo setfacl -R -d -m u:www-data:rwx,g:www-data:rwx,u:zelio_dev:rwx,g:zelio_dev:rwx /arquivos
+```
+
+---
+
 ## 💾 Aumento de Armazenamento - Partição Simples (EXT4)
 
 ### 1. Verificar montagens atuais
