@@ -144,6 +144,18 @@ if [ -z "$DB_ROOT_PASS" ]; then
     DB_ROOT_PASS=$(openssl rand -base64 12 2>/dev/null || date +%s | sha256sum | base64 | head -c 16)
 fi
 
+echo -e "\n  ${FG_CYAN}[i]${NC} Usuário do sistema/desenvolvedor para permissões de escrita SFTP/SSH (opcional)."
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuário desenvolvedor adicional [Deixe vazio se não houver]: ${NC}")" DEV_USER
+if [ -n "$DEV_USER" ]; then
+    if id "$DEV_USER" >/dev/null 2>&1; then
+        log_info "Usuário desenvolvedor configurado com acesso total ao diretório web: ${FG_GREEN}${DEV_USER}${NC}"
+    else
+        log_warning "Usuário '${DEV_USER}' não encontrado no sistema. ACLs serão preparadas para quando ele for criado."
+    fi
+else
+    log_info "Nenhum usuário adicional informado (apenas www-data)."
+fi
+
 log_info "Domínio configurado: ${BOLD}${DOMAIN_NAME}${NC}"
 log_info "Diretório Web Raiz: ${BOLD}${WEB_ROOT}${NC}"
 log_info "Versão do PHP solicitada: ${BOLD}${LOG_PHP_MSG}${NC}"
@@ -396,10 +408,25 @@ fi
 # 7. CONFIGURAÇÃO DE PERMISSÕES E POSIX ACLs
 # ==============================================================================
 print_header "CONFIGURAÇÃO DE PERMISSÕES (POSIX ACLs)"
+
+log_info "Garantindo permissões de travessia (execução) nos diretórios pai de ${WEB_ROOT}..."
+PARENT_DIR="$(dirname "$WEB_ROOT")"
+while [ "$PARENT_DIR" != "/" ] && [ "$PARENT_DIR" != "." ]; do
+    chmod o+x "$PARENT_DIR" > /dev/null 2>&1 || true
+    PARENT_DIR="$(dirname "$PARENT_DIR")"
+done
+
 log_info "Aplicando herança de permissões automática com POSIX ACLs (setfacl) em ${WEB_ROOT}..."
 setfacl -R -m u:www-data:rwx,g:www-data:rwx "$WEB_ROOT" > /dev/null 2>&1 || true
 setfacl -R -d -m u:www-data:rwx,g:www-data:rwx "$WEB_ROOT" > /dev/null 2>&1 || true
-log_success "Diretório preparado e ACLs ativas: Novos arquivos em ${WEB_ROOT} herdarão acesso total para www-data."
+
+if [ -n "$DEV_USER" ] && id "$DEV_USER" >/dev/null 2>&1; then
+    setfacl -R -m u:"${DEV_USER}":rwx,g:"${DEV_USER}":rwx "$WEB_ROOT" > /dev/null 2>&1 || true
+    setfacl -R -d -m u:"${DEV_USER}":rwx,g:"${DEV_USER}":rwx "$WEB_ROOT" > /dev/null 2>&1 || true
+    log_success "POSIX ACLs ativadas: Permissões de escrita e leitura compartilhadas entre 'www-data' e '${DEV_USER}'."
+else
+    log_success "Diretório preparado e ACLs ativas: Novos arquivos em ${WEB_ROOT} herdarão acesso total para www-data."
+fi
 
 # ==============================================================================
 # 8. DIAGNÓSTICO DO PHP (info.php)

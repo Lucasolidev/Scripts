@@ -151,6 +151,18 @@ else
     log_info "Senha definida para o Usuário Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
 fi
 
+echo -e "\n  ${FG_CYAN}[i]${NC} Usuário do sistema/desenvolvedor para permissões de escrita SFTP/SSH (opcional)."
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuário desenvolvedor adicional [Deixe vazio se não houver]: ${NC}")" DEV_USER
+if [ -n "$DEV_USER" ]; then
+    if id "$DEV_USER" >/dev/null 2>&1; then
+        log_info "Usuário desenvolvedor configurado com acesso total ao diretório web: ${FG_GREEN}${DEV_USER}${NC}"
+    else
+        log_warning "Usuário '${DEV_USER}' não encontrado no sistema. ACLs serão preparadas para quando ele for criado."
+    fi
+else
+    log_info "Nenhum usuário adicional informado (apenas www-data)."
+fi
+
 # Detecta a versão do Ubuntu para definir a versão ideal do PHP automaticamente
 UBUNTU_VER=$(lsb_release -rs 2>/dev/null || echo "24.04")
 if [[ "$UBUNTU_VER" == "26.04" ]]; then
@@ -585,13 +597,30 @@ fi
 # ==============================================================================
 print_header "PERMISSÕES E SEGURANÇA NO DIRETÓRIO WEB"
 
-log_info "Aplicando permissões granulares (diretórios 755 / arquivos 644) e herança POSIX ACLs..."
+log_info "Garantindo permissões de travessia (execução) nos diretórios pai de ${JOOMLA_ROOT}..."
+PARENT_DIR="$(dirname "$JOOMLA_ROOT")"
+while [ "$PARENT_DIR" != "/" ] && [ "$PARENT_DIR" != "." ]; do
+    chmod o+x "$PARENT_DIR" > /dev/null 2>&1 || true
+    PARENT_DIR="$(dirname "$PARENT_DIR")"
+done
+
+log_info "Aplicando permissões granulares (diretórios 775 / arquivos 664) e herança POSIX ACLs..."
 chown -R www-data:www-data "$JOOMLA_ROOT"
 find "$JOOMLA_ROOT" -type d -exec chmod 775 {} + > /dev/null 2>&1 || true
 find "$JOOMLA_ROOT" -type f -exec chmod 664 {} + > /dev/null 2>&1 || true
+
+# ACL básica para o servidor web
 setfacl -R -m u:www-data:rwx,g:www-data:rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
 setfacl -R -d -m u:www-data:rwx,g:www-data:rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
-log_success "POSIX ACLs ativadas: Permissões de escrita e leitura garantidas para o Apache/Joomla."
+
+# Se houver usuário desenvolvedor configurado, adiciona permissão total e herança contínua
+if [ -n "$DEV_USER" ] && id "$DEV_USER" >/dev/null 2>&1; then
+    setfacl -R -m u:"${DEV_USER}":rwx,g:"${DEV_USER}":rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
+    setfacl -R -d -m u:"${DEV_USER}":rwx,g:"${DEV_USER}":rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
+    log_success "POSIX ACLs ativadas: Permissões de escrita e leitura compartilhadas entre 'www-data' e '${DEV_USER}'."
+else
+    log_success "POSIX ACLs ativadas: Permissões de escrita e leitura garantidas para o Apache/Joomla (www-data)."
+fi
 
 # Reinicia o Apache e PHP-FPM para aplicar todas as configurações
 systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
