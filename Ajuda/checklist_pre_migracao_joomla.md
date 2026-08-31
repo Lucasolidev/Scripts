@@ -28,26 +28,26 @@ Localizado na raiz da aplicação web atual (ex: `/var/www/html/configuration.ph
 ### 🔍 Parâmetros a extrair do arquivo:
 ```php
 // Conexão com o Banco de Dados (Use os mesmos valores no script para facilitar)
-public $dbtype = 'mysqli';           // Tipo de driver
-public $host = 'localhost';          // Host do banco
-public $user = 'joomla_user';        // Usuário do banco
-public $password = 'SUA_SENHA_AQUI'; // Senha do usuário em texto plano
-public $db = 'joomla_db';            // Nome da base de dados
-public $dbprefix = 'jos_';           // Prefixo das tabelas (MANDATÓRIO)
+public $dbtype = '<driver_mysqli>';          // Tipo de driver
+public $host = '<host_do_banco>';            // Host do banco
+public $user = '<usuario_do_banco>';         // Usuário do banco
+public $password = '<senha_do_usuario>';     // Senha do usuário em texto plano
+public $db = '<nome_da_base_de_dados>';      // Nome da base de dados
+public $dbprefix = '<prefixo_tabelas_jos_>'; // Prefixo das tabelas (MANDATÓRIO)
 
 // Segurança e Chave Criptográfica
-public $secret = 'ChAvE_sEcReTa_123';// Mantém hashes e sessões válidas
+public $secret = '<chave_secreta_unica>';    // Mantém hashes e sessões válidas
 
 // Configuração de Envio de E-mails
-public $mailer = 'smtp';             // mail ou smtp
-public $mailfrom = 'contato@dominio.com.br';
-public $fromname = 'Nome do Site';
-public $smtphost = 'smtp.exemplo.com.br';
-public $smtpport = '587';            // 465 (SSL) ou 587 (TLS)
-public $smtpauth = true;
-public $smtpuser = 'smtp@dominio.com.br';
-public $smtppass = 'SENHA_DO_EMAIL_AQUI';
-public $smtpsecure = 'tls';
+public $mailer = '<metodo_smtp_ou_mail>';    // mail ou smtp
+public $mailfrom = '<email_remetente>';
+public $fromname = '<nome_do_site>';
+public $smtphost = '<host_servidor_smtp>';
+public $smtpport = '<porta_smtp_587_465>';   // 465 (SSL) ou 587 (TLS)
+public $smtpauth = true;                     // true ou false
+public $smtpuser = '<usuario_smtp>';
+public $smtppass = '<senha_smtp>';
+public $smtpsecure = '<tls_ou_ssl>';
 
 // Caminhos Locais Antigos (Deverão ser adaptados no novo servidor)
 public $log_path = '/var/www/.../administrator/logs';
