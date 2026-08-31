@@ -117,9 +117,10 @@ Use emojis padronizados para manter a consistência visual nos títulos H2 e des
 
 1. **Sintaxe Explicita em Blocos de Código**:
    * Sempre especificar a linguagem do bloco (ex: ```bash, ```powershell, ```cmd, ```apache, ```nginx, ```yaml, ```sql).
-2. **Placeholders Padronizados**:
-   * Nunca usar valores genéricos/reais de produção.
-   * Usar placeholders claros: `meu_site.conf`, `meu_dominio.com.br`, `meu_app`, `192.168.1.50`, `usuario_exemplo`.
+2. **Placeholders Padronizados e Prevenção contra Falsos Positivos de Segurança (GitGuardian / Secret Scanners)**:
+   * **PROIBIÇÃO DE CREDENCIAIS REAIS OU SIMULADAS**: Nunca incluir senhas reais, tokens de API, chaves privadas ou credenciais de produção.
+   * **EVITAR LITERAIS QUE ACIONEM SCANNERS**: Jamais utilize valores literais em atribuições de variáveis sensíveis em exemplos de código (ex: `password = 'senha123'`, `smtppass = 'SENHA_AQUI'`, `secret = 'abc123xyz'`), pois ativam os detectores de segredos do GitGuardian e GitHub Secret Scanning.
+   * **OBRIGATÓRIO USAR PLACEHOLDERS EM COLCHETES ANGULARES**: Todo exemplo de configuração, documentação ou script deve conter apenas tags genéricas: `<senha_do_usuario>`, `<chave_secreta_unica>`, `<usuario_smtp>`, `<senha_smtp>`, `<host_servidor_smtp>`, `<seu_dominio.com.br>`, `<192.168.1.X>`.
 3. **Boas Práticas de SysAdmin / DevOps**:
    * **Validação Prévia**: Sempre incluir comando de teste de sintaxe antes de reiniciar serviços (ex: `apache2ctl -t`, `nginx -t`, `testparm -s`).
    * **Graceful Reload**: Dar preferência a `reload` em vez de `restart` quando aplicável para evitar queda de conexões.
@@ -148,12 +149,12 @@ O arquivo deve ser salvo como `Scripts/ajuda_[TECNOLOGIA_LOWERCASE].md` e seguir
    - Seção 1 (H2 com emoji 📁): Tabela markdown com principais caminhos de arquivo, configurações e logs.
    - Seções 2 em diante (H2 numerados e com emojis temáticos): Agrupamento lógico dos comandos mais usados em produção.
 
-3. REGRAS DE CÓDIGO E CONTEÚDO:
+3. REGRAS DE CÓDIGO, SEGURANÇA E CONTEÚDO:
    - Todos os blocos de código devem ter linguagem definida (ex: bash, yaml, sql).
    - Inclua comentários inline `#` para comandos alternativos ou explicações de flags.
    - Destaque comandos críticos ou de teste de sintaxe com observações entre parênteses como (CRÍTICO) ou (MANDATÓRIO).
    - Adicione callouts `> 💡` com boas práticas de segurança, desempenho e manutenções.
-   - Utilize placeholders padronizados (`meu_app`, `meu_dominio.com.br`, `192.168.1.X`).
+   - SEGURANÇA E GITGUARDIAN: NUNCA use senhas/chaves literais em exemplos. Use obrigatoriamente placeholders em colchetes angulares como `<senha_usuario>`, `<chave_secreta>`, `<host_smtp>`, `<meu_dominio.com.br>`.
    - Mantenha o tom profissional, direto e em Português do Brasil (PT-BR).
 ```
 
@@ -169,4 +170,5 @@ Antes de finalizar qualquer novo arquivo `ajuda_*.md`, verifique:
 - [ ] A tabela de diretórios e arquivos vitais foi incluída?
 - [ ] Os blocos de código contêm especificação de linguagem (`bash`, `yaml`, `nginx`, etc.)?
 - [ ] Foram incluídos comandos de validação de sintaxe antes de comandos de reinício/reload?
+- [ ] Todos os exemplos de credenciais, senhas e chaves utilizam placeholders explícitos `<...>` para evitar falsos positivos do GitGuardian / Secret Scanners?
 - [ ] O texto está totalmente em Português do Brasil (PT-BR)?

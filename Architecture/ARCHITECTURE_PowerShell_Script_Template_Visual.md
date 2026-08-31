@@ -48,4 +48,8 @@
 >    Write-Host "  - Configuracao ABC:      Aplicada" -ForegroundColor White
 >    Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
 >    ```
+> 
+> 6. **Gestao Segura de Credenciais e Placeholders (Prevencao GitGuardian)**:
+>    - Nunca utilize credenciais fixas (hardcoded) no script. Solicite senhas interativamente via `Read-Host -AsSecureString` ou gere dinamicamente via gerador criptografico.
+>    - Em comentarios, metadados e documentacoes de ajuda, use sempre tags genericas entre colchetes angulares (ex: `<SuaSenha>`, `<UsuarioAdmin>`, `<ChaveAPI>`, `<ServidorSMTP>`) para nao ativar detectores de segredos do GitHub/GitGuardian.
 > "

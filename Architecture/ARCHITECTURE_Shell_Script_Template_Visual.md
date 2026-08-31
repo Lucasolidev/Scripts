@@ -205,5 +205,10 @@
 >    # ==============================================================================
 >    ```
 > 
+> 14. **Gestão Segura de Credenciais e Prevenção de Falsos Positivos (GitGuardian / Secret Scanners)**:
+>    - **Zero Hardcoded Secrets**: Nunca inclua senhas, tokens de API ou chaves em texto plano no código dos scripts.
+>    - **Geração e Coleta Segura**: Senhas devem ser geradas dinamicamente em tempo de execução via `openssl rand -base64 16` ou solicitadas interativamente com entrada oculta via `read -sp`.
+>    - **Placeholders Padronizados em Exemplos**: Em qualquer documentação, comentário ou mensagem do script, utilize obrigatoriamente tags genéricas entre colchetes angulares (`<senha_do_usuario>`, `<chave_secreta>`, `<host_smtp>`) para evitar o disparo acidental de ferramentas de auditoria e scanners de segredos.
+> 
 > Aqui está o script original que deve ser adaptado:
 > `[INSIRA O SCRIPT AQUI]`"
