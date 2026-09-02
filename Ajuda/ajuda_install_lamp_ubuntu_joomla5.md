@@ -6,7 +6,7 @@
 ![MariaDB](https://img.shields.io/badge/MariaDB_11.4_LTS-003545?style=flat&logo=mariadb&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP_8.3-777BB4?style=flat&logo=php&logoColor=white)
 ![Auditd](https://img.shields.io/badge/Auditd-Realtime_Monitor-0078D4?style=flat&logo=linux&logoColor=white)
-![Security](https://img.shields.io/badge/Security-Hardened_v2.0-28A745?style=flat&logo=dependabot&logoColor=white)
+![Security](https://img.shields.io/badge/Security-Hardened_v2.1-28A745?style=flat&logo=dependabot&logoColor=white)
 
 Guia operacional rápido, referência técnica e *cheat sheet* para o ambiente de produção **Joomla 5** configurado através do script [`install_lamp_ubuntu_joomla5.sh`](../install_lamp_ubuntu_joomla5.sh). Abrange a operação do **Apache 2.4 com FastCGI/HTTP2**, **MariaDB 11.4 LTS (UTF8MB4)**, **PHP 8.3/8.5 (OPcache, APCu e Redis)**, **Blindagem Anti-Webshells**, **Auditoria em Tempo Real (Auditd)**, rotinas CLI do **Cron**, segurança com **Fail2Ban/UFW** e permissões **POSIX ACLs**.
 
@@ -36,13 +36,13 @@ Guia operacional rápido, referência técnica e *cheat sheet* para o ambiente d
 wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu_joomla5.sh -O install_lamp_ubuntu_joomla5.sh && chmod +x install_lamp_ubuntu_joomla5.sh && sudo ./install_lamp_ubuntu_joomla5.sh
 ```
 
-### O que o instalador aplica automaticamente (v2.0):
+### O que o instalador aplica automaticamente (v2.1):
 * **Download Oficial do Joomla 5.x**: Baixa e descompacta automaticamente a última versão estável oficial do Joomla 5 no DocumentRoot.
 * **Blindagem Anti-Webshell no Apache**: Bloqueio de execução de scripts PHP (`.php`, `.phtml`, `.php5`, `.inc`) dentro das pastas `assets`, `images`, `cache`, `tmp`, `media` e `phocadownloadpap`.
 * **Bloqueio de Extensões Sensíveis**: Nega acesso direto via web para extensões de backup e scripts (`.log`, `.sql`, `.bak`, `.old`, `.orig`, `.ini`, `.sh`, `.tar`, `.gz`, `.zip`).
 * **Proteção de Arquivos Ocultos**: Bloqueia acesso a `.git`, `.env`, `.user.ini`, preservando o funcionamento pleno do `.htaccess`.
 * **Suíte PHP Completa e Hardening**: Instala PHP 8.3/8.5 com `disable_functions` rigoroso (`exec`, `shell_exec`, `system`, `passthru`, `proc_open`, `popen`, `show_source`, `pcntl_exec`), `session.cookie_httponly = 1`, `session.cookie_samesite = 'Lax'`.
-* **Auditoria em Tempo Real (Auditd)**: Monitora em nc�vel de kernel qualquer alteração, criação ou deleção de arquivos no diretório web (`-k web_modificacoes`).
+* **Auditoria em Tempo Real (Auditd)**: Monitora em ncvel de kernel qualquer alteração, criação ou deleção de arquivos no diretório web (`-k web_modificacoes`).
 * **Cron Oficial Integrado**: Cria o agendador de 5 minutos executando `cli/joomla.php scheduler:run` para limpeza de cache e publicação de artigos.
 * **POSIX ACLs e Travessia**: Permissões `775/664` com herança contínua mútua entre `www-data` e o desenvolvedor (`DEV_USER`).
 
@@ -185,9 +185,11 @@ getfacl /var/www/html/meu_site.com.br
 # Verificar status da jaula Apache/Joomla no Fail2Ban
 sudo fail2ban-client status apache-badbots
 sudo fail2ban-client status apache-auth
+sudo fail2ban-client status joomla-admin
 
 # Desbloquear um IP bloqueado por engano
 sudo fail2ban-client set apache-badbots unbanip 192.168.1.100
+sudo fail2ban-client set joomla-admin unbanip 192.168.1.100
 
 # Acompanhar logs de acessos e erros do Joomla e Apache em tempo real
 sudo tail -f /var/log/apache2/*access.log

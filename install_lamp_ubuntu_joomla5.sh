@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.0
+# Version: 2.1
 # ------------------------------------------------
-VERSION="2.0"
+VERSION="2.1"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -455,6 +455,7 @@ cat <<EOF > "/etc/apache2/sites-available/${DOMAIN_NAME}.conf"
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
+        php_admin_value open_basedir ":/tmp:/var/lib/php/sessions:/dev/urandom"
     </Directory>
 
     # Bloqueio Critico: Proibe execucao de qualquer interpretador PHP em pastas de upload/estaticos
@@ -496,6 +497,7 @@ cat <<EOF > /etc/apache2/sites-available/000-default.conf
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
+        php_admin_value open_basedir ":/tmp:/var/lib/php/sessions:/dev/urandom"
     </Directory>
 
     # Bloqueio Critico: Proibe execucao de qualquer interpretador PHP em pastas de upload/estaticos
@@ -670,6 +672,14 @@ fi
 
 if [ -d /etc/fail2ban/jail.d ]; then
     log_info "Configurando jaula modular do Fail2Ban para protecao Web..."
+    # Filtro customizado contra forca bruta no /administrator do Joomla
+    mkdir -p /etc/fail2ban/filter.d
+    cat <<'EOF' > /etc/fail2ban/filter.d/joomla-admin.conf
+[Definition]
+failregex = ^<HOST> -.*"POST .*/administrator/index\.php.*" (200|303|401|403)
+ignoreregex =
+EOF
+
     cat <<'EOF' > /etc/fail2ban/jail.d/apache-joomla.local
 [apache-auth]
 enabled = true
@@ -684,6 +694,15 @@ enabled  = true
 port     = http,https
 logpath  = %(apache_access_log)s
 maxretry = 2
+bantime  = 86400
+
+[joomla-admin]
+enabled  = true
+port     = http,https
+filter   = joomla-admin
+logpath  = /var/log/apache2/*access.log
+maxretry = 5
+findtime = 600
 bantime  = 86400
 EOF
     systemctl restart fail2ban > /dev/null 2>&1 || true
