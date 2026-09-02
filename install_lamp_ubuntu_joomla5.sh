@@ -1,46 +1,45 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.6
+# Version: 2.0
 # ------------------------------------------------
-VERSION="1.6"
+VERSION="2.0"
 # ==============================================================================
-# SCRIPT DE INSTALAÇÃO DA PILHA LAMP AUTOMÁTICO E ENDURECIDO - JOOMLA 5.x
+# SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
+# COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
 # UBUNTU SERVER (22.04 / 24.04 / 26.04 LTS)
 # ==============================================================================
-# O que este script faz (Descrição e Auditoria de Funções):
-# 1. Valida privilégios de execução (exige Root/Sudo) e inicializa captura de log.
-# 2. Coleta parâmetros essenciais (Domínio, Diretório Web Raiz, Banco MariaDB, Senhas).
-# 3. Atualiza os repositórios do sistema e instala pré-requisitos essenciais.
-# 4. Instala e configura o Apache 2.4.x com mod_rewrite, mod_ssl, mod_headers, mod_deflate e HTTP/2.
-# 5. Aplica hardening no Apache (ServerTokens Prod, ServerSignature Off, Headers e Bloqueio de Arquivos Sensíveis).
-# 6. Instala o MariaDB Server (11.4 LTS Recomendado) com hardening, cria banco e usuário dedicados para o Joomla 5 (utf8mb4).
-# 7. Configura o PHP (Recomendado 8.3/8.2) com TODAS as extensões obrigatórias e recomendadas para o Joomla 5:
-#    (pdo_mysql, mysqli, json, xml, dom, simplexml, gd, zip, zlib, mbstring, curl, intl, opcache, bcmath, imagick, fileinfo).
-# 8. Otimiza o php.ini para Joomla 5 com hardening de sessões, cookies HttpOnly/SameSite e allow_url_include=Off.
-# 9. Configura VirtualHost Apache otimizado para o domínio informado (suporte a .htaccess, SEF URLs amigáveis, segurança).
-# 10. Baixa e extrai automaticamente o pacote estável oficial do Joomla 5.x.
-# 11. Aplica permissões granulares e herança avançada POSIX ACLs no diretório web (www-data).
-# 12. Configura rotinas agendadas (Cron Jobs) para execução periódica das tarefas CLI do Joomla (cli/joomla.php).
-# 13. Integra as portas HTTP (80) e HTTPS (443) ao Firewall UFW de forma automática e silenciosa.
-# 14. Integra a proteção de jails Web (Apache Auth e BadBots) ao Fail2Ban de forma modular em /etc/fail2ban/jail.d/.
-# 15. Exibe Resumo Final Completo com credenciais, instruções de DNS e resumo de segurança.
-# 16. Geração e salvamento automático dos arquivos de log em /root e na Home do usuário.
+# O que este script faz (Descricao e Auditoria de Funcoes):
+# 1. Valida privilegios de execucao (exige Root/Sudo) e inicializa captura de log.
+# 2. Coleta parametros essenciais (Dominio, Diretorio Web Raiz, Banco MariaDB, Senhas).
+# 3. Atualiza os repositorios do sistema e instala pre-requisitos essenciais (incluindo auditd).
+# 4. Instala e configura o Apache 2.4.x com mod_rewrite, mod_ssl, mod_headers, mod_deflate, HTTP/2 e FastCGI.
+# 5. Aplica blindagem no Apache (bloqueio de execucao PHP em pastas de midia/uploads/cache, ocultacao de banners, headers de seguranca).
+# 6. Instala o MariaDB Server (11.4 LTS Recomendado) com hardening, cria banco e usuario dedicados para o Joomla 5 (utf8mb4).
+# 7. Configura o PHP (Recomendado 8.3/8.2) com TODAS as extensoes obrigatorias e recomendadas para o Joomla 5.
+# 8. Otimiza o php.ini para Joomla 5 com hardening estrito (disable_functions com bloqueio de exec/shell, HttpOnly, SameSite).
+# 9. Configura VirtualHost Apache otimizado para o dominio informado e 000-default.conf com regras anti-webshell.
+# 10. Baixa e extrai automaticamente o pacote estavel oficial do Joomla 5.x.
+# 11. Aplica permissoes granulares e heranca avancada POSIX ACLs no diretorio web (www-data / DEV_USER).
+# 12. Configura rotinas agendadas (Cron Jobs) para execucao periodica das tarefas CLI do Joomla (cli/joomla.php).
+# 13. Configura o Linux Audit Daemon (auditd) com regras ativas para monitorar alteracoes no diretorio web em tempo real.
+# 14. Integra as portas HTTP (80) e HTTPS (443) ao Firewall UFW e jails Web ao Fail2Ban.
+# 15. Exibe Resumo Final Completo com credenciais, auditoria auditd e resumo de seguranca.
+# 16. Geracao e salvamento automatico dos arquivos de log em /root e na Home do usuario.
 # ==============================================================================
-# Execução recomendada (copiar e colar comando único):
+# Execucao recomendada (copiar e colar comando unico):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu_joomla5.sh -O install_lamp_ubuntu_joomla5.sh && chmod +x install_lamp_ubuntu_joomla5.sh && sudo ./install_lamp_ubuntu_joomla5.sh
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive
 
-# ==========================================
+# ========================================
 # PALETA DE CORES (ANSI ESCAPE CODES)
-# ==========================================
+# ========================================
 NC='\033[0m'              # Reset (Sem Cor)
 BOLD='\033[1m'
 DIM='\033[2m'
 UNDERLINE='\033[4m'
 
-# Cores de Fonte (Foreground)
 FG_BLACK='\033[30m'
 FG_RED='\033[31m'
 FG_GREEN='\033[32m'
@@ -50,12 +49,11 @@ FG_MAGENTA='\033[35m'
 FG_CYAN='\033[36m'
 FG_WHITE='\033[37m'
 
-# Símbolos Customizados
-ARROW="❯"
+ARROW="➜"
 
-# ==========================================
-# FUNÇÕES DE HIGHLIGHT E LOGGING
-# ==========================================
+# ========================================
+# FUNCOES DE HIGHLIGHT E LOGGING
+# ========================================
 
 draw_separator() {
     echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
@@ -64,7 +62,7 @@ draw_separator() {
 print_header() {
     local title="$1"
     echo -e ""
-    echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
+    echo -e "${FG_CYAN}${BOLD}▶ ${title}${NC}"
     draw_separator
 }
 
@@ -79,20 +77,20 @@ get_service_status() {
 
 log_info()    { echo -e "  ${FG_CYAN}[i]${NC}  ${BOLD}INFO:${NC}      $1"; }
 log_success() { echo -e "  ${FG_GREEN}[+]${NC}  ${FG_GREEN}${BOLD}SUCESSO:${NC}   $1"; }
-log_warning() { echo -e "  ${FG_YELLOW}[!]${NC}  ${FG_YELLOW}${BOLD}ATENÇÃO:${NC}   $1"; }
+log_warning() { echo -e "  ${FG_YELLOW}[!]${NC}  ${FG_YELLOW}${BOLD}ATENCAO:${NC}   $1"; }
 log_error()   { echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"; }
 log_skipped() { echo -e "  ${FG_RED}[-]${NC}  ${FG_RED}${BOLD}PULADO:${NC}    $1"; }
 
 print_alert_box() {
     local msg="$1"
-    echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
+    echo -e "\n  ${FG_YELLOW}${BOLD}⚠️  ATENCAO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
 }
 
 # ==============================================================================
-# 1. VERIFICAÇÃO DE PRIVILÉGIOS (ROOT) E INICIALIZAÇÃO DE LOG
+# 1. VERIFICACAO DE PRIVILEGIOS (ROOT) E INICIALIZACAO DE LOG
 # ==============================================================================
 if [ "$(id -u)" -ne 0 ]; then
-    print_header "ERRO DE EXECUÇÃO"
+    print_header "ERRO DE EXECUCAO"
     log_error "Este script precisa ser executado como ROOT ou via sudo."
     echo -e "  Exemplo: ${FG_YELLOW}sudo bash $0${NC}\n"
     exit 1
@@ -104,74 +102,72 @@ LOG_LATEST="relatorio_install_lamp_ubuntu_joomla5_latest.log"
 LOG_TMP="/tmp/${LOG_FILENAME}"
 exec > >(tee -a "$LOG_TMP") 2>&1
 
-print_header "INSTALADOR AUTOMÁTICO LAMP ENDURECIDO - JOOMLA 5 (UBUNTU SERVER)"
-
+print_header "INSTALADOR AUTOMATICO LAMP ENDURECIDO - JOOMLA 5 (UBUNTU SERVER)"
 # ==============================================================================
-# 2. COLETA DE PARÂMETROS DO AMBIENTE
+# 2. COLETA DE PARAMETROS DO AMBIENTE
 # ==============================================================================
-print_header "COLETA DE PARÂMETROS DO AMBIENTE"
+print_header "COLETA DE PARAMETROS DO AMBIENTE"
 
-echo -e "  ${FG_CYAN}[i]${NC} Domínio do site Joomla 5 (ex: meusite.com.br ou prototipo.net.br)."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Domínio do site: ${NC}")" DOMAIN_NAME
+echo -e "  ${FG_CYAN}[i]${NC} Dominio do site Joomla 5 (ex: meusite.com.br ou prototipo.net.br)."
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Dominio do site: ${NC}")" DOMAIN_NAME
 while [ -z "$DOMAIN_NAME" ]; do
-    log_warning "O domínio não pode ser vazio."
-    read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o domínio do site: ${NC}")" DOMAIN_NAME
+    log_warning "O dominio nao pode ser vazio."
+    read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Informe o dominio do site: ${NC}")" DOMAIN_NAME
 done
 
-# Limpa caracteres especiais do domínio para usar como identificador seguro
+# Limpa caracteres especiais do dominio para usar como identificador seguro
 CLEAN_DOMAIN_ID=$(echo "$DOMAIN_NAME" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:upper:]' '[:lower:]')
-log_info "Domínio definido: ${FG_GREEN}${DOMAIN_NAME}${NC}"
+log_info "Dominio definido: ${FG_GREEN}${DOMAIN_NAME}${NC}"
 
-echo -e "\n  ${FG_CYAN}[i]${NC} Diretório raiz da aplicação web (permite informar outro disco/ponto de montagem)."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Diretório de instalação [Padrão: /var/www/html/${DOMAIN_NAME}]: ${NC}")" CUSTOM_DOC_ROOT
+echo -e "\n  ${FG_CYAN}[i]${NC} Diretorio raiz da aplicacao web (permite informar outro disco/ponto de montagem)."
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Diretorio de instalacao [Padrao: /var/www/html/${DOMAIN_NAME}]: ${NC}")" CUSTOM_DOC_ROOT
 JOOMLA_ROOT=${CUSTOM_DOC_ROOT:-"/var/www/html/${DOMAIN_NAME}"}
-log_info "Diretório Web Raiz: ${FG_GREEN}${JOOMLA_ROOT}${NC}"
+log_info "Diretorio Web Raiz: ${FG_GREEN}${JOOMLA_ROOT}${NC}"
 
-echo -e "\n  ${FG_CYAN}[i]${NC} Configuração do Banco de Dados MariaDB para o Joomla 5."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar aleatória): ${NC}")" DB_ROOT_PASS
+echo -e "\n  ${FG_CYAN}[i]${NC} Configuracao do Banco de Dados MariaDB para o Joomla 5."
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar aleatoria): ${NC}")" DB_ROOT_PASS
 if [ -z "$DB_ROOT_PASS" ]; then
     DB_ROOT_PASS=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 18)
     log_info "Senha gerada para MariaDB Root: ${FG_GREEN}${DB_ROOT_PASS}${NC}"
 fi
 
 DEFAULT_DB_NAME="joomla_${CLEAN_DOMAIN_ID:0:15}_db"
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Nome do Banco de Dados [Padrão: ${DEFAULT_DB_NAME}]: ${NC}")" JOOMLA_DB_NAME
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Nome do Banco de Dados [Padrao: ${DEFAULT_DB_NAME}]: ${NC}")" JOOMLA_DB_NAME
 JOOMLA_DB_NAME=${JOOMLA_DB_NAME:-$DEFAULT_DB_NAME}
 log_info "Nome do Banco definido: ${FG_GREEN}${JOOMLA_DB_NAME}${NC}"
 
 DEFAULT_DB_USER="joomla_${CLEAN_DOMAIN_ID:0:15}_usr"
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuário do Banco [Padrão: ${DEFAULT_DB_USER}]: ${NC}")" JOOMLA_DB_USER
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuario do Banco [Padrao: ${DEFAULT_DB_USER}]: ${NC}")" JOOMLA_DB_USER
 JOOMLA_DB_USER=${JOOMLA_DB_USER:-$DEFAULT_DB_USER}
-log_info "Usuário do Banco definido: ${FG_GREEN}${JOOMLA_DB_USER}${NC}"
+log_info "Usuario do Banco definido: ${FG_GREEN}${JOOMLA_DB_USER}${NC}"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do Usuário do Joomla DB (deixe vazio para gerar aleatória): ${NC}")" JOOMLA_DB_PASS
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do Usuario do Joomla DB (deixe vazio para gerar aleatoria): ${NC}")" JOOMLA_DB_PASS
 if [ -z "$JOOMLA_DB_PASS" ]; then
     JOOMLA_DB_PASS=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 18)
-    log_info "Senha gerada para o Usuário Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
+    log_info "Senha gerada para o Usuario Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
 else
-    log_info "Senha definida para o Usuário Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
+    log_info "Senha definida para o Usuario Joomla DB: ${FG_GREEN}${JOOMLA_DB_PASS}${NC}"
 fi
 
-echo -e "\n  ${FG_CYAN}[i]${NC} Usuário do sistema/desenvolvedor para permissões de escrita SFTP/SSH (opcional)."
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuário desenvolvedor adicional [Deixe vazio se não houver]: ${NC}")" DEV_USER
+echo -e "\n  ${FG_CYAN}[i]${NC} Usuario do sistema/desenvolvedor para permissoes de escrita SFTP/SSH (opcional)."
+read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuario desenvolvedor adicional [Deixe vazio se nao houver]: ${NC}")" DEV_USER
 if [ -n "$DEV_USER" ]; then
     if id "$DEV_USER" >/dev/null 2>&1; then
-        log_info "Usuário desenvolvedor configurado com acesso total ao diretório web: ${FG_GREEN}${DEV_USER}${NC}"
+        log_info "Usuario desenvolvedor configurado com acesso total ao diretorio web: ${FG_GREEN}${DEV_USER}${NC}"
     else
-        log_warning "Usuário '${DEV_USER}' não encontrado no sistema. ACLs serão preparadas para quando ele for criado."
+        log_warning "Usuario '${DEV_USER}' nao encontrado no sistema. ACLs serao preparadas para quando ele for criado."
     fi
 else
-    log_info "Nenhum usuário adicional informado (apenas www-data)."
+    log_info "Nenhum usuario adicional informado (apenas www-data)."
 fi
 
-# Detecta a versão do Ubuntu para definir a versão ideal do PHP automaticamente
 UBUNTU_VER=$(lsb_release -rs 2>/dev/null || echo "24.04")
 if [[ "$UBUNTU_VER" == "26.04" ]]; then
     PHP_VER="8.5"
-    log_info "Ubuntu 26.04 detectado: Versão do PHP configurada automaticamente: ${FG_GREEN}PHP 8.5${NC}"
+    log_info "Ubuntu 26.04 detectado: Versao do PHP configurada automaticamente: ${FG_GREEN}PHP 8.5${NC}"
 else
     PHP_VER="8.3"
-    log_info "Ubuntu ${UBUNTU_VER} LTS detectado: Versão do PHP configurada automaticamente: ${FG_GREEN}PHP 8.3 (Recomendado Joomla 5)${NC}"
+    log_info "Ubuntu ${UBUNTU_VER} LTS detectado: Versao do PHP configurada automaticamente: ${FG_GREEN}PHP 8.3 (Recomendado Joomla 5)${NC}"
 fi
 
 DOWNLOAD_JOOMLA="s"
@@ -179,15 +175,15 @@ DOWNLOAD_JOOMLA="s"
 draw_separator
 
 # ==============================================================================
-# 3. ATUALIZAÇÃO DO SISTEMA E PRÉ-REQUISITOS
+# 3. ATUALIZACAO DO SISTEMA E PRE-REQUISITOS
 # ==============================================================================
-print_header "PREPARANDO SISTEMA E REPOSITÓRIOS"
+print_header "PREPARANDO SISTEMA, DEPENDENCIAS E AUDITD"
 
 log_info "Atualizando a lista de pacotes do APT..."
 apt-get update -y > /dev/null 2>&1 || true
 log_success "Lista de pacotes atualizada."
 
-log_info "Instalando dependências essenciais de infraestrutura..."
+log_info "Instalando dependencias essenciais de infraestrutura e auditoria..."
 PRE_REQ_PACKAGES=(
     "software-properties-common"
     "curl"
@@ -202,58 +198,65 @@ PRE_REQ_PACKAGES=(
     "logrotate"
     "postfix"
     "mailutils"
+    "auditd"
+    "audispd-plugins"
 )
 
 for pkg in "${PRE_REQ_PACKAGES[@]}"; do
     if dpkg -l | grep -q "^ii  $pkg " > /dev/null 2>&1; then
-        log_info "Pacote '$pkg' já está instalado."
+        log_info "Pacote '$pkg' ja esta instalado."
     else
         log_info "Instalando '$pkg'..."
         if apt-get install -y "$pkg" > /dev/null 2>&1; then
             log_success "Pacote '$pkg' instalado com sucesso."
         else
-            log_warning "Aviso na instalação de '$pkg'."
+            log_warning "Aviso na instalacao de '$pkg'."
         fi
     fi
 done
-
 # ==============================================================================
-# 4. INSTALAÇÃO E HARDENING DO APACHE 2.4.x
+# 4. INSTALACAO E HARDENING DO APACHE 2.4.x
 # ==============================================================================
-print_header "INSTALAÇÃO E HARDENING DO APACHE 2.4.x"
+print_header "INSTALACAO E HARDENING DO APACHE 2.4.x"
 
 log_info "Instalando o Apache2..."
 if apt-get install -y apache2 > /dev/null 2>&1; then
     log_success "Apache2 instalado com sucesso."
 else
-    log_error "Falha na instalação do Apache2."
+    log_error "Falha na instalacao do Apache2."
     exit 1
 fi
 
-log_info "Habilitando módulos obrigatórios e recomendados para Joomla 5 no Apache..."
+log_info "Habilitando modulos obrigatorios e recomendados para Joomla 5 no Apache..."
 APACHE_MODULES=("rewrite" "ssl" "headers" "deflate" "expires" "http2" "remoteip" "env" "dir" "mime" "setenvif" "filter" "fcgid")
 for mod in "${APACHE_MODULES[@]}"; do
     a2enmod "$mod" > /dev/null 2>&1
-    log_success "Módulo Apache '$mod' habilitado."
+    log_success "Modulo Apache '$mod' habilitado."
 done
 
-log_info "Desativando módulos desnecessários/inseguros no Apache (autoindex, status, mpm_prefork)..."
+log_info "Desativando modulos desnecessarios/inseguros no Apache (autoindex, status, mpm_prefork)..."
 a2dismod -f autoindex status mpm_prefork > /dev/null 2>&1 || true
 
-log_info "Aplicando endurecimento de segurança no Apache (ocultação de banners e desativação de TRACE)..."
+log_info "Aplicando endurecimento de seguranca no Apache (ocultacao de banners, headers e desativacao de TRACE)..."
 if [ -f /etc/apache2/conf-available/security.conf ]; then
     sed -i 's/^ServerTokens .*/ServerTokens Prod/' /etc/apache2/conf-available/security.conf
     sed -i 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
     grep -q "^TraceEnable Off" /etc/apache2/conf-available/security.conf || echo "TraceEnable Off" >> /etc/apache2/conf-available/security.conf
+    
+    grep -q "X-Content-Type-Options" /etc/apache2/conf-available/security.conf || echo 'Header always set X-Content-Type-Options "nosniff"' >> /etc/apache2/conf-available/security.conf
+    grep -q "X-Frame-Options" /etc/apache2/conf-available/security.conf || echo 'Header always set X-Frame-Options "SAMEORIGIN"' >> /etc/apache2/conf-available/security.conf
+    grep -q "X-XSS-Protection" /etc/apache2/conf-available/security.conf || echo 'Header always set X-XSS-Protection "1; mode=block"' >> /etc/apache2/conf-available/security.conf
+    grep -q "Referrer-Policy" /etc/apache2/conf-available/security.conf || echo 'Header always set Referrer-Policy "strict-origin-when-cross-origin"' >> /etc/apache2/conf-available/security.conf
+    
     a2enconf security > /dev/null 2>&1 || true
 fi
 
 # ==============================================================================
-# 5. INSTALAÇÃO E HARDENING DO MARIADB SERVER (RECOMENDADO JOOMLA 5: 11.1+)
+# 5. INSTALACAO E HARDENING DO MARIADB SERVER (RECOMENDADO JOOMLA 5: 11.1+)
 # ==============================================================================
-print_header "INSTALAÇÃO E HARDENING DO MARIADB SERVER (RECOMENDADO JOOMLA 5: 11.1+)"
+print_header "INSTALACAO E HARDENING DO MARIADB SERVER (RECOMENDADO JOOMLA 5: 11.1+)"
 
-log_info "Configurando repositório oficial MariaDB Server (Versão Recomendada 11.4 LTS)..."
+log_info "Configurando repositorio oficial MariaDB Server (Versao Recomendada 11.4 LTS)..."
 if ! dpkg -l | grep -q "mariadb-server"; then
     rm -f /etc/apt/sources.list.d/mariadb*maxscale* 2>/dev/null || true
     curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | bash -s -- --mariadb-server-version="mariadb-11.4" > /dev/null 2>&1 || true
@@ -265,15 +268,15 @@ log_info "Instalando o MariaDB Server..."
 if apt-get install -y mariadb-server mariadb-client > /dev/null 2>&1; then
     log_success "MariaDB Server instalado com sucesso."
 else
-    log_warning "Tentando instalar via repositório padrão do sistema..."
+    log_warning "Tentando instalar via repositorio padrao do sistema..."
     apt-get install -y mariadb-server mariadb-client > /dev/null 2>&1 || true
 fi
 
-log_info "Iniciando e habilitando o serviço MariaDB..."
+log_info "Iniciando e habilitando o servico MariaDB..."
 systemctl enable --now mariadb > /dev/null 2>&1
-log_success "Serviço MariaDB em execução ($(mariadb --version 2>/dev/null | awk '{print $5}' | tr -d ','))."
+log_success "Servico MariaDB em execucao ($(mariadb --version 2>/dev/null | awk '{print $5}' | tr -d ','))."
 
-log_info "Otimizando charset MariaDB para UTF8MB4 (Obrigatório Joomla 5)..."
+log_info "Otimizando charset MariaDB para UTF8MB4 (Obrigatorio Joomla 5)..."
 cat <<'EOF' > /etc/mysql/mariadb.conf.d/60-joomla5.cnf
 [client]
 default-character-set = utf8mb4
@@ -292,9 +295,8 @@ EOF
 
 systemctl restart mariadb > /dev/null 2>&1
 
-log_info "Aplicando endurecimento de segurança no MariaDB e criando banco de dados do Joomla 5..."
+log_info "Aplicando endurecimento de seguranca no MariaDB e criando banco de dados do Joomla 5..."
 
-# Prepara script SQL mantendo autenticação nativa via Unix Socket para o sudo e definindo a senha do root
 TMP_SQL=$(mktemp)
 cat <<EOF > "$TMP_SQL"
 SET PASSWORD FOR 'root'@'localhost' = PASSWORD('${DB_ROOT_PASS}');
@@ -317,20 +319,15 @@ EOF
 mariadb < "$TMP_SQL" > /dev/null 2>&1 || mariadb -u root -p"$DB_ROOT_PASS" < "$TMP_SQL" > /dev/null 2>&1 || true
 rm -f "$TMP_SQL"
 
-log_success "Banco '${JOOMLA_DB_NAME}' e usuário '${JOOMLA_DB_USER}' criados com permissões completas em UTF8MB4."
-
+log_success "Banco '${JOOMLA_DB_NAME}' e usuario '${JOOMLA_DB_USER}' criados com permissoes completas em UTF8MB4."
 # ==============================================================================
-# 6. INSTALAÇÃO DO PHP E MÓDULOS DO JOOMLA 5
+# 6. INSTALACAO DO PHP (RECOMENDADO JOOMLA 5)
 # ==============================================================================
-print_header "INSTALAÇÃO DO PHP (RECOMENDADO JOOMLA 5)"
+print_header "INSTALACAO DO PHP (RECOMENDADO JOOMLA 5)"
 
-# Detecta a distribuição Ubuntu
 UBUNTU_RELEASE=$(lsb_release -rs 2>/dev/null || echo "24.04")
 
 if [[ "$UBUNTU_RELEASE" == "22.04" || "$UBUNTU_RELEASE" == "24.04" ]]; then
-    # ==========================================================================
-    # FLUXO UBUNTU 22.04 / 24.04 LTS (PHP 8.3 VIA PPA OFICIAL)
-    # ==========================================================================
     log_info "Ubuntu ${UBUNTU_RELEASE} LTS detectado: Instalando PHP 8.3 via PPA ondrej/php..."
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
     apt-get update -y > /dev/null 2>&1 || true
@@ -364,15 +361,10 @@ if [[ "$UBUNTU_RELEASE" == "22.04" || "$UBUNTU_RELEASE" == "24.04" ]]; then
     log_success "PHP 8.3 com APCu e Redis instalado e configurado no Ubuntu ${UBUNTU_RELEASE}."
 
 else
-    # ==========================================================================
-    # FLUXO UBUNTU 26.04 DEV (PHP NATIVO)
-    # ==========================================================================
-    log_info "Ubuntu ${UBUNTU_RELEASE} detectado: Instalando suíte nativa do PHP do repositório Ubuntu..."
+    log_info "Ubuntu ${UBUNTU_RELEASE} detectado: Instalando suite nativa do PHP do repositorio Ubuntu..."
     
-    # Atualiza lista de pacotes e instala o PHP nativo do repositório do sistema
     DEBIAN_FRONTEND=noninteractive apt-get install -y php-cli php-fpm php-mysql php-curl php-gd php-mbstring php-xml php-zip php-intl php-bcmath php-imagick php-soap php-readline php-apcu php-redis php-igbinary || true
     
-    # Caso os meta-pacotes falhem no Ubuntu 26, descobre a versão exata (ex: 8.5)
     NAT_FPM=$(apt-cache search -n "^php[0-9.]*-fpm$" | head -n 1 | awk '{print $1}')
     if [ -n "$NAT_FPM" ]; then
         NAT_V=$(echo "$NAT_FPM" | sed 's/[^0-9.]//g')
@@ -388,101 +380,70 @@ else
     log_success "PHP ${PHP_VER} nativo instalado e configurado no Ubuntu 26.04."
 fi
 
-# Detecta a versão real ativa instalada do PHP no sistema
 DETECTED_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
 [ -n "$DETECTED_PHP_VER" ] && PHP_VER="$DETECTED_PHP_VER"
 if [ -n "$DETECTED_PHP_VER" ]; then
     PHP_VER="$DETECTED_PHP_VER"
     log_success "PHP ${PHP_VER} ativo e operacional no sistema."
 else
-    log_warning "Versão PHP detectada: ${PHP_VER}"
+    log_warning "Versao PHP detectada: ${PHP_VER}"
 fi
 
-# Configura o Apache para processar PHP via FastCGI / PHP-FPM (Padrão ouro moderno)
-log_info "Integrando PHP-FPM ao Apache 2.4 (proxy_fcgi)..."
-a2enmod proxy proxy_fcgi setenvif > /dev/null 2>&1 || true
-a2enconf "php${PHP_VER}-fpm" > /dev/null 2>&1 || a2enconf php-fpm > /dev/null 2>&1 || true
-
-# Garante existência do diretório de runtime do PHP e inicialização dos serviços
-mkdir -p /run/php
-systemctl unmask php8.5-fpm > /dev/null 2>&1 || true
-systemctl unmask php-fpm > /dev/null 2>&1 || true
-systemctl enable --now php8.5-fpm > /dev/null 2>&1 || systemctl enable --now "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable --now php-fpm > /dev/null 2>&1 || true
-systemctl restart php8.5-fpm > /dev/null 2>&1 || systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
-
-# Configura o Handler explícito universal do PHP-FPM para evitar falha no Apache
-ACTUAL_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
-[ -z "$ACTUAL_SOCK" ] && ACTUAL_SOCK="/run/php/php${PHP_VER}-fpm.sock"
-
-if [ -n "$ACTUAL_SOCK" ]; then
-    cat <<EOF > /etc/apache2/conf-available/joomla-php-fpm.conf
-<FilesMatch \.php$>
-    SetHandler "proxy:unix:${ACTUAL_SOCK}|fcgi://localhost"
-</FilesMatch>
-EOF
-    a2enconf joomla-php-fpm > /dev/null 2>&1 || true
-fi
-
-systemctl restart apache2 > /dev/null 2>&1 || true
-
 # ==============================================================================
-# 7. AJUSTES DE PERFORMANCE E HARDENING NO PHP.INI
+# 7. OTIMIZACAO DO PHP.INI E BLINDAGEM DE EXECUCAO (HARDENING)
 # ==============================================================================
-print_header "OTIMIZAÇÃO DO PHP.INI PARA JOOMLA 5"
+print_header "OTIMIZACAO DO PHP.INI E BLINDAGEM DE EXECUCAO (PHP ${PHP_VER})"
 
-log_info "Configurando diretivas de performance e limites no php.ini..."
-for ini_file in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/apache2/php.ini" "/etc/php/${PHP_VER}/cli/php.ini"; do
-    if [ -f "$ini_file" ]; then
-        # Memória e Uploads (Requisitos oficiais Joomla 5: memory_limit >= 256MB)
-        sed -i 's/^memory_limit =.*/memory_limit = 512M/' "$ini_file"
-        sed -i 's/^upload_max_filesize =.*/upload_max_filesize = 64M/' "$ini_file"
-        sed -i 's/^post_max_size =.*/post_max_size = 64M/' "$ini_file"
-        sed -i 's/^max_execution_time =.*/max_execution_time = 300/' "$ini_file"
-        sed -i 's/^max_input_time =.*/max_input_time = 300/' "$ini_file"
-        sed -i 's/^max_input_vars =.*/max_input_vars = 5000/' "$ini_file"
-        sed -i 's/^output_buffering =.*/output_buffering = Off/' "$ini_file"
-        sed -i 's/^expose_php =.*/expose_php = Off/' "$ini_file"
-        sed -i 's/^;date.timezone =.*/date.timezone = America\/Sao_Paulo/' "$ini_file"
+for PHP_INI_PATH in "/etc/php/${PHP_VER}/fpm/php.ini" "/etc/php/${PHP_VER}/cli/php.ini" "/etc/php/${PHP_VER}/apache2/php.ini"; do
+    if [ -f "$PHP_INI_PATH" ]; then
+        log_info "Configurando e endurecendo: $PHP_INI_PATH..."
+        
+        sed -i 's/^memory_limit = .*/memory_limit = 512M/' "$PHP_INI_PATH"
+        sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 64M/' "$PHP_INI_PATH"
+        sed -i 's/^post_max_size = .*/post_max_size = 64M/' "$PHP_INI_PATH"
+        sed -i 's/^max_execution_time = .*/max_execution_time = 300/' "$PHP_INI_PATH"
+        sed -i 's/^max_input_time = .*/max_input_time = 300/' "$PHP_INI_PATH"
+        sed -i 's/^max_input_vars = .*/max_input_vars = 5000/' "$PHP_INI_PATH"
+        sed -i 's|^;date\.timezone =.*|date.timezone = America/Sao_Paulo|' "$PHP_INI_PATH"
+        sed -i 's|^date\.timezone =.*|date.timezone = America/Sao_Paulo|' "$PHP_INI_PATH"
 
-        # Otimização OPcache e APCu para Joomla 5
-        sed -i 's/^;opcache.enable=.*/opcache.enable=1/' "$ini_file"
-        sed -i 's/^;opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini_file"
-        sed -i 's/^opcache.enable_cli=.*/opcache.enable_cli=1/' "$ini_file"
-        sed -i 's/^;opcache.memory_consumption=.*/opcache.memory_consumption=128/' "$ini_file"
-        sed -i 's/^;opcache.interned_strings_buffer=.*/opcache.interned_strings_buffer=16/' "$ini_file"
-        sed -i 's/^;opcache.max_accelerated_files=.*/opcache.max_accelerated_files=10000/' "$ini_file"
-        sed -i 's/^;opcache.revalidate_freq=.*/opcache.revalidate_freq=2/' "$ini_file"
-        grep -q "^apc.enabled=1" "$ini_file" || echo -e "\n[apcu]\napc.enabled=1\napc.shm_size=64M\napc.enable_cli=1" >> "$ini_file"
+        sed -i 's/^disable_functions =.*/disable_functions = exec,passthru,shell_exec,system,proc_open,popen,show_source,pcntl_exec/' "$PHP_INI_PATH"
 
-        # Diretivas de Segurança e Proteção de Sessão / Cookies
-        sed -i 's/^;session.cookie_httponly =.*/session.cookie_httponly = 1/' "$ini_file"
-        sed -i 's/^session.cookie_httponly =.*/session.cookie_httponly = 1/' "$ini_file"
-        sed -i 's/^;session.cookie_samesite =.*/session.cookie_samesite = "Lax"/' "$ini_file"
-        sed -i 's/^session.cookie_samesite =.*/session.cookie_samesite = "Lax"/' "$ini_file"
-        sed -i 's/^;session.use_strict_mode =.*/session.use_strict_mode = 1/' "$ini_file"
-        sed -i 's/^session.use_strict_mode =.*/session.use_strict_mode = 1/' "$ini_file"
-        sed -i 's/^;session.use_only_cookies =.*/session.use_only_cookies = 1/' "$ini_file"
-        sed -i 's/^session.use_only_cookies =.*/session.use_only_cookies = 1/' "$ini_file"
-        sed -i 's/^display_errors =.*/display_errors = Off/' "$ini_file"
-        sed -i 's/^log_errors =.*/log_errors = On/' "$ini_file"
-        sed -i 's/^allow_url_include =.*/allow_url_include = Off/' "$ini_file"
+        sed -i 's/^display_errors = .*/display_errors = Off/' "$PHP_INI_PATH"
+        sed -i 's/^display_startup_errors = .*/display_startup_errors = Off/' "$PHP_INI_PATH"
+        sed -i 's/^log_errors = .*/log_errors = On/' "$PHP_INI_PATH"
+        sed -i 's/^expose_php = .*/expose_php = Off/' "$PHP_INI_PATH"
+        sed -i 's/^allow_url_include = .*/allow_url_include = Off/' "$PHP_INI_PATH"
 
-        # Hardening de funções inseguras mantendo compatibilidade
-        sed -i "s/^disable_functions =.*/disable_functions = exec,passthru,shell_exec,system,proc_open,popen,curl_multi_exec,parse_ini_file,show_source/" "$ini_file" || true
+        sed -i 's/^session\.cookie_httponly =.*/session.cookie_httponly = 1/' "$PHP_INI_PATH"
+        sed -i 's/^session\.use_only_cookies =.*/session.use_only_cookies = 1/' "$PHP_INI_PATH"
+        sed -i 's/^session\.use_strict_mode =.*/session.use_strict_mode = 1/' "$PHP_INI_PATH"
+        sed -i "s/^session\.cookie_samesite =.*/session.cookie_samesite = 'Lax'/" "$PHP_INI_PATH"
+
+        sed -i 's/^;opcache\.enable=.*/opcache.enable=1/' "$PHP_INI_PATH"
+        sed -i 's/^opcache\.enable=.*/opcache.enable=1/' "$PHP_INI_PATH"
+        sed -i 's/^;opcache\.memory_consumption=.*/opcache.memory_consumption=256/' "$PHP_INI_PATH"
+        sed -i 's/^opcache\.memory_consumption=.*/opcache.memory_consumption=256/' "$PHP_INI_PATH"
+        sed -i 's/^;opcache\.interned_strings_buffer=.*/opcache.interned_strings_buffer=16/' "$PHP_INI_PATH"
+        sed -i 's/^opcache\.interned_strings_buffer=.*/opcache.interned_strings_buffer=16/' "$PHP_INI_PATH"
+        sed -i 's/^;opcache\.max_accelerated_files=.*/opcache.max_accelerated_files=20000/' "$PHP_INI_PATH"
+        sed -i 's/^opcache\.max_accelerated_files=.*/opcache.max_accelerated_files=20000/' "$PHP_INI_PATH"
+        sed -i 's/^;opcache\.revalidate_freq=.*/opcache.revalidate_freq=2/' "$PHP_INI_PATH"
+        sed -i 's/^opcache\.revalidate_freq=.*/opcache.revalidate_freq=2/' "$PHP_INI_PATH"
     fi
 done
-systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
-log_success "php.ini ajustado: memory_limit=512M, opcache.enable_cli=1, display_errors=Off, cookies HttpOnly/SameSite/Strict, allow_url_include=Off e disable_functions ativado."
 
+systemctl enable --now "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl enable --now php-fpm > /dev/null 2>&1 || true
+systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
+log_success "Servico PHP-FPM (${PHP_VER}) configurado, otimizado e ativo."
 # ==============================================================================
-# 8. ESTRUTURA DO DIRETÓRIO E VIRTUALHOST APACHE
+# 8. CONFIGURACAO DE VIRTUALHOST APACHE COM BLINDAGEM ANTI-WEBSHELL
 # ==============================================================================
-print_header "CONFIGURAÇÃO DO VIRTUALHOST APACHE (JOOMLA 5)"
+print_header "CONFIGURACAO DO VIRTUALHOST APACHE COM BLINDAGEM DE EXECUCAO"
 
 mkdir -p "$JOOMLA_ROOT"
 
-log_info "Criando VirtualHost para o domínio '${DOMAIN_NAME}' em /etc/apache2/sites-available/${DOMAIN_NAME}.conf..."
-cat <<EOF > /etc/apache2/sites-available/${DOMAIN_NAME}.conf
+cat <<EOF > "/etc/apache2/sites-available/${DOMAIN_NAME}.conf"
 <VirtualHost *:80>
     ServerName ${DOMAIN_NAME}
     ServerAlias www.${DOMAIN_NAME}
@@ -496,17 +457,24 @@ cat <<EOF > /etc/apache2/sites-available/${DOMAIN_NAME}.conf
         Require all granted
     </Directory>
 
-    # Bloqueio de Segurança: Arquivos Ocultos (.git, .env, etc.)
-    <FilesMatch "^\.">
+    # Bloqueio Critico: Proibe execucao de qualquer interpretador PHP em pastas de upload/estaticos
+    <DirectoryMatch "^${JOOMLA_ROOT}/(assets|images|cache|tmp|phocadownloadpap|media)/">
+        <FilesMatch "\.(php|phtml|php[0-9]|phps|pht|inc)$">
+            Require all denied
+        </FilesMatch>
+    </DirectoryMatch>
+
+    # Bloqueio de Seguranca: Arquivos Ocultos especificos (.git, .env, etc.)
+    <FilesMatch "^\.(git|env|user\.ini)">
         Require all denied
     </FilesMatch>
 
-    # Bloqueio de Segurança: Impedir visualização direta de backups, logs e scripts
-    <FilesMatch "\.(log|sql|bak|old|orig|ini|sh|dist)$">
+    # Bloqueio de Seguranca: Impedir visualizacao direta de backups, logs, dumps e scripts
+    <FilesMatch "\.(log|sql|bak|old|orig|ini|sh|dist|tar|gz|zip)$">
         Require all denied
     </FilesMatch>
 
-    # Headers de Segurança recomendados (Hardening de Produção)
+    # Headers de Seguranca recomendados (Hardening de Producao)
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-Frame-Options "SAMEORIGIN"
     Header always set X-XSS-Protection "1; mode=block"
@@ -518,7 +486,6 @@ cat <<EOF > /etc/apache2/sites-available/${DOMAIN_NAME}.conf
 </VirtualHost>
 EOF
 
-# Configura tanto o site do domínio quanto o VirtualHost padrão (IP direto) para o diretório do Joomla
 cat <<EOF > /etc/apache2/sites-available/000-default.conf
 <VirtualHost *:80>
     ServerAdmin webmaster@localhost
@@ -531,33 +498,47 @@ cat <<EOF > /etc/apache2/sites-available/000-default.conf
         Require all granted
     </Directory>
 
-    # Headers de Segurança
+    # Bloqueio Critico: Proibe execucao de qualquer interpretador PHP em pastas de upload/estaticos
+    <DirectoryMatch "^${JOOMLA_ROOT}/(assets|images|cache|tmp|phocadownloadpap|media)/">
+        <FilesMatch "\.(php|phtml|php[0-9]|phps|pht|inc)$">
+            Require all denied
+        </FilesMatch>
+    </DirectoryMatch>
+
+    # Bloqueio de Seguranca: Arquivos Ocultos especificos (.git, .env, etc.)
+    <FilesMatch "^\.(git|env|user\.ini)">
+        Require all denied
+    </FilesMatch>
+
+    # Bloqueio de Seguranca: Impedir visualizacao direta de backups, logs, dumps e scripts
+    <FilesMatch "\.(log|sql|bak|old|orig|ini|sh|dist|tar|gz|zip)$">
+        Require all denied
+    </FilesMatch>
+
+    # Headers de Seguranca
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-Frame-Options "SAMEORIGIN"
     Header always set X-XSS-Protection "1; mode=block"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
 
-    ErrorLog \${APACHE_LOG_DIR}/error.log
-    CustomLog \${APACHE_LOG_DIR}/access.log combined
+    ErrorLog \${APACHE_LOG_DIR}/default_error.log
+    CustomLog \${APACHE_LOG_DIR}/default_access.log combined
 </VirtualHost>
 EOF
 
 a2ensite 000-default.conf > /dev/null 2>&1 || true
 a2ensite "${DOMAIN_NAME}.conf" > /dev/null 2>&1
-log_success "VirtualHost ${DOMAIN_NAME}.conf e 000-default.conf ativados com suporte completo a .htaccess e URLs amigáveis (SEF)."
+log_success "VirtualHost ${DOMAIN_NAME}.conf e 000-default.conf ativados com bloqueio de execucao PHP em pastas estaticas."
 
 # ==============================================================================
-# 9. DOWNLOAD E EXTRAÇÃO DO JOOMLA 5.x
+# 9. DOWNLOAD E EXTRACAO DO JOOMLA 5.x
 # ==============================================================================
 if [[ "$DOWNLOAD_JOOMLA" != "n" && "$DOWNLOAD_JOOMLA" != "nao" ]]; then
     print_header "DOWNLOAD DO PACOTE OFICIAL DO JOOMLA 5"
-    log_info "Baixando pacote oficial de instalação do Joomla 5.x..."
+    log_info "Baixando pacote oficial de instalacao do Joomla 5.x..."
     
-    # URL de fallback direta garantida caso a API do GitHub atinja rate limit
     LATEST_JOOMLA_ZIP="https://github.com/joomla/joomla-cms/releases/download/5.2.4/Joomla_5.2.4-Stable-Full_Package.zip"
-    
-    # Tenta descobrir release mais recente dinamicamente
-    API_ZIP=$(curl -s "https://api.github.com/repos/joomla/joomla-cms/releases/latest" 2>/dev/null | grep "browser_download_url.*Joomla_5.*Full_Package.zip" | head -n 1 | cut -d '"' -f 4)
+    API_ZIP=$(curl -s "https://api.github.com/repos/joomla/joomla-cms/releases/latest" 2>/dev/null | grep "browser_download_url.*Joomla_5.*Full_Package\.zip" | head -n 1 | cut -d '"' -f 4)
     [ -n "$API_ZIP" ] && LATEST_JOOMLA_ZIP="$API_ZIP"
 
     log_info "Baixando de: ${LATEST_JOOMLA_ZIP}..."
@@ -568,23 +549,21 @@ if [[ "$DOWNLOAD_JOOMLA" != "n" && "$DOWNLOAD_JOOMLA" != "nao" ]]; then
         unzip -q -o /tmp/joomla_pkg.zip -d "$JOOMLA_ROOT"
         rm -f /tmp/joomla_pkg.zip
         
-        # Habilita .htaccess padrão do Joomla se existir htaccess.txt
         if [ -f "${JOOMLA_ROOT}/htaccess.txt" ]; then
             cp "${JOOMLA_ROOT}/htaccess.txt" "${JOOMLA_ROOT}/.htaccess"
-            log_success "Arquivo .htaccess nativo do Joomla ativado para URLs amigáveis."
+            log_success "Arquivo .htaccess nativo do Joomla ativado para URLs amigaveis."
         fi
 
-        # Se o Joomla já tiver sido configurado anteriormente, sincroniza a nova senha do banco no configuration.php
         if [ -f "${JOOMLA_ROOT}/configuration.php" ]; then
             log_info "Sincronizando nova senha do MariaDB no arquivo configuration.php existente do Joomla..."
-            sed -i "s/public \$password = '.*/public \$password = '${JOOMLA_DB_PASS}';/" "${JOOMLA_ROOT}/configuration.php" || true
-            sed -i "s/public \$user = '.*/public \$user = '${JOOMLA_DB_USER}';/" "${JOOMLA_ROOT}/configuration.php" || true
-            sed -i "s/public \$db = '.*/public \$db = '${JOOMLA_DB_NAME}';/" "${JOOMLA_ROOT}/configuration.php" || true
+            sed -i "s/public \\\$password = '.*/public \\\$password = '${JOOMLA_DB_PASS}';/" "${JOOMLA_ROOT}/configuration.php" || true
+            sed -i "s/public \\\$user = '.*/public \\\$user = '${JOOMLA_DB_USER}';/" "${JOOMLA_ROOT}/configuration.php" || true
+            sed -i "s/public \\\$db = '.*/public \\\$db = '${JOOMLA_DB_NAME}';/" "${JOOMLA_ROOT}/configuration.php" || true
             log_success "Arquivo configuration.php sincronizado com as novas credenciais do banco."
         fi
-        log_success "Joomla 5 baixado e extraído com sucesso em ${JOOMLA_ROOT}."
+        log_success "Joomla 5 baixado e extraido com sucesso em ${JOOMLA_ROOT}."
     else
-        log_warning "Não foi possível baixar automaticamente o pacote do Joomla. Criando arquivo de teste..."
+        log_warning "Nao foi possivel baixar automaticamente o pacote do Joomla. Criando arquivo de teste..."
         cat <<'EOF' > "${JOOMLA_ROOT}/index.php"
 <?php
 phpinfo();
@@ -592,45 +571,38 @@ phpinfo();
 EOF
     fi
 fi
-
 # ==============================================================================
-# 10. PERMISSÕES E POSIX ACLs
+# 10. PERMISSOES E POSIX ACLs
 # ==============================================================================
-print_header "PERMISSÕES E SEGURANÇA NO DIRETÓRIO WEB"
+print_header "PERMISSOES E SEGURANCA NO DIRETORIO WEB"
 
-log_info "Garantindo permissões de travessia (execução) nos diretórios pai de ${JOOMLA_ROOT}..."
+log_info "Garantindo permissoes de travessia (execucao) nos diretorios pai de ${JOOMLA_ROOT}..."
 PARENT_DIR="$(dirname "$JOOMLA_ROOT")"
 while [ "$PARENT_DIR" != "/" ] && [ "$PARENT_DIR" != "." ]; do
     chmod o+x "$PARENT_DIR" > /dev/null 2>&1 || true
     PARENT_DIR="$(dirname "$PARENT_DIR")"
 done
 
-log_info "Aplicando permissões granulares (diretórios 775 / arquivos 664) e herança POSIX ACLs..."
+log_info "Aplicando permissoes granulares (diretorios 775 / arquivos 664) e heranca POSIX ACLs..."
 chown -R www-data:www-data "$JOOMLA_ROOT"
 find "$JOOMLA_ROOT" -type d -exec chmod 775 {} + > /dev/null 2>&1 || true
 find "$JOOMLA_ROOT" -type f -exec chmod 664 {} + > /dev/null 2>&1 || true
 
-# ACL básica para o servidor web
 setfacl -R -m u:www-data:rwx,g:www-data:rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
 setfacl -R -d -m u:www-data:rwx,g:www-data:rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
 
-# Se houver usuário desenvolvedor configurado, adiciona permissão total e herança contínua
 if [ -n "$DEV_USER" ] && id "$DEV_USER" >/dev/null 2>&1; then
     setfacl -R -m u:"${DEV_USER}":rwx,g:"${DEV_USER}":rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
     setfacl -R -d -m u:"${DEV_USER}":rwx,g:"${DEV_USER}":rwx "$JOOMLA_ROOT" > /dev/null 2>&1 || true
-    log_success "POSIX ACLs ativadas: Permissões de escrita e leitura compartilhadas entre 'www-data' e '${DEV_USER}'."
+    log_success "POSIX ACLs ativadas: Permissoes de escrita e leitura compartilhadas entre 'www-data' e '${DEV_USER}'."
 else
-    log_success "POSIX ACLs ativadas: Permissões de escrita e leitura garantidas para o Apache/Joomla (www-data)."
+    log_success "POSIX ACLs ativadas: Permissoes de escrita e leitura garantidas para o Apache/Joomla (www-data)."
 fi
 
-# Reinicia o Apache e PHP-FPM para aplicar todas as configurações
-systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
-systemctl restart apache2 > /dev/null 2>&1 || true
-
 # ==============================================================================
-# 11. CONFIGURAÇÃO DE ROTINAS AGENDADAS (CRON JOBS DO JOOMLA)
+# 11. CONFIGURACAO DE ROTINAS AGENDADAS (CRON JOBS DO JOOMLA)
 # ==============================================================================
-print_header "CONFIGURAÇÃO DE ROTINAS AGENDADAS DO JOOMLA (CRON JOBS)"
+print_header "CONFIGURACAO DE ROTINAS AGENDADAS DO JOOMLA (CRON JOBS)"
 
 log_info "Criando agendamento oficial das rotinas CLI do Joomla 5 no Crontab..."
 JOOMLA_CRON_FILE="/etc/cron.d/joomla5_${CLEAN_DOMAIN_ID}_scheduler"
@@ -642,124 +614,158 @@ chmod 644 "$JOOMLA_CRON_FILE"
 log_success "Cron Job configurado: '${JOOMLA_ROOT}/cli/joomla.php scheduler:run' a cada 5 minutos."
 
 # ==============================================================================
-# 12. INTEGRAÇÃO DE FIREWALL (UFW)
+# 12. CONFIGURACAO DO LINUX AUDIT DAEMON (AUDITD) PARA AUDITORIA WEB
 # ==============================================================================
-if command -v ufw > /dev/null 2>&1; then
-    log_info "Garantindo liberação das portas HTTP (80/tcp) e HTTPS (443/tcp) no UFW Firewall..."
-    ufw allow 80/tcp > /dev/null 2>&1
-    ufw allow 443/tcp > /dev/null 2>&1
-    log_success "Portas HTTP (80) e HTTPS (443) liberadas no Firewall UFW."
+print_header "CONFIGURACAO DO LINUX AUDIT DAEMON (AUDITD)"
+
+log_info "Configurando retencao e rotacao de logs em /etc/audit/auditd.conf..."
+if [ -f /etc/audit/auditd.conf ]; then
+    sed -i 's/^max_log_file =.*/max_log_file = 50/' /etc/audit/auditd.conf
+    sed -i 's/^num_logs =.*/num_logs = 10/' /etc/audit/auditd.conf
+    sed -i 's/^max_log_file_action =.*/max_log_file_action = ROTATE/' /etc/audit/auditd.conf
+    sed -i 's/^space_left =.*/space_left = 100/' /etc/audit/auditd.conf
+    sed -i 's/^space_left_action =.*/space_left_action = SYSLOG/' /etc/audit/auditd.conf
+    sed -i 's/^admin_space_left_action =.*/admin_space_left_action = SUSPEND/' /etc/audit/auditd.conf
+    log_success "Parametros de rotacao e protecao de disco configurados no auditd.conf."
 fi
 
+log_info "Criando regras de auditoria em tempo real em /etc/audit/rules.d/web_security.rules..."
+mkdir -p /etc/audit/rules.d
+cat <<EOF > /etc/audit/rules.d/web_security.rules
 # ==============================================================================
-# 13. INTEGRAÇÃO DO FAIL2BAN (JAILS WEB APACHE)
+# REGRAS DE AUDITORIA DE SEGURANCA WEB (AUDITD)
+# Monitoramento de alteracoes em arquivos, configuracoes e servicos
 # ==============================================================================
-if command -v fail2ban-client > /dev/null 2>&1 || [ -d /etc/fail2ban ]; then
-    log_info "Integrando jails de proteção Web (Apache Auth e BadBots) ao Fail2Ban..."
-    mkdir -p /var/log/apache2 /etc/fail2ban/jail.d
-    touch /var/log/apache2/error.log /var/log/apache2/access.log
-    chown -R www-data:adm /var/log/apache2 > /dev/null 2>&1 || true
 
-    # Adiciona de forma modular sem sobrescrever a jail SSH já configurada no pos_install_server
-    cat <<EOF > /etc/fail2ban/jail.d/apache-joomla.local
+# 1. Monitora criacao, escrita (w) e alteracao de atributos/permissoes (a) no diretorio do site
+-w ${JOOMLA_ROOT} -p wa -k web_modificacoes
+
+# 2. Monitora alteracoes nos arquivos de configuracao do Apache
+-w /etc/apache2/ -p wa -k config_apache
+
+# 3. Monitora alteracoes nos arquivos de configuracao do PHP
+-w /etc/php/ -p wa -k config_php
+
+# 4. Monitora alteracoes nos arquivos de configuracao do MariaDB / MySQL
+-w /etc/mysql/ -p wa -k config_mysql
+EOF
+
+log_info "Carregando regras de auditoria no kernel..."
+augenrules --load > /dev/null 2>&1 || true
+systemctl enable --now auditd > /dev/null 2>&1 || true
+service auditd restart > /dev/null 2>&1 || true
+log_success "Auditd ativo e monitorando modificacoes no diretorio '${JOOMLA_ROOT}' (tag: web_modificacoes)."
+
+# ==============================================================================
+# 13. INTEGRACAO DE FIREWALL (UFW) E FAIL2BAN
+# ==============================================================================
+print_header "INTEGRACAO DE SEGURANCA DE BORDA (UFW & FAIL2BAN)"
+
+if command -v ufw > /dev/null 2>&1; then
+    log_info "Garantindo liberacao das portas HTTP (80/tcp) e HTTPS (443/tcp) no UFW Firewall..."
+    ufw allow 80/tcp > /dev/null 2>&1
+    ufw allow 443/tcp > /dev/null 2>&1
+    log_success "Regras de Firewall UFW validadas para trafego Web (80/443)."
+fi
+
+if [ -d /etc/fail2ban/jail.d ]; then
+    log_info "Configurando jaula modular do Fail2Ban para protecao Web..."
+    cat <<'EOF' > /etc/fail2ban/jail.d/apache-joomla.local
 [apache-auth]
 enabled = true
 port    = http,https
-logpath = /var/log/apache2/*error.log
+logpath = %(apache_error_log)s
+maxretry = 5
+findtime = 600
+bantime  = 3600
 
 [apache-badbots]
 enabled  = true
 port     = http,https
-logpath  = /var/log/apache2/*error.log
+logpath  = %(apache_access_log)s
 maxretry = 2
-bantime  = 24h
+bantime  = 86400
 EOF
-
     systemctl restart fail2ban > /dev/null 2>&1 || true
-    log_success "Proteção Apache Auth e BadBots ativada modularmente no Fail2Ban (/etc/fail2ban/jail.d/apache-joomla.local)."
+    log_success "Jaulas 'apache-auth' e 'apache-badbots' ativadas no Fail2Ban."
 fi
 
-# Reinicia o Apache com todas as alterações
-systemctl restart apache2 > /dev/null 2>&1
-
+systemctl restart "php${PHP_VER}-fpm" > /dev/null 2>&1 || systemctl restart php-fpm > /dev/null 2>&1 || true
+systemctl restart apache2 > /dev/null 2>&1 || true
 # ==============================================================================
-# 14. RESUMO FINAL DO SISTEMA E INSTRUÇÕES
+# 14. PAINEL DE RESUMO FINAL E AUDITORIA
 # ==============================================================================
-SERVER_IP=$(hostname -I | awk '{print $1}')
-[ -z "$SERVER_IP" ] && SERVER_IP="localhost"
+SERVER_IP=$(curl -s -4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 
-print_header "RESUMO DO SISTEMA - INSTALAÇÃO DO JOOMLA 5 CONCLUÍDA"
+print_header "RESUMO DA INSTALACAO E BLINDAGEM - JOOMLA 5"
 
-echo -e "  ${FG_GREEN}${BOLD}✔ AMBIENTE JOOMLA 5 INSTALADO E ENDURECIDO COM SUCESSO!${NC}\n"
+echo -e "  ${FG_GREEN}${BOLD}✔ AMBIENTE LAMP JOOMLA 5 ENDURECIDO E OPERACIONAL!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}Domínio Configurado:${NC}     ${FG_CYAN}${DOMAIN_NAME}${NC}"
-echo -e "  ${BOLD}Diretório Raiz (Web):${NC}    ${FG_CYAN}${JOOMLA_ROOT}${NC}"
-echo -e "  ${BOLD}Servidor Web:${NC}            Apache 2.4.x [Rewrite, HTTP/2, FastCGI, Headers de Segurança]"
+echo -e "  ${BOLD}Dominio Configurado:${NC}     ${FG_CYAN}${DOMAIN_NAME}${NC}"
+echo -e "  ${BOLD}Diretorio Web Raiz:${NC}      ${FG_CYAN}${JOOMLA_ROOT}${NC}"
+echo -e "  ${BOLD}Servidor Web:${NC}            Apache 2.4.x [Rewrite, HTTP/2, FastCGI, Headers e Anti-Webshell]"
 echo -e "  ${BOLD}Banco de Dados:${NC}          MariaDB Server [UTF8MB4 / Collation Unicode CI]"
-echo -e "  ${BOLD}Versão do PHP:${NC}           PHP ${PHP_VER} (memory_limit = 512M, OPcache, APCu e Redis ativos)"
-echo -e "  ${BOLD}Permissões POSIX ACL:${NC}    ${FG_GREEN}Ativo e Herdando (${JOOMLA_ROOT})${NC}"
+echo -e "  ${BOLD}Versao do PHP:${NC}           PHP ${PHP_VER} (OPcache, APCu, Redis e disable_functions ativos)"
+echo -e "  ${BOLD}Permissoes POSIX ACL:${NC}    ${FG_GREEN}Ativo e Herdando (${JOOMLA_ROOT})${NC}"
 echo -e "  ${BOLD}Tarefas Agendadas (Cron):${NC} ${FG_GREEN}Ativo (cli/joomla.php a cada 5min)${NC}"
+echo -e "  ${BOLD}Auditoria em Tempo Real:${NC}  ${FG_GREEN}Auditd Ativo (Monitorando modificacoes web e configs)${NC}"
 echo -e "  ${BOLD}Firewall UFW & Fail2Ban:${NC}  ${FG_GREEN}Portas 80/443 liberadas e Jails Web ativas${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Credenciais do Banco de Dados para o Instalador Web do Joomla:${NC}"
-echo -e "    • Servidor (Host):       ${FG_CYAN}localhost${NC}"
-echo -e "    • Nome do Banco:         ${FG_CYAN}${JOOMLA_DB_NAME}${NC}"
-echo -e "    • Usuário do Banco:      ${FG_CYAN}${JOOMLA_DB_USER}${NC}"
-echo -e "    • Senha do Usuário:      ${FG_YELLOW}${JOOMLA_DB_PASS}${NC}"
-echo -e "    • Senha do MariaDB Root: ${FG_YELLOW}${DB_ROOT_PASS}${NC}"
+echo -e "    ▶ Servidor (Host):       ${FG_CYAN}localhost${NC}"
+echo -e "    ▶ Nome do Banco:        ${FG_CYAN}${JOOMLA_DB_NAME}${NC}"
+echo -e "    ▶ Usuario do Banco:      ${FG_CYAN}${JOOMLA_DB_USER}${NC}"
+echo -e "    ▶ Senha do Usuario:      ${FG_YELLOW}${JOOMLA_DB_PASS}${NC}"
+echo -e "    ▶ Senha do MariaDB Root: ${FG_YELLOW}${DB_ROOT_PASS}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-echo -e "  ${BOLD}URLs de Acesso para Finalizar a Instalação e Administração:${NC}"
-echo -e "    • Portal Principal (Domínio): ${FG_CYAN}http://${DOMAIN_NAME}/${NC}"
-echo -e "    • Painel Admin (Domínio):     ${FG_CYAN}http://${DOMAIN_NAME}/administrator${NC}"
-echo -e "    • Portal Principal (Via IP):  ${FG_CYAN}http://${SERVER_IP}/${NC}"
-echo -e "    • Painel Admin (Via IP):      ${FG_CYAN}http://${SERVER_IP}/administrator${NC}"
-echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
-
-echo -e "\n  ${BOLD}🔒 MEDIDAS DE SEGURANÇA E HARDENING APLICADAS:${NC}"
-echo -e "  ${FG_YELLOW}1. Proteção contra Injeção e Vazamento de Cookies e Sessão (PHP):${NC}"
-echo -e "     • ${BOLD}session.cookie_httponly = 1${NC} (Impede roubo de cookies via scripts XSS)"
-echo -e "     • ${BOLD}session.cookie_samesite = 'Lax'${NC} (Mitiga ataques CSRF / Cross-Site Request Forgery)"
-echo -e "     • ${BOLD}session.use_strict_mode = 1 / session.use_only_cookies = 1${NC} (Evita fixação e sequestro de sessão)"
-echo -e "     • ${BOLD}display_errors = Off / log_errors = On${NC} (Oculta caminhos internos do servidor e registra erros em log privado)"
-echo -e "     • ${BOLD}allow_url_include = Off / expose_php = Off${NC} (Impede RFI e oculta versão do PHP nos cabeçalhos)"
-echo -e "     • ${BOLD}disable_functions expandido${NC} (Desativa exec, shell_exec, system, proc_open, popen, curl_multi_exec)"
-echo -e "  ${FG_YELLOW}2. Endurecimento de Segurança e Módulos no Apache:${NC}"
-echo -e "     • ${BOLD}Módulos Inseguros Desativados:${NC} autoindex (impede navegação por pastas) e status (oculta telemetria)"
-echo -e "     • ${BOLD}Proteção contra XST:${NC} TraceEnable Off (Bloqueia requisições do método HTTP TRACE)"
-echo -e "     • ${BOLD}Bloqueio de Arquivos Sensíveis:${NC} Impede acesso direto a .git, .env, .htaccess, .log, .sql, .bak, .sh e .ini"
-echo -e "     • ${BOLD}Injeção de Cabeçalhos:${NC} X-Content-Type-Options (nosniff), X-Frame-Options (SAMEORIGIN), XSS-Protection"
-echo -e "  ${FG_YELLOW}3. Permissões Granulares e Isolamento:${NC}"
-echo -e "     • Herança contínua via POSIX ACLs restrita ao usuário www-data"
-echo -e "     • Banco de dados dedicado com privilégios limitados estritamente ao banco do Joomla"
+echo -e "  ${BOLD}URLs de Acesso para Finalizar a Instalacao e Administracao:${NC}"
+echo -e "    ▶ Portal Principal (Dominio): ${FG_CYAN}http://${DOMAIN_NAME}/${NC}"
+echo -e "    ▶ Painel Admin (Dominio):     ${FG_CYAN}http://${DOMAIN_NAME}/administrator${NC}"
+echo -e "    ▶ Portal Principal (Via IP):  ${FG_CYAN}http://${SERVER_IP}/${NC}"
+echo -e "    ▶ Painel Admin (Via IP):      ${FG_CYAN}http://${SERVER_IP}/administrator${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
-echo -e "\n  ${BOLD}⚙️ O QUE FAZ O AGENDADOR DE TAREFAS (CRON JOOMLA 5):${NC}"
+echo -e "\n  ${BOLD}斡️ MEDIDAS DE SEGURANCA E HARDENING APLICADAS:${NC}"
+echo -e "  ${FG_YELLOW}1. Bloqueio de Execucao PHP em Pastas Estaticas (Apache):${NC}"
+echo -e "    ▶ Proibe terminantemente execucao de .php/.phtml em assets, images, cache, tmp e media"
+echo -e "    ▶ Bloqueio de acesso a arquivos de backup e logs (.sql, .bak, .log, .sh, .env, .git)"
+echo -e "    ▶ Injecao de Headers de Seguranca: X-Content-Type-Options, X-Frame-Options, XSS-Protection"
+echo -e "  ${FG_YELLOW}2. Protecao contra Injecao e Hardening do PHP:${NC}"
+echo -e "    ▶ ${BOLD}disable_functions:${NC} Bloqueia exec, shell_exec, system, proc_open, popen, pcntl_exec"
+echo -e "    ▶ ${BOLD}session.cookie_httponly = 1 / session.cookie_samesite = 'Lax'${NC} (Protecao CSRF/XSS)"
+echo -e "    ▶ ${BOLD}allow_url_include = Off / expose_php = Off / display_errors = Off${NC}"
+echo -e "  ${FG_YELLOW}3. Auditoria do Sistema em Tempo Real com Auditd:${NC}"
+echo -e "    ▶ Rastreia qualquer arquivo criado, modificado ou excluido dentro de ${JOOMLA_ROOT}"
+echo -e "    ▶ Consultar alteracoes web:  ${FG_CYAN}sudo ausearch -k web_modificacoes -i${NC}"
+echo -e "    ▶ Consultar eventos recentes: ${FG_CYAN}sudo ausearch -k web_modificacoes -ts recent -i${NC}"
+echo -e "    ▶ Relatorio consolidado:      ${FG_CYAN}sudo aureport -f -i --summary${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+
+echo -e "\n  ${BOLD}⏱️ O QUE FAZ O AGENDADOR DE TAREFAS (CRON JOOMLA 5):${NC}"
 echo -e "  O comando ${FG_CYAN}cli/joomla.php scheduler:run${NC} executa a cada 5min em segundo plano:"
-echo -e "    • ${BOLD}Limpeza Automática:${NC}  Remove cache obsoleto e sessões expiradas para não inflar o banco"
-echo -e "    • ${BOLD}Smart Search:${NC}        Atualiza o índice de busca inteligente com os novos conteúdos"
-echo -e "    • ${BOLD}Segurança:${NC}           Verifica atualizações do Joomla/extensões e notifica o admin"
-echo -e "    • ${BOLD}Fila de E-mails:${NC}     Processa envio em lote de newsletters/contatos sem travar o site"
-echo -e "    • ${BOLD}Artigos Agendados:${NC}   Publica e despublica conteúdos programados pontualmente"
+echo -e "    ▶ ${BOLD}Limpeza Automatica:${NC}  Remove cache obsoleto e sessoes expiradas para nao inflar o banco"
+echo -e "    ▶ ${BOLD}Smart Search:${NC}        Atualiza o indice de busca inteligente com os novos conteudos"
+echo -e "    ▶ ${BOLD}Seguranca:${NC}           Verifica atualizacoes do Joomla/extensoes e notifica o admin"
+echo -e "    ▶ ${BOLD}Fila de E-mails:${NC}     Processa envio em lote de newsletters/contatos sem travar o site"
+echo -e "    ▶ ${BOLD}Artigos Agendados:${NC}   Publica e despublica conteudos programados pontualmente"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 
-echo -e "\n  ${BOLD}📌 APONTAMENTO DE DNS RECOMENDADO:${NC}"
-echo -e "  Crie no painel DNS do seu domínio (${DOMAIN_NAME}):"
-echo -e "    • Tipo ${FG_CYAN}A${NC}  | Nome: ${FG_YELLOW}@${NC}   | Destino (IP): ${FG_GREEN}${SERVER_IP}${NC}"
-echo -e "    • Tipo ${FG_CYAN}A${NC}  | Nome: ${FG_YELLOW}www${NC} | Destino (IP): ${FG_GREEN}${SERVER_IP}${NC}"
+echo -e "\n  ${BOLD}网 APONTAMENTO DE DNS RECOMENDADO:${NC}"
+echo -e "  Crie no painel DNS do seu dominio (${DOMAIN_NAME}):"
+echo -e "    ▶ Tipo ${FG_CYAN}A${NC}  | Nome: ${FG_YELLOW}@${NC}   | Destino (IP): ${FG_GREEN}${SERVER_IP}${NC}"
+echo -e "    ▶ Tipo ${FG_CYAN}A${NC}  | Nome: ${FG_YELLOW}www${NC} | Destino (IP): ${FG_GREEN}${SERVER_IP}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 # ==============================================================================
-# 15. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# 15. GERACAO E SALVAMENTO DOS ARQUIVOS DE LOG DA INSTALACAO
 # ==============================================================================
-print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
+print_header "ARQUIVOS DE LOG DA INSTALACAO"
 
-# Salva cópias no diretório /root
 cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
 cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
 log_success "Log salvo em: /root/${LOG_FILENAME}"
-log_success "Atalho do último log: /root/${LOG_LATEST}"
+log_success "Atalho do ultimo log: /root/${LOG_LATEST}"
 
-# Se executado via sudo, salva também na pasta home do usuário real
 if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
     REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
     if [ -d "$REAL_USER_HOME" ]; then
@@ -774,4 +780,4 @@ rm -f "$LOG_TMP" 2>/dev/null || true
 
 draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
-echo -e "${FG_GREEN}${BOLD}❯ Instalação do ambiente Joomla 5 finalizada com sucesso!${NC}\n"
+echo -e "${FG_GREEN}${BOLD}✔ Instalacao do ambiente Joomla 5 finalizada com sucesso!${NC}\n"
