@@ -43,6 +43,7 @@
 >    - Todas as perguntas (`read -p`) devem ser agrupadas no início em um bloco chamado `"COLETA DE PARÂMETROS"`.
 >    - Utilize o padrão `  ${FG_YELLOW}${ARROW} Pergunta? (s/N): ${NC}` nas perguntas do `read` (onde `(s/N)` indica que o padrão ao apertar ENTER é Não).
 >    - **Feedback Visual Imediato (`log_info`)**: Imediatamente após a coleta de qualquer entrada do usuário (seja um valor digitado, gerado aleatoriamente ou o valor padrão assumido ao dar ENTER), exiba uma linha com `log_info` confirmando o valor definido (ex: `log_info "Nome do Banco definido: ${FG_GREEN}${JOOMLA_DB_NAME}${NC}"`). Isso dá clareza e segurança visual ao operador.
+>    - **Exceção Obrigatória para Segredos**: Senhas, tokens, chaves e outros segredos devem usar `read -r -s`/`read -r -sp`. O feedback deve confirmar apenas que o valor foi recebido ou gerado, sem revelar conteúdo, comprimento ou parte do segredo no console ou log.
 > 
 > 4. **Instalação Silenciosa e Limpa (`apt-get`)**:
 >    - **Regra Obrigatória:** Sempre utilize **`apt-get`** em vez de `apt` para garantir máxima compatibilidade, estabilidade de CLI e execução não-interativa segura sem avisos ou caracteres ocultos nos arquivos de log.
@@ -110,8 +111,9 @@
 >    Todas as etapas lógicas de execução do script devem ser claramente identificadas por cabeçalhos e comentários numerados sequencialmente (ex: `# 1. VERIFICAÇÃO DE PRIVILÉGIOS`, `# 2. COLETA DE PARÂMETROS`, ..., `# N. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG`). Isso facilita a auditoria, leitura e manutenção do código.
 > 
 > 9. **Gestão de Permissões Granulares e POSIX ACLs (Herança Web & Desenvolvedores)**:
->    - **Travessia Obrigatória de Diretórios Pai (`+x`)**: Quando o `DocumentRoot` ou diretório de aplicação estiver localizado em pontos de montagem externos ou caminhos customizados (ex: `/arquivos/sistemas/site/meusite`), garanta permissão de execução (`chmod o+x`) em todas as pastas pai recursivamente até a raiz (`/`), evitando que usuários não-root sofram bloqueio de travessia (*Permission denied*).
->    - **Herança Contínua com Default ACLs (`setfacl`)**: Sempre configure ACLs recursivas e padrão (`setfacl -R -d -m`) para `www-data` e opcionalmente para usuários desenvolvedores do sistema (`DEV_USER`), garantindo que uploads via Apache ou envios de arquivos via SFTP/SSH herdem permissões `rwx` mútuas sem conflito de permissão.
+>    - **Travessia com Menor Privilégio**: Nunca aplique `chmod o+x` indiscriminadamente em toda a árvore pai. Quando necessário, conceda somente travessia ao usuário ou grupo do serviço com ACL específica, por exemplo `setfacl -m u:www-data:--x <diretorio>`, após validar e resolver o caminho absoluto.
+>    - **Código Não Gravável pelo Serviço Web**: O código da aplicação deve pertencer a `root` ou ao usuário de deploy e ser apenas legível pelo processo web. Conceda escrita ao `www-data` exclusivamente nas pastas documentadas como mutáveis (uploads, cache, sessões e temporários).
+>    - **Default ACLs Restritas**: Aplique ACLs recursivas e padrão somente dentro das pastas mutáveis. É proibido conceder `rwx` recursivo ao serviço web sobre todo o `DocumentRoot`.
 > 
 > 10. **Isolamento e Separação Rígida por Versão da Distribuição (OS Release Branching)**:
 >    - **Regra Arquitetural Obrigatória:** Quando houver diferenças de repositórios, versões de pacotes ou comportamentos entre versões de SO (ex: Ubuntu 22.04 / 24.04 LTS vs Ubuntu 26.04 Dev), **SEPARE RIGOROSAMENTE** os blocos de código em condicionais explícitas baseadas em `lsb_release -rs` ou `/etc/os-release`.
@@ -124,7 +126,13 @@
 >      LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
 >      LOG_FILENAME="relatorio_nome_do_script_${LOG_TIMESTAMP}.log"
 >      LOG_LATEST="relatorio_nome_do_script_latest.log"
->      LOG_TMP="/tmp/${LOG_FILENAME}"
+>      umask 077
+>      RUNTIME_DIR=$(mktemp -d -p /tmp nome_do_script.XXXXXXXX) || exit 1
+>      chmod 700 "$RUNTIME_DIR"
+>      LOG_TMP="${RUNTIME_DIR}/${LOG_FILENAME}"
+>      touch "$LOG_TMP" && chmod 600 "$LOG_TMP"
+>      cleanup() { rm -rf -- "$RUNTIME_DIR"; }
+>      trap cleanup EXIT INT TERM HUP
 >      exec > >(tee -a "$LOG_TMP") 2>&1
 >      ```
 >    - Na **última etapa numerada do script**, salve automaticamente cópias com timestamp e o atalho padronizado `relatorio_<nome_do_script>_latest.log` no diretório `/root` e na Home do usuário real que executou o comando via `sudo`:
@@ -137,21 +145,21 @@
 >      # Salva cópias no diretório /root
 >      cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
 >      cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
+>      chmod 600 "/root/${LOG_FILENAME}" "/root/${LOG_LATEST}" 2>/dev/null || true
 >      log_success "Log salvo em: /root/${LOG_FILENAME}"
 >      log_success "Atalho do último log: /root/${LOG_LATEST}"
 >
 >      # Se executado via sudo, salva também na pasta home do usuário real
->      if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+>      if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
 >        REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
 >        if [ -d "$REAL_USER_HOME" ]; then
 >          cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
 >          cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
+>          chmod 600 "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
 >          chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
 >          log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
 >        fi
 >      fi
->
->      rm -f "$LOG_TMP" 2>/dev/null || true
 >
 >      draw_separator
 >      echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
@@ -207,8 +215,26 @@
 > 
 > 14. **Gestão Segura de Credenciais e Prevenção de Falsos Positivos (GitGuardian / Secret Scanners)**:
 >    - **Zero Hardcoded Secrets**: Nunca inclua senhas, tokens de API ou chaves em texto plano no código dos scripts.
->    - **Geração e Coleta Segura**: Senhas devem ser geradas dinamicamente em tempo de execução via `openssl rand -base64 16` ou solicitadas interativamente com entrada oculta via `read -sp`.
+>    - **Geração e Coleta Segura**: Senhas devem ser geradas dinamicamente em tempo de execução via `openssl rand -hex 18` ou solicitadas interativamente com entrada oculta via `read -r -sp`.
+>    - **Segredos Fora dos Logs**: Nunca imprimir credenciais no resumo, em funções `log_*`, em argumentos de linha de comando ou em arquivos de relatório. Quando for indispensável persistir uma credencial, usar arquivo dedicado, proprietário `root:root`, modo `0600`, fora do `DocumentRoot` e informar somente seu caminho.
 >    - **Placeholders Padronizados em Exemplos**: Em qualquer documentação, comentário ou mensagem do script, utilize obrigatoriamente tags genéricas entre colchetes angulares (`<senha_do_usuario>`, `<chave_secreta>`, `<host_smtp>`) para evitar o disparo acidental de ferramentas de auditoria e scanners de segredos.
+> 
+> 15. **Execução Estrita, Validação e Falha Segura**:
+>    - Iniciar scripts Bash com `set -Eeuo pipefail` e `umask 077`. Usar `trap` para limpeza de temporários e tratamento de interrupções.
+>    - Validar por lista de permissões todos os valores usados em caminhos, nomes de arquivos, SQL, cron, systemd, Apache/Nginx e outras configurações privilegiadas. Rejeitar quebras de linha, caracteres de controle, caminhos relativos e destinos críticos.
+>    - Não mascarar falhas críticas com `|| true`. Instalação de dependências, validação de configuração e início de serviços devem abortar com mensagem clara. Antes de recarregar um serviço, executar seu teste nativo de configuração.
+> 
+> 16. **Cadeia de Suprimentos e Arquivos Temporários**:
+>    - É proibido executar conteúdo remoto diretamente com construções como `curl ... | bash` ou `wget ... | sh`. Baixar por HTTPS, fixar a origem/versão e verificar assinatura ou checksum publicado por canal oficial antes de executar ou extrair.
+>    - Nunca usar nomes previsíveis em `/tmp`. Criar diretório privado com `mktemp -d`, modo `0700`, arquivos modo `0600` e limpeza via `trap`. Validar arquivos compactados contra caminhos absolutos e travessia (`../`) antes da extração.
+> 
+> 17. **Menor Privilégio para Bancos, Rede e Serviços Web**:
+>    - Usuários de aplicação devem ser restritos ao host necessário, sem curingas como `'%'` e sem `GRANT OPTION`, salvo requisito explícito documentado. Bancos locais devem escutar apenas em loopback.
+>    - Firewalls devem preservar primeiro a porta SSH efetivamente configurada, aplicar política de entrada restritiva e abrir somente serviços instalados e validados.
+>    - Aplicações com autenticação devem oferecer HTTPS antes do uso em produção; habilitar redirecionamento, cookies `Secure` e HSTS somente após um certificado válido estar ativo.
+>    - Quando um controle depender do kernel ou do ambiente (por exemplo, regras do `auditd`), detectar explicitamente ambientes restritos como WSL. Nunca silenciar a falha: informar no resumo final que a proteção ficou indisponível e manter a falha bloqueante nos servidores Linux suportados.
+>    - Se uma instalação web exigir o arquivo de configuração inicial, preferir o fluxo que exporta a configuração para instalação controlada como administrador. Não criar arquivo vazio quando a aplicação o interpretar como configuração válida e nunca liberar escrita do processo web no diretório inteiro de código.
+>    - Escrita persistente do processo web em toda a árvore da aplicação só pode ser habilitada mediante autorização explícita para o diretório exato. O script deve avisar que permite instaladores, extensões e atualizações pelo painel, mas reduz a contenção caso o processo web seja comprometido.
 > 
 > Aqui está o script original que deve ser adaptado:
 > `[INSIRA O SCRIPT AQUI]`"

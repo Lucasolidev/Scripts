@@ -3,12 +3,12 @@
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
 ![Joomla](https://img.shields.io/badge/Joomla_5-5091CD?style=flat&logo=joomla&logoColor=white)
 ![Apache](https://img.shields.io/badge/Apache-D22128?style=flat&logo=apache&logoColor=white)
-![MariaDB](https://img.shields.io/badge/MariaDB_11.4_LTS-003545?style=flat&logo=mariadb&logoColor=white)
+![MariaDB](https://img.shields.io/badge/MariaDB-Ubuntu_Repository-003545?style=flat&logo=mariadb&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP_8.3-777BB4?style=flat&logo=php&logoColor=white)
 ![Auditd](https://img.shields.io/badge/Auditd-Realtime_Monitor-0078D4?style=flat&logo=linux&logoColor=white)
-![Security](https://img.shields.io/badge/Security-Hardened_v2.1-28A745?style=flat&logo=dependabot&logoColor=white)
+![Security](https://img.shields.io/badge/Security-Hardened_v2.2-28A745?style=flat&logo=dependabot&logoColor=white)
 
-Guia operacional rápido, referência técnica e *cheat sheet* para o ambiente de produção **Joomla 5** configurado através do script [`install_lamp_ubuntu_joomla5.sh`](../install_lamp_ubuntu_joomla5.sh). Abrange a operação do **Apache 2.4 com FastCGI/HTTP2**, **MariaDB 11.4 LTS (UTF8MB4)**, **PHP 8.3/8.5 (OPcache, APCu e Redis)**, **Blindagem Anti-Webshells**, **Auditoria em Tempo Real (Auditd)**, rotinas CLI do **Cron**, segurança com **Fail2Ban/UFW** e permissões **POSIX ACLs**.
+Guia operacional rápido, referência técnica e *cheat sheet* para o ambiente de produção **Joomla 5** configurado através do script [`install_lamp_ubuntu_joomla5.sh`](../install_lamp_ubuntu_joomla5.sh). Abrange a operação do **Apache 2.4 com FastCGI/HTTP2**, **MariaDB do repositório Ubuntu (UTF8MB4)**, **PHP nativo/PHP 8.3 (OPcache, APCu e Redis)**, **Blindagem Anti-Webshells**, **Auditoria em Tempo Real (Auditd)**, rotinas CLI do **Cron**, segurança com **Fail2Ban/UFW** e permissões **POSIX ACLs**.
 
 ---
 
@@ -31,20 +31,22 @@ Guia operacional rápido, referência técnica e *cheat sheet* para o ambiente d
 
 ## ⚙️ 2. Execução Rápida do Script
 
-### Execução via Linha Única
+### Execução segura
 ```bash
-wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_lamp_ubuntu_joomla5.sh -O install_lamp_ubuntu_joomla5.sh && chmod +x install_lamp_ubuntu_joomla5.sh && sudo ./install_lamp_ubuntu_joomla5.sh
+# Após revisar localmente a origem e a integridade do arquivo
+chmod +x install_lamp_ubuntu_joomla5.sh
+sudo ./install_lamp_ubuntu_joomla5.sh
 ```
 
-### O que o instalador aplica automaticamente (v2.1):
+### O que o instalador aplica automaticamente (v2.2):
 * **Download Oficial do Joomla 5.x**: Baixa e descompacta automaticamente a última versão estável oficial do Joomla 5 no DocumentRoot.
 * **Blindagem Anti-Webshell no Apache**: Bloqueio de execução de scripts PHP (`.php`, `.phtml`, `.php5`, `.inc`) dentro das pastas `assets`, `images`, `cache`, `tmp`, `media` e `phocadownloadpap`.
-* **Bloqueio de Extensões Sensíveis**: Nega acesso direto via web para extensões de backup e scripts (`.log`, `.sql`, `.bak`, `.old`, `.orig`, `.ini`, `.sh`, `.tar`, `.gz`, `.zip`).
+* **Bloqueio de Extensões Sensíveis**: Nega acesso direto via web para backups e scripts (`.log`, `.sql`, `.bak`, `.old`, `.orig`, `.ini`, `.sh`, `.tar`, `.zip`). Recursos nativos Joomla `CSS.gz` e `JS.gz` continuam acessíveis.
 * **Proteção de Arquivos Ocultos**: Bloqueia acesso a `.git`, `.env`, `.user.ini`, preservando o funcionamento pleno do `.htaccess`.
-* **Suíte PHP Completa e Hardening**: Instala PHP 8.3/8.5 com `disable_functions` rigoroso (`exec`, `shell_exec`, `system`, `passthru`, `proc_open`, `popen`, `show_source`, `pcntl_exec`), `session.cookie_httponly = 1`, `session.cookie_samesite = 'Lax'`.
-* **Auditoria em Tempo Real (Auditd)**: Monitora em ncvel de kernel qualquer alteração, criação ou deleção de arquivos no diretório web (`-k web_modificacoes`).
+* **Suíte PHP Completa e Hardening**: Ubuntu 24.04 usa PHP 8.3 nativo e assinado pelo repositório Ubuntu; Ubuntu 22.04 usa o PPA configurado pelo script para PHP 8.3; versões posteriores usam a suíte nativa disponível. Aplica `disable_functions`, `HttpOnly` e `SameSite=Lax`.
+* **Auditoria em Tempo Real (Auditd)**: Monitora, em nível de kernel, alterações no diretório web (`-k web_modificacoes`). No WSL as regras são informadas como indisponíveis, pois o kernel não oferece suporte.
 * **Cron Oficial Integrado**: Cria o agendador de 5 minutos executando `cli/joomla.php scheduler:run` para limpeza de cache e publicação de artigos.
-* **POSIX ACLs e Travessia**: Permissões `775/664` com herança contínua mútua entre `www-data` e o desenvolvedor (`DEV_USER`).
+* **POSIX ACLs e Escrita Web**: Neste perfil autorizado, `www-data` recebe escrita recursiva e herdável em toda a árvore Joomla, permitindo instalador, extensões e atualizações pelo painel. Isso reduz a contenção se o processo web for comprometido.
 
 ---
 
@@ -161,17 +163,17 @@ cat /etc/cron.d/joomla5_*
 
 ---
 
-## 🔒 8. Gestão de Permissões Granulares (POSIX ACLs)
+## 🔒 8. Gestão de Permissões e Escrita Web (POSIX ACLs)
 
 Para conceder acesso total a um desenvolvedor (ex: `developer_user`) na pasta do site (inclusive em pontos de montagem como `/arquivos/sistemas/site/meusite`):
 
 ```bash
-# 1. Garantir permissões de travessia em todas as pastas pai
-sudo chmod o+x /arquivos /arquivos/sistemas /arquivos/sistemas/site
+# 1. Garantir travessia ao Apache sem expor as pastas pai a todos os usuários
+sudo setfacl -m u:www-data:--x /arquivos /arquivos/sistemas /arquivos/sistemas/site
 
-# 2. Aplicar permissões recursivas e herança padrão para www-data e o desenvolvedor
-sudo setfacl -R -m u:www-data:rwx,g:www-data:rwx,u:developer_user:rwx,g:developer_user:rwx /var/www/html/meu_site.com.br
-sudo setfacl -R -d -m u:www-data:rwx,g:www-data:rwx,u:developer_user:rwx,g:developer_user:rwx /var/www/html/meu_site.com.br
+# 2. Modo atualmente autorizado: escrita web em toda a árvore Joomla
+sudo setfacl -R -m u:www-data:rwX,m::rwX /var/www/html/meu_site.com.br
+sudo find /var/www/html/meu_site.com.br -type d -exec setfacl -m d:u:www-data:rwx,d:m::rwx {} +
 
 # 3. Auditar a herança de permissões ativa
 getfacl /var/www/html/meu_site.com.br
@@ -185,11 +187,9 @@ getfacl /var/www/html/meu_site.com.br
 # Verificar status da jaula Apache/Joomla no Fail2Ban
 sudo fail2ban-client status apache-badbots
 sudo fail2ban-client status apache-auth
-sudo fail2ban-client status joomla-admin
 
 # Desbloquear um IP bloqueado por engano
 sudo fail2ban-client set apache-badbots unbanip 192.168.1.100
-sudo fail2ban-client set joomla-admin unbanip 192.168.1.100
 
 # Acompanhar logs de acessos e erros do Joomla e Apache em tempo real
 sudo tail -f /var/log/apache2/*access.log

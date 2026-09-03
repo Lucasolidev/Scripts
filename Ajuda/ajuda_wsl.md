@@ -170,6 +170,48 @@ mkdir "D:\Backups\Temp\Ubuntu26-Custom"
 wsl --import Ubuntu-26-Custom "D:\Backups\Temp\Ubuntu26-Custom" "D:\Backups\Ubuntu26.04_Backup.vhdx" --vhd
 ```
 
+### Clonar diretamente uma distro base usando o arquivo VHDX
+Execute os comandos no **PowerShell**, dentro da pasta que contém os diretórios das distribuições. Antes da cópia, desligue o WSL para garantir que o disco virtual não esteja em uso.
+
+#### Clonar `Ubuntu-24.04-ShellCheck` como `Ubuntu-24.04-Teste`
+```powershell
+wsl --shutdown
+
+New-Item -ItemType Directory -Force ".\Ubuntu-24.04-Teste"
+
+Copy-Item `
+  ".\Ubuntu-24.04-ShellCheck\shellcheck.vhdx" `
+  ".\Ubuntu-24.04-Teste\ubuntu-teste.vhdx" `
+  -Force
+
+wsl --import-in-place `
+  Ubuntu-24.04-Teste `
+  (Resolve-Path ".\Ubuntu-24.04-Teste\ubuntu-teste.vhdx")
+```
+
+#### Clonar `Ubuntu-26.04-ShellCheck` como `Ubuntu-26.04-Teste`
+```powershell
+wsl --shutdown
+
+New-Item -ItemType Directory -Force ".\Ubuntu-26.04-Teste"
+
+Copy-Item `
+  ".\Ubuntu-26.04-ShellCheck\ubuntu-26-shellcheck.vhdx" `
+  ".\Ubuntu-26.04-Teste\ubuntu-teste.vhdx" `
+  -Force
+
+wsl --import-in-place `
+  Ubuntu-26.04-Teste `
+  (Resolve-Path ".\Ubuntu-26.04-Teste\ubuntu-teste.vhdx")
+```
+
+> 💡 O primeiro argumento de `wsl --import-in-place` é o nome da nova distribuição. O segundo deve ser o caminho do VHDX copiado. As distribuições `Ubuntu-24.04-ShellCheck` e `Ubuntu-26.04-ShellCheck` permanecem intactas como bases.
+
+Confira as distribuições registradas:
+```powershell
+wsl --list --verbose
+```
+
 ### Excluir / Desinstalar uma distribuição (⚠️ Ação Irreversível)
 ```powershell
 wsl --unregister NomeDaDistro
@@ -368,5 +410,4 @@ Com a montagem automática desativada, a sessão nativa do MobaXterm não funcio
   * `vmIdleTimeout=-1` para **nunca** desligar por inatividade.
   * `vmIdleTimeout=600000` para aumentar a tolerância para **10 minutos** (ou outro valor em milissegundos).
 * Depois de salvar o arquivo, execute `wsl --shutdown` no PowerShell para aplicar.
-
 
