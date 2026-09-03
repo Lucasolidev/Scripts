@@ -129,17 +129,76 @@ wsl --status
 
 ## 💾 4. Backup, Restauração e Exclusão de Distros (`.tar` e `.vhdx`)
 
-### Criar backup (Exportar) de uma distro inteira
-```powershell
-# Criar a pasta que centralizará os arquivos e as cópias do WSL
-New-Item -ItemType Directory -Force "C:\Users\Administrador\WSL"
+### Estrutura final deste guia
 
-# Exportar as distros-base como discos VHDX (mais rápido e sem compactação)
-wsl --export Ubuntu-24.04 "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste.vhdx" --vhd
-wsl --export Ubuntu-26.04 "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste.vhdx" --vhd
+As imagens-base ficam separadas das instalações ativas. Assim, elas podem ser reutilizadas para criar ambientes de teste independentes:
+
+```text
+C:\WSL\
+├── Ubuntu-26.04.vhdx          # imagem-base pronta
+├── Ubuntu-24.04.vhdx          # imagem-base pronta
+├── Ubuntu-26.04\              # distribuição principal importada
+├── Ubuntu-24.04\              # distribuição importada
+├── Ubuntu-26.04-Teste\        # criada somente quando necessário
+├── Ubuntu-24.04-Teste\        # criada somente quando necessário
+└── wsl-pass.txt               # credenciais solicitadas
 ```
 
-> 💡 O `--export` cria um arquivo de backup; ele **não** cria uma nova distribuição registrada. Nos comandos acima, `Ubuntu-24.04` e `Ubuntu-26.04` são as distros-base, enquanto `Ubuntu-24.04-Teste.vhdx` e `Ubuntu-26.04-Teste.vhdx` são os arquivos exportados.
+> ⚠️ O arquivo `C:\WSL\wsl-pass.txt` armazena a senha em texto puro. O script restringe suas permissões ao usuário atual, ao `SYSTEM` e aos administradores, mas o ideal é usar uma senha exclusiva para essas VMs e não reutilizá-la em outros serviços.
+
+### 1. Instalar as duas distribuições sem abrir a configuração interativa
+
+```powershell
+wsl --update
+wsl --set-default-version 2
+wsl --install -d Ubuntu-26.04 --no-launch
+wsl --install -d Ubuntu-24.04 --no-launch
+```
+
+Se o Windows solicitar uma reinicialização, reinicie antes de continuar.
+
+### 2. Atualizar, instalar o ShellCheck e criar o usuário
+
+Repita os comandos para cada distribuição. O script `Implantacao_WSL.ps1` automatiza esta etapa sem exibir a senha no terminal.
+
+```powershell
+# Ubuntu 26.04
+wsl -d Ubuntu-26.04 -u root -- bash -lc "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get -y dist-upgrade; apt-get install -y sudo shellcheck"
+wsl -d Ubuntu-26.04 -u root -- bash -lc "id -u administrador >/dev/null 2>&1 || useradd --create-home --shell /bin/bash administrador; usermod --append --groups sudo administrador; printf '[user]\ndefault=administrador\n' > /etc/wsl.conf"
+"administrador:<SuaSenhaWSL>" | wsl -d Ubuntu-26.04 -u root -- chpasswd
+
+# Ubuntu 24.04
+wsl -d Ubuntu-24.04 -u root -- bash -lc "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get -y dist-upgrade; apt-get install -y sudo shellcheck"
+wsl -d Ubuntu-24.04 -u root -- bash -lc "id -u administrador >/dev/null 2>&1 || useradd --create-home --shell /bin/bash administrador; usermod --append --groups sudo administrador; printf '[user]\ndefault=administrador\n' > /etc/wsl.conf"
+"administrador:<SuaSenhaWSL>" | wsl -d Ubuntu-24.04 -u root -- chpasswd
+```
+
+Salvar as credenciais solicitadas:
+
+```powershell
+New-Item -ItemType Directory -Force "C:\WSL"
+@'
+Distribuicoes: Ubuntu-26.04, Ubuntu-24.04
+Usuario: administrador
+Senha: <SuaSenhaWSL>
+'@ | Set-Content -Encoding utf8 "C:\WSL\wsl-pass.txt"
+
+$identidadeAtual = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+icacls "C:\WSL\wsl-pass.txt" /inheritance:r /grant:r "${identidadeAtual}:(F)" "*S-1-5-18:(F)" "*S-1-5-32-544:(F)"
+```
+
+### 3. Exportar as distribuições prontas como imagens-base
+
+Desligue o WSL para garantir consistência e exporte somente depois de concluir as atualizações:
+
+```powershell
+wsl --shutdown
+
+wsl --export Ubuntu-26.04 "C:\WSL\Ubuntu-26.04.vhdx" --vhd
+wsl --export Ubuntu-24.04 "C:\WSL\Ubuntu-24.04.vhdx" --vhd
+```
+
+> 💡 O `--export` apenas cria os arquivos VHDX. As distribuições registradas ainda continuam no local padrão até a execução de `wsl --unregister`.
 
 ### Onde fica uma distribuição instalada pela Store?
 Uma distribuição instalada com `wsl --install` é armazenada automaticamente pelo Windows no perfil do usuário. O local pode variar conforme a versão do WSL/Windows, normalmente em um destes formatos:
@@ -156,7 +215,7 @@ Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss\*" 
   Select-Object DistributionName, BasePath
 ```
 
-Para escolher o local da distro, use `wsl --import`. Neste guia, as cópias de teste ficam em `C:\Users\Administrador\WSL`.
+Para escolher o local da distro, use `wsl --import`. Neste guia, as imagens-base, as distribuições ativas e as cópias de teste ficam sob `C:\WSL`.
 
 ### Backup Físico Manual (Cópia direta do arquivo `ext4.vhdx`)
 Como cada distribuição do WSL 2 fica armazenada em um único arquivo de disco virtual (`ext4.vhdx`), você pode fazer um "snapshot físico" copiando o arquivo diretamente:
@@ -174,51 +233,82 @@ Como cada distribuição do WSL 2 fica armazenada em um único arquivo de disco 
 
 3. **Fazer o backup:** Copie o arquivo `ext4.vhdx` da pasta informada no `BasePath` para a sua pasta de backups ou HD externo.
 
-### Criar as distribuições de teste em `C:\Users\Administrador\WSL`
-Depois de exportar os VHDX acima, importe-os com os nomes das novas distribuições:
-```powershell
-# Registrar a cópia de teste do Ubuntu 24.04
-wsl --import Ubuntu-24.04-Teste `
-  "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste" `
-  "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste.vhdx" `
-  --vhd
+### 4. Remover as instalações do local padrão e reimportar em `C:\WSL`
 
-# Registrar a cópia de teste do Ubuntu 26.04
-wsl --import Ubuntu-26.04-Teste `
-  "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste" `
-  "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste.vhdx" `
-  --vhd
+Confirme primeiro que os dois arquivos existem e têm tamanho maior que zero:
+
+```powershell
+Get-Item "C:\WSL\Ubuntu-26.04.vhdx", "C:\WSL\Ubuntu-24.04.vhdx" |
+  Select-Object FullName, Length
 ```
 
-> ⚠️ O diretório de instalação passado ao `wsl --import` deve estar vazio ou ainda não existir. Após a importação, o VHDX passa a ser gerenciado dentro da pasta da distro de teste.
-
-### Fluxo completo: base atualizada → cópia de teste
-Execute no **PowerShell**. Antes de exportar, desligue o WSL para garantir uma cópia consistente do disco.
+> ⚠️ `wsl --unregister` apaga a instalação registrada e seus dados. Execute os comandos abaixo somente depois de validar os dois VHDX exportados.
 
 ```powershell
+wsl --unregister Ubuntu-26.04
+wsl --unregister Ubuntu-24.04
+
+wsl --import Ubuntu-26.04 "C:\WSL\Ubuntu-26.04" "C:\WSL\Ubuntu-26.04.vhdx" --vhd
+wsl --import Ubuntu-24.04 "C:\WSL\Ubuntu-24.04" "C:\WSL\Ubuntu-24.04.vhdx" --vhd
+
+wsl --set-default Ubuntu-26.04
 wsl --shutdown
-
-# 1. Exportar as bases atualizadas
-New-Item -ItemType Directory -Force "C:\Users\Administrador\WSL"
-wsl --export Ubuntu-24.04 "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste.vhdx" --vhd
-wsl --export Ubuntu-26.04 "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste.vhdx" --vhd
-
-# 2. Registrar as cópias com os nomes de teste
-wsl --import Ubuntu-24.04-Teste "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste" "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste.vhdx" --vhd
-wsl --import Ubuntu-26.04-Teste "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste" "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste.vhdx" --vhd
 ```
 
-As distribuições-base `Ubuntu-24.04` e `Ubuntu-26.04` permanecem intactas. Para iniciar uma cópia de teste:
+As imagens `C:\WSL\Ubuntu-26.04.vhdx` e `C:\WSL\Ubuntu-24.04.vhdx` permanecem como bases reutilizáveis. As distribuições ativas passam a ser armazenadas nas pastas de mesmo nome.
+
+### 5. Criar instâncias de teste a partir das imagens-base
+
+Quando precisar testar alguma alteração, importe novas cópias independentes:
 
 ```powershell
-wsl -d Ubuntu-24.04-Teste
-wsl -d Ubuntu-26.04-Teste
+wsl --import Ubuntu-26.04-Teste "C:\WSL\Ubuntu-26.04-Teste" "C:\WSL\Ubuntu-26.04.vhdx" --vhd
+wsl --import Ubuntu-24.04-Teste "C:\WSL\Ubuntu-24.04-Teste" "C:\WSL\Ubuntu-24.04.vhdx" --vhd
 ```
 
-Confira as distribuições registradas. A lista deve incluir `Ubuntu-24.04`, `Ubuntu-26.04`, `Ubuntu-24.04-Teste` e `Ubuntu-26.04-Teste`:
+Para iniciar as cópias:
+
+```powershell
+wsl -d Ubuntu-26.04-Teste
+wsl -d Ubuntu-24.04-Teste
+```
+
+Para descartar e recriar uma cópia de teste limpa:
+
+```powershell
+wsl --unregister Ubuntu-26.04-Teste
+wsl --import Ubuntu-26.04-Teste "C:\WSL\Ubuntu-26.04-Teste" "C:\WSL\Ubuntu-26.04.vhdx" --vhd
+```
+
+> ⚠️ O diretório informado no `wsl --import` precisa estar vazio ou não existir. Nunca use `--import-in-place` com as imagens-base: isso faria o WSL utilizar diretamente o VHDX que deve permanecer preservado.
+
+### 6. Automatizar o processo com PowerShell
+
+Execute o script em um **PowerShell como Administrador**, a partir da raiz do repositório `Scripts`:
+
+```powershell
+# Instalar, preparar, exportar, desregistrar e reimportar as bases
+.\Implantacao_WSL.ps1
+
+# Se as distribuições já existem e você quer prepará-las conscientemente
+.\Implantacao_WSL.ps1 -UsarDistribuicoesExistentes
+
+# Criar Ubuntu-26.04-Teste e Ubuntu-24.04-Teste quando necessário
+.\Implantacao_WSL.ps1 -Modo CriarTestes
+```
+
+No modo de preparação, o script solicita e confirma a senha com `Read-Host -AsSecureString`; informe a senha definida para essas VMs. O valor não fica gravado no código-fonte, mas é salvo em `C:\WSL\wsl-pass.txt` conforme solicitado. Antes de desregistrar as instalações originais, o script exige que você digite `DESREGISTRAR`. A opção `-SemConfirmacao` existe para execução automatizada, mas deve ser usada somente quando os VHDX já tiverem sido validados.
+
+Confira o resultado:
+
 ```powershell
 wsl --list --verbose
+wsl --status
+wsl -d Ubuntu-26.04 -- whoami
+wsl -d Ubuntu-26.04 -- shellcheck --version
 ```
+
+Referências oficiais: [comandos básicos do WSL](https://learn.microsoft.com/windows/wsl/basic-commands) e [configurações do `.wslconfig` e `/etc/wsl.conf`](https://learn.microsoft.com/windows/wsl/wsl-config).
 
 ### Excluir / Desinstalar uma distribuição (⚠️ Ação Irreversível)
 ```powershell
@@ -276,18 +366,18 @@ O WSL 2 pode consumir muita memória RAM se não for limitado. Crie o arquivo `C
 # Executar no PowerShell para criar o arquivo com limites de memória e desativar desligamento automático:
 @'
 [wsl2]
-memory=4GB
-processors=4
-swap=2GB
+memory=2GB
+processors=2
+swap=512MB
 localhostForwarding=true
 vmIdleTimeout=600000
-'@ | Out-File -Encoding utf8 "$HOME\.wslconfig"
+'@ | Out-File -Encoding utf8 "$env:USERPROFILE\.wslconfig"
 
 # Conferir o conteúdo criado:
-Get-Content "$HOME\.wslconfig"
+Get-Content "$env:USERPROFILE\.wslconfig"
 
 # Abrir no Bloco de Notas caso queira editar manualmente:
-notepad "$HOME\.wslconfig"
+notepad "$env:USERPROFILE\.wslconfig"
 
 # Aplicar as mudanças (OBRIGATÓRIO reiniciar a VM do WSL):
 wsl --shutdown
