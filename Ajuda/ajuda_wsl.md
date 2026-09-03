@@ -131,12 +131,32 @@ wsl --status
 
 ### Criar backup (Exportar) de uma distro inteira
 ```powershell
-# Exportar para arquivo .tar (compactado padrão)
-wsl --export Ubuntu-26.04 "D:\Backups\Ubuntu_Backup.tar"
+# Criar a pasta que centralizará os arquivos e as cópias do WSL
+New-Item -ItemType Directory -Force "C:\Users\Administrador\WSL"
 
-# Exportar diretamente o disco VHDX (muito mais rápido, sem compactar)
-wsl --export Ubuntu-26.04 "D:\Backups\Ubuntu_Backup.vhdx" --vhd
+# Exportar as distros-base como discos VHDX (mais rápido e sem compactação)
+wsl --export Ubuntu-24.04 "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste.vhdx" --vhd
+wsl --export Ubuntu-26.04 "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste.vhdx" --vhd
 ```
+
+> 💡 O `--export` cria um arquivo de backup; ele **não** cria uma nova distribuição registrada. Nos comandos acima, `Ubuntu-24.04` e `Ubuntu-26.04` são as distros-base, enquanto `Ubuntu-24.04-Teste.vhdx` e `Ubuntu-26.04-Teste.vhdx` são os arquivos exportados.
+
+### Onde fica uma distribuição instalada pela Store?
+Uma distribuição instalada com `wsl --install` é armazenada automaticamente pelo Windows no perfil do usuário. O local pode variar conforme a versão do WSL/Windows, normalmente em um destes formatos:
+
+```text
+%LOCALAPPDATA%\Packages\<pacote-da-distribuicao>\LocalState\ext4.vhdx
+%LOCALAPPDATA%\wsl\{GUID}\ext4.vhdx
+```
+
+Não é recomendado depender desses caminhos internos. Para verificar o caminho real de cada distribuição instalada, execute:
+
+```powershell
+Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss\*" |
+  Select-Object DistributionName, BasePath
+```
+
+Para escolher o local da distro, use `wsl --import`. Neste guia, as cópias de teste ficam em `C:\Users\Administrador\WSL`.
 
 ### Backup Físico Manual (Cópia direta do arquivo `ext4.vhdx`)
 Como cada distribuição do WSL 2 fica armazenada em um único arquivo de disco virtual (`ext4.vhdx`), você pode fazer um "snapshot físico" copiando o arquivo diretamente:
@@ -154,60 +174,48 @@ Como cada distribuição do WSL 2 fica armazenada em um único arquivo de disco 
 
 3. **Fazer o backup:** Copie o arquivo `ext4.vhdx` da pasta informada no `BasePath` para a sua pasta de backups ou HD externo.
 
-### Restaurar (Importar) um backup em qualquer pasta do Windows
+### Criar as distribuições de teste em `C:\Users\Administrador\WSL`
+Depois de exportar os VHDX acima, importe-os com os nomes das novas distribuições:
 ```powershell
-# Importar a partir de um backup .tar
-wsl --import Ubuntu_Dev "D:\WSL\Ubuntu_Dev" "D:\Backups\Ubuntu_Backup.tar" --version 2
+# Registrar a cópia de teste do Ubuntu 24.04
+wsl --import Ubuntu-24.04-Teste `
+  "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste" `
+  "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste.vhdx" `
+  --vhd
 
-# Importar a partir de um disco .vhdx (usando a flag --vhd)
-wsl --import Ubuntu_Dev "D:\WSL\Ubuntu_Dev" "D:\Backups\Ubuntu_Backup.vhdx" --vhd
+# Registrar a cópia de teste do Ubuntu 26.04
+wsl --import Ubuntu-26.04-Teste `
+  "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste" `
+  "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste.vhdx" `
+  --vhd
 ```
 
-### Clonar ou Importar com outro nome usando seu backup
-Se quiser clonar ou importar com outro nome usando seu backup:
-```powershell
-mkdir "D:\Backups\Temp\Ubuntu26-Custom"
-wsl --import Ubuntu-26-Custom "D:\Backups\Temp\Ubuntu26-Custom" "D:\Backups\Ubuntu26.04_Backup.vhdx" --vhd
-```
+> ⚠️ O diretório de instalação passado ao `wsl --import` deve estar vazio ou ainda não existir. Após a importação, o VHDX passa a ser gerenciado dentro da pasta da distro de teste.
 
-### Clonar diretamente uma distro base usando o arquivo VHDX
-Execute os comandos no **PowerShell**, dentro da pasta que contém os diretórios das distribuições. Antes da cópia, desligue o WSL para garantir que o disco virtual não esteja em uso.
+### Fluxo completo: base atualizada → cópia de teste
+Execute no **PowerShell**. Antes de exportar, desligue o WSL para garantir uma cópia consistente do disco.
 
-#### Clonar `Ubuntu-24.04-ShellCheck` como `Ubuntu-24.04-Teste`
-```powershell
-wsl --shutdown
-
-New-Item -ItemType Directory -Force ".\Ubuntu-24.04-Teste"
-
-Copy-Item `
-  ".\Ubuntu-24.04-ShellCheck\shellcheck.vhdx" `
-  ".\Ubuntu-24.04-Teste\ubuntu-teste.vhdx" `
-  -Force
-
-wsl --import-in-place `
-  Ubuntu-24.04-Teste `
-  (Resolve-Path ".\Ubuntu-24.04-Teste\ubuntu-teste.vhdx")
-```
-
-#### Clonar `Ubuntu-26.04-ShellCheck` como `Ubuntu-26.04-Teste`
 ```powershell
 wsl --shutdown
 
-New-Item -ItemType Directory -Force ".\Ubuntu-26.04-Teste"
+# 1. Exportar as bases atualizadas
+New-Item -ItemType Directory -Force "C:\Users\Administrador\WSL"
+wsl --export Ubuntu-24.04 "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste.vhdx" --vhd
+wsl --export Ubuntu-26.04 "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste.vhdx" --vhd
 
-Copy-Item `
-  ".\Ubuntu-26.04-ShellCheck\ubuntu-26-shellcheck.vhdx" `
-  ".\Ubuntu-26.04-Teste\ubuntu-teste.vhdx" `
-  -Force
-
-wsl --import-in-place `
-  Ubuntu-26.04-Teste `
-  (Resolve-Path ".\Ubuntu-26.04-Teste\ubuntu-teste.vhdx")
+# 2. Registrar as cópias com os nomes de teste
+wsl --import Ubuntu-24.04-Teste "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste" "C:\Users\Administrador\WSL\Ubuntu-24.04-Teste.vhdx" --vhd
+wsl --import Ubuntu-26.04-Teste "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste" "C:\Users\Administrador\WSL\Ubuntu-26.04-Teste.vhdx" --vhd
 ```
 
-> 💡 O primeiro argumento de `wsl --import-in-place` é o nome da nova distribuição. O segundo deve ser o caminho do VHDX copiado. As distribuições `Ubuntu-24.04-ShellCheck` e `Ubuntu-26.04-ShellCheck` permanecem intactas como bases.
+As distribuições-base `Ubuntu-24.04` e `Ubuntu-26.04` permanecem intactas. Para iniciar uma cópia de teste:
 
-Confira as distribuições registradas:
+```powershell
+wsl -d Ubuntu-24.04-Teste
+wsl -d Ubuntu-26.04-Teste
+```
+
+Confira as distribuições registradas. A lista deve incluir `Ubuntu-24.04`, `Ubuntu-26.04`, `Ubuntu-24.04-Teste` e `Ubuntu-26.04-Teste`:
 ```powershell
 wsl --list --verbose
 ```
