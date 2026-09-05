@@ -117,6 +117,7 @@ Use emojis padronizados para manter a consistência visual nos títulos H2 e des
 
 1. **Sintaxe Explicita em Blocos de Código**:
    * Sempre especificar a linguagem do bloco (ex: ```bash, ```powershell, ```cmd, ```apache, ```nginx, ```yaml, ```sql).
+   * Manter cada comando, regra ou instrução copiável em um bloco de código separado, para que possa ser copiado individualmente.
 2. **Placeholders Padronizados e Prevenção contra Falsos Positivos de Segurança (GitGuardian / Secret Scanners)**:
    * **PROIBIÇÃO DE CREDENCIAIS REAIS OU SIMULADAS**: Nunca incluir senhas reais, tokens de API, chaves privadas ou credenciais de produção.
    * **EVITAR LITERAIS QUE ACIONEM SCANNERS**: Jamais utilize valores literais em atribuições de variáveis sensíveis em exemplos de código (ex: `password = 'senha123'`, `smtppass = 'SENHA_AQUI'`, `secret = 'abc123xyz'`), pois ativam os detectores de segredos do GitGuardian e GitHub Secret Scanning.
@@ -151,6 +152,7 @@ O arquivo deve ser salvo como `Scripts/ajuda_[TECNOLOGIA_LOWERCASE].md` e seguir
 
 3. REGRAS DE CÓDIGO, SEGURANÇA E CONTEÚDO:
    - Todos os blocos de código devem ter linguagem definida (ex: bash, yaml, sql).
+   - Mantenha cada comando, regra ou instrução copiável em um bloco de código separado, permitindo a cópia individual.
    - Inclua comentários inline `#` para comandos alternativos ou explicações de flags.
    - Destaque comandos críticos ou de teste de sintaxe com observações entre parênteses como (CRÍTICO) ou (MANDATÓRIO).
    - Adicione callouts `> 💡` com boas práticas de segurança, desempenho e manutenções.
@@ -169,6 +171,7 @@ Antes de finalizar qualquer novo arquivo `ajuda_*.md`, verifique:
 - [ ] As seções H2 possuem emojis relevantes, números organizados e divisores `---`?
 - [ ] A tabela de diretórios e arquivos vitais foi incluída?
 - [ ] Os blocos de código contêm especificação de linguagem (`bash`, `yaml`, `nginx`, etc.)?
+- [ ] Cada comando, regra ou instrução copiável está em um bloco de código separado?
 - [ ] Foram incluídos comandos de validação de sintaxe antes de comandos de reinício/reload?
 - [ ] Todos os exemplos de credenciais, senhas e chaves utilizam placeholders explícitos `<...>` para evitar falsos positivos do GitGuardian / Secret Scanners?
 - [ ] O texto está totalmente em Português do Brasil (PT-BR)?

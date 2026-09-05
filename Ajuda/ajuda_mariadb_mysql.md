@@ -1,5 +1,11 @@
 # 🛢️ Guia Prático, Comparativo e Comandos de Operação do MariaDB & MySQL
 
+![MariaDB](https://img.shields.io/badge/MariaDB-003545?style=flat&logo=mariadb&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=flat&logo=mysql&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![SQL](https://img.shields.io/badge/SQL-CC292B?style=flat&logo=sqlite&logoColor=white)
+
 Este guia reúne as diferenças conceituais entre **MariaDB vs MySQL**, um comparativo dos principais bancos de dados do mercado (**SQLite, PostgreSQL, SQL Server**) e todos os comandos essenciais para administração, gerenciamento de usuários, backup, restauração e solução de problemas.
 
 ---
@@ -93,9 +99,9 @@ Conectado ao prompt do MariaDB (`mysql>`), use os comandos abaixo:
 
 * **Criar um novo usuário com senha:**
   ```sql
-  CREATE USER 'meuusuario'@'localhost' IDENTIFIED BY 'SenhaForte123!';
+  CREATE USER 'meuusuario'@'localhost' IDENTIFIED BY '<senha_do_usuario>';
   -- Ou permitir acesso de qualquer IP (%):
-  CREATE USER 'meuusuario'@'%' IDENTIFIED BY 'SenhaForte123!';
+  CREATE USER 'meuusuario'@'%' IDENTIFIED BY '<senha_do_usuario>';
   ```
 
 * **Conceder todos os privilégios de um banco para um usuário:**
@@ -111,7 +117,7 @@ Conectado ao prompt do MariaDB (`mysql>`), use os comandos abaixo:
 
 * **Alterar a senha de um usuário existente:**
   ```sql
-  ALTER USER 'meuusuario'@'localhost' IDENTIFIED BY 'NovaSenha123!';
+  ALTER USER 'meuusuario'@'localhost' IDENTIFIED BY '<nova_senha>';
   FLUSH PRIVILEGES;
   ```
 
@@ -212,7 +218,7 @@ Caso perca a senha do `root` do MariaDB:
 4. Execute os comandos para resetar a senha:
    ```sql
    FLUSH PRIVILEGES;
-   ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('NovaSenhaRoot123');
+   ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('<nova_senha_root>');
    FLUSH PRIVILEGES;
    EXIT;
    ```

@@ -1,10 +1,29 @@
 # 🛡️ Guia Prático e Comandos de Segurança de Rede (UFW, IPTables & Diagnóstico)
 
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![Security](https://img.shields.io/badge/Security-informational?style=flat&logo=auth0&logoColor=white)
+![Firewall](https://img.shields.io/badge/Firewall-UFW_--_IPTables-critical?style=flat)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
 Este guia reúne os comandos essenciais para administração de **firewall**, liberação de portas, bloqueio de IPs, redirecionamento de tráfego (NAT) e diagnóstico de rede no Linux usando **UFW**, **IPTables** e utilitários de sistema.
 
 ---
 
-## 🧱 1. Gerenciamento de Firewall com UFW (Uncomplicated Firewall)
+## 📁 1. Arquivos e Diretórios Vitais de Configuração
+
+| Caminho / Arquivo | Descrição |
+| :--- | :--- |
+| `/etc/ufw/` | Diretório principal com regras e configurações do UFW. |
+| `/etc/default/ufw` | Configurações padrão de inicialização e políticas padrão do UFW. |
+| `/etc/ufw/before.rules` | Regras avaliadas antes das regras da CLI (usado para NAT/Port Forwarding). |
+| `/etc/ufw/after.rules` | Regras avaliadas após as regras da CLI. |
+| `/var/log/ufw.log` | Arquivo de log com eventos de pacotes bloqueados e conexões do UFW. |
+| `/etc/iptables/rules.v4` | Arquivo persistente de regras do IPTables IPv4 (`iptables-persistent`). |
+
+---
+
+## 🧱 2. Gerenciamento de Firewall com UFW (Uncomplicated Firewall)
 
 O **UFW** é o gerenciador de firewall padrão e amigável do Ubuntu/Debian.
 
@@ -92,7 +111,7 @@ O **UFW** é o gerenciador de firewall padrão e amigável do Ubuntu/Debian.
 
 ---
 
-## ⚡ 2. Redirecionamento de Portas e NAT (Port Forwarding via UFW)
+## ⚡ 3. Redirecionamento de Portas e NAT (Port Forwarding via UFW)
 
 Para redirecionar uma porta pública recebida na VPS para um IP interno ou outra porta local (ex: porta 80 ➔ 8080):
 
@@ -115,7 +134,7 @@ Para redirecionar uma porta pública recebida na VPS para um IP interno ou outra
 
 ---
 
-## ⚙️ 3. Comandos Tradicionais com IPTables
+## ⚙️ 4. Comandos Tradicionais com IPTables
 
 O `iptables` é o utilitário nativo de filtragem de pacotes do Kernel Linux.
 
@@ -151,7 +170,7 @@ O `iptables` é o utilitário nativo de filtragem de pacotes do Kernel Linux.
 
 ---
 
-## 🔍 4. Diagnóstico de Rede e Monitoramento de Portas Aberta
+## 🔍 5. Diagnóstico de Rede e Monitoramento de Portas Abertas
 
 * **Verificar todas as portas TCP e UDP escutando no sistema (com o processo correspondente):**
   ```bash

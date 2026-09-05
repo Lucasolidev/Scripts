@@ -1,5 +1,11 @@
 # 🐘 Guia Prático e Comandos de Operação do Samba (Server & Client)
 
+![Samba](https://img.shields.io/badge/Samba-informational?style=flat&logo=samba&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![Windows Server](https://img.shields.io/badge/Windows%20Server-0078D6?style=flat&logo=windows&logoColor=white)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
 Este guia reúne os principais comandos, arquivos de configuração, diretórios de logs e procedimentos operacionais para administrar o **Samba** em ambientes Linux (como **Servidor de Arquivos Standalone** ou **Controlador de Domínio Active Directory AD-DC**) e interagir via clientes **Linux** e **Windows**.
 
 ---
@@ -57,9 +63,7 @@ Os logs do Samba por padrão ficam localizados no diretório `/var/log/samba/`.
 
 ---
 
-## ⚙️ 3. Comandos de Gerenciamento do Servidor (Server-Side)
-
-### 🛠️ Validação e Gerenciamento de Serviços
+## ⚙️ 3. Validação e Gerenciamento de Serviços (Server-Side)
 
 * **Validar a sintaxe do arquivo `smb.conf` (Obrigatório após edições):**
   ```bash
@@ -80,7 +84,7 @@ Os logs do Samba por padrão ficam localizados no diretório `/var/log/samba/`.
 
 ---
 
-### 👥 4. Gerenciamento de Usuários (Samba Standalone / Servidor de Arquivos)
+## 👥 4. Gerenciamento de Usuários (Samba Standalone / Servidor de Arquivos)
 
 No Samba Standalone, o usuário deve primeiro existir no Linux (`/etc/passwd`) e depois ser adicionado à base de senhas do Samba (`smbpasswd`).
 
@@ -116,7 +120,7 @@ No Samba Standalone, o usuário deve primeiro existir no Linux (`/etc/passwd`) e
 
 ---
 
-### 👑 5. Gerenciamento de Usuários e Grupos no Samba Active Directory (`samba-tool`)
+## 👑 5. Gerenciamento de Usuários e Grupos no Samba Active Directory (`samba-tool`)
 
 Quando o Samba está configurado como **Active Directory DC**, utiliza-se a ferramenta oficial **`samba-tool`**.
 
@@ -124,7 +128,7 @@ Quando o Samba está configurado como **Active Directory DC**, utiliza-se a ferr
 
 * **Criar um novo usuário no Active Directory:**
   ```bash
-  sudo samba-tool user create usuario_novo 'SenhaForte123'
+  sudo samba-tool user create usuario_novo '<senha_do_usuario>'
   ```
 
 * **Listar todos os usuários do domínio:**
@@ -179,7 +183,7 @@ Quando o Samba está configurado como **Active Directory DC**, utiliza-se a ferr
 
 ---
 
-### 📊 6. Monitoramento de Conexões e Arquivos Abertos (`smbstatus`)
+## 📊 6. Monitoramento de Conexões e Arquivos Abertos (`smbstatus`)
 
 O comando `smbstatus` mostra quem está conectado no servidor em tempo real e quais arquivos estão abertos/bloqueados.
 
@@ -222,7 +226,7 @@ smbclient //192.168.1.8/compartilhamento -U nome_usuario
 #### 3. Montar compartilhamento manualmente via terminal
 ```bash
 sudo mkdir -p /mnt/samba_pasta
-sudo mount -t cifs -o username=administrador,password=SuaSenha,domain=MEUDOMINIO //192.168.1.8/arquivos /mnt/samba_pasta
+sudo mount -t cifs -o username=administrador,password=<sua_senha>,domain=MEUDOMINIO //192.168.1.8/arquivos /mnt/samba_pasta
 ```
 
 #### 4. Montar compartilhamento de forma permanente no `/etc/fstab` (Recomendado)
@@ -234,7 +238,7 @@ sudo mount -t cifs -o username=administrador,password=SuaSenha,domain=MEUDOMINIO
    Adicione o conteúdo:
    ```ini
    username=administrador
-   password=SuaSenhaSegura
+   password=<sua_senha_segura>
    domain=MEUDOMINIO
    ```
 2. Ajuste as permissões do arquivo:

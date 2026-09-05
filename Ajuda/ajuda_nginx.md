@@ -6,7 +6,7 @@
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat&logo=php&logoColor=white)
 ![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
 
-## 📁 Estrutura de Arquivos e Diretórios Chave
+## 📁 1. Estrutura de Arquivos e Diretórios Chave
 
 | Caminho | Descrição |
 | :--- | :--- |
@@ -21,7 +21,7 @@
 
 ---
 
-## 🛠️ Comandos de Gerenciamento do Serviço
+## 🛠️ 2. Comandos de Gerenciamento do Serviço
 
 ### Testar a sintaxe dos arquivos de configuração (MANDATÓRIO antes de reiniciar)
 ```bash
@@ -59,7 +59,7 @@ sudo systemctl disable nginx
 
 ---
 
-## 🌐 Gerenciamento de Server Blocks (VirtualHosts)
+## 🌐 3. Gerenciamento de Server Blocks (VirtualHosts)
 
 ### Habilitar um site (Criando o link simbólico em `sites-enabled`)
 ```bash
@@ -137,7 +137,7 @@ server {
 
 ---
 
-## ⚡ Otimizações & Ajustes no `/etc/nginx/nginx.conf`
+## ⚡ 4. Otimizações & Ajustes no `/etc/nginx/nginx.conf`
 
 ### 1. Aumentar limite global de Upload no Nginx
 Adicione dentro do bloco `http { ... }`:
@@ -164,7 +164,7 @@ gzip_types text/plain text/css application/json application/javascript text/xml 
 
 ---
 
-## 🔒 Permissões de Arquivos & Propriedade
+## 🔒 5. Permissões de Arquivos & Propriedade
 
 ### Ajustar permissões e proprietário do diretório da aplicação
 ```bash
@@ -175,7 +175,7 @@ sudo find /var/www/meu_site -type f -exec chmod 644 {} \;
 
 ---
 
-## 🔍 Monitoramento e Resolução de Problemas (Troubleshooting)
+## 🔍 6. Monitoramento e Resolução de Problemas (Troubleshooting)
 
 ### Acompanhar o log de erros do Nginx em tempo real
 ```bash
@@ -199,7 +199,7 @@ ls -la /run/php/php*.sock
 
 ---
 
-## 🔐 Certificado SSL Gratuito com Let's Encrypt (Certbot)
+## 🔐 7. Certificado SSL Gratuito com Let's Encrypt (Certbot)
 
 ### 1. Instalar o Certbot para Nginx
 ```bash

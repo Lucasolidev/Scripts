@@ -5,9 +5,23 @@
 ![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white)
 ![CMD](https://img.shields.io/badge/Command_Prompt-4D4D4D?style=flat&logo=windows-terminal&logoColor=white)
 
-## 📌 Meus comandos pessoais mais usados
+Guia de referência rápida com atalhos, utilitários MMC, cmdlets do PowerShell e comandos essenciais para administração do **Windows** e **Windows Server**.
 
-### 🛠️ Sistema e Ferramentas
+---
+
+## 📁 1. Arquivos, Logs e Diretórios Vitais do Sistema
+
+| Caminho / Arquivo | Descrição |
+| :--- | :--- |
+| `C:\Windows\System32\` | Diretório de binários centrais, ferramentas MMC e bibliotecas DLL do sistema. |
+| `C:\Windows\System32\drivers\etc\hosts` | Arquivo de mapeamento estático local de resolução de nomes DNS/IP. |
+| `C:\Windows\System32\winevt\Logs\` | Diretório contendo os arquivos físicos de eventos (`.evtx`) lidos pelo Event Viewer. |
+| `C:\ProgramData\` | Diretório oculto para dados e configurações compartilhadas de aplicações de serviços. |
+| `C:\Windows\Logs\CBS\` | Logs de manutenção e integridade de componentes do sistema (`sfc` e `dism`). |
+
+---
+
+## 🛠️ 2. Sistema e Ferramentas Administrativas
 * **Verificar o Tempo de Atividade (Uptime):**
   ```cmd
   cmd /k systeminfo | find "Tempo"
@@ -49,7 +63,9 @@
   diskmgmt.msc
   ```
 
-### 👥 Gerenciamento de Usuários
+---
+
+## 👥 3. Gerenciamento de Usuários e Grupos
 * **Gerenciar contas de usuário (Contas de Usuário Avançadas):**
   ```cmd
   netplwiz
@@ -59,7 +75,9 @@
   lusrmgr.msc
   ```
 
-### 🛡️ Segurança e Políticas
+---
+
+## 🛡️ 4. Segurança e Políticas (GPO & Secpol)
 * **Editor de Diretiva de Grupo Local** (Group Policy - GPO Local):
   ```cmd
   gpedit.msc
@@ -69,7 +87,9 @@
   secpol.msc
   ```
 
-### 🌐 Rede e Conexões
+---
+
+## 🌐 5. Rede e Conexões
 * **Conexões de rede (Adaptadores de Rede):**
   ```cmd
   ncpa.cpl
@@ -91,7 +111,9 @@
   tracert google.com
   ```
 
-### 🧹 Manutenção e Reparo
+---
+
+## 🧹 6. Manutenção e Reparo do Sistema
 * **Limpeza de Disco** (Apagar temporários do Windows Update):
   ```cmd
   cleanmgr
@@ -109,7 +131,9 @@
   Dism.exe /Online /Cleanup-Image /StartComponentCleanup
   ```
 
-### 💽 Armazenamento e Discos
+---
+
+## 💽 7. Armazenamento e Discos
 * **Forçar leitura do disco após aumento de armazenamento (CMD):**
   ```cmd
   diskpart

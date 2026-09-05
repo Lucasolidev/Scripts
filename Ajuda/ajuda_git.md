@@ -1,10 +1,28 @@
 # 🌿 Guia Prático e Comandos de Operação do Git & GitHub Workflow
 
+![Git](https://img.shields.io/badge/Git-F05032?style=flat&logo=git&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat&logo=github&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
 Este guia reúne os comandos essenciais para versionamento de código, gerenciamento de branches, envio de commits, resolução de conflitos e boas práticas com o **Git** e **GitHub**.
 
 ---
 
-## ⚙️ 1. Configurações Iniciais do Git
+## 📁 1. Arquivos e Diretórios Vitais do Git
+
+| Caminho / Arquivo | Descrição |
+| :--- | :--- |
+| `.git/` | Diretório raiz interno com todo o histórico, objetos, refs e índices do repositório. |
+| `.git/config` | Configurações locais específicas deste repositório clonado/iniciado. |
+| `~/.gitconfig` | Configurações globais do usuário (`user.name`, `user.email`, aliases). |
+| `.gitignore` | Arquivo que especifica arquivos e pastas intencionalmente não rastreados pelo Git. |
+| `.gitattributes` | Define atributos de caminho para fins de quebra de linha (CRLF/LF) e diffs binários. |
+
+---
+
+## ⚙️ 2. Configurações Iniciais do Git
 
 * **Configurar nome do autor e e-mail global:**
   ```bash
@@ -24,7 +42,7 @@ Este guia reúne os comandos essenciais para versionamento de código, gerenciam
 
 ---
 
-## 🚀 2. Ciclo de Vida do Código (Add, Commit, Push, Pull)
+## 🚀 3. Ciclo de Vida do Código (Add, Commit, Push, Pull)
 
 * **Iniciar um novo repositório na pasta atual:**
   ```bash
@@ -69,7 +87,7 @@ Este guia reúne os comandos essenciais para versionamento de código, gerenciam
 
 ---
 
-## 🌿 3. Gerenciamento de Branches (Ramificações)
+## 🌿 4. Gerenciamento de Branches (Ramificações)
 
 * **Listar todas as branches locais:**
   ```bash
@@ -113,7 +131,7 @@ Este guia reúne os comandos essenciais para versionamento de código, gerenciam
 
 ---
 
-## 📦 4. Salvamento Temporário (`git stash`)
+## 📦 5. Salvamento Temporário (`git stash`)
 
 O `stash` salva suas alterações modificadas sem precisar fazer um commit, deixando a árvore limpa para trocar de branch.
 
@@ -141,7 +159,7 @@ O `stash` salva suas alterações modificadas sem precisar fazer um commit, deix
 
 ---
 
-## ⏪ 5. Histórico e Correções de Erros (Undo & Reset)
+## ⏪ 6. Histórico e Correções de Erros (Undo & Reset)
 
 * **Ver o histórico de commits formatado em uma linha:**
   ```bash
@@ -179,7 +197,7 @@ O `stash` salva suas alterações modificadas sem precisar fazer um commit, deix
 
 ---
 
-## 🌐 6. Gerenciamento de Repositórios Remotos (`git remote`)
+## 🌐 7. Gerenciamento de Repositórios Remotos (`git remote`)
 
 * **Exibir repositórios remotos configurados:**
   ```bash

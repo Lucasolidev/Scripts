@@ -134,7 +134,7 @@ SHOW DATABASES;
 CREATE DATABASE `meu_banco` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Criar usuário com senha e conceder privilégios totais
-CREATE USER 'meu_usuario'@'localhost' IDENTIFIED BY 'MinhaSenhaSegura123!';
+CREATE USER 'meu_usuario'@'localhost' IDENTIFIED BY '<senha_segura>';
 GRANT ALL PRIVILEGES ON `meu_banco`.* TO 'meu_usuario'@'localhost';
 FLUSH PRIVILEGES;
 

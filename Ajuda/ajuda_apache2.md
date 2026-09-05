@@ -11,7 +11,7 @@ Guia de referência rápida para administração do servidor web **Apache2** em 
 
 ---
 
-## 📁 Estrutura de Arquivos e Diretórios Chave
+## 📁 1. Estrutura de Arquivos e Diretórios Chave
 
 | Caminho / Arquivo | Descrição |
 | :--- | :--- |
@@ -30,9 +30,10 @@ Guia de referência rápida para administração do servidor web **Apache2** em 
 
 ---
 
-## 🛠️ Comandos Principais de Gerenciamento do Serviço
+## 🛠️ 2. Comandos Principais de Gerenciamento do Serviço
 
 ### Testar a sintaxe dos arquivos de configuração (CRÍTICO - Sempre execute antes de reiniciar)
+
 ```bash
 sudo apache2ctl configtest
 # Ou de forma simplificada:
@@ -40,53 +41,62 @@ sudo apache2ctl -t
 ```
 
 ### Reiniciar o Apache2 (Aplica alterações completas de porta ou módulos)
+
 ```bash
 sudo systemctl restart apache2
 ```
 
 ### Recarregar o Apache2 sem derrubar conexões ativas (Graceful Reload — Recomendado)
+
 ```bash
 sudo systemctl reload apache2
 ```
 
 ### Verificar o status de execução do serviço
+
 ```bash
 sudo systemctl status apache2
 ```
 
 ### Iniciar / Parar o serviço
+
 ```bash
 sudo systemctl start apache2
 sudo systemctl stop apache2
 ```
 
 ### Habilitar / Desabilitar a inicialização automática no boot do sistema
+
 ```bash
 sudo systemctl enable apache2
 sudo systemctl disable apache2
 ```
 
 ### Listar todos os VirtualHosts ativos e suas respectivas portas
+
 ```bash
 sudo apache2ctl -S
 ```
 
 ### Listar todos os módulos atualmente carregados na memória
+
 ```bash
 sudo apache2ctl -M
 ```
 
 ---
 
-## 🌐 Gerenciamento de VirtualHosts (`a2ensite` / `a2dissite`)
+## 🌐 3. Gerenciamento de VirtualHosts (`a2ensite` / `a2dissite`)
 
 ### Habilitar um novo site / VirtualHost
+
 ```bash
 sudo a2ensite meu_site.conf
 sudo systemctl reload apache2
 ```
 
 ### Desabilitar um site / VirtualHost ativo
+
 ```bash
 sudo a2dissite meu_site.conf
 # Exemplo para desativar o site padrão inicial:
@@ -95,6 +105,7 @@ sudo systemctl reload apache2
 ```
 
 ### 📄 Modelo Completo de VirtualHost HTTP (`/etc/apache2/sites-available/meu_site.conf`)
+
 ```apache
 <VirtualHost *:80>
     ServerName meu_dominio.com.br
@@ -116,6 +127,7 @@ sudo systemctl reload apache2
 ```
 
 ### 📄 Modelo Completo de VirtualHost HTTPS com SSL (`/etc/apache2/sites-available/meu_site-ssl.conf`)
+
 ```apache
 <IfModule mod_ssl.c>
 <VirtualHost *:443>
@@ -143,27 +155,31 @@ sudo systemctl reload apache2
 
 ---
 
-## 🔌 Gerenciamento de Módulos (`a2enmod` / `a2dismod`)
+## 🔌 4. Gerenciamento de Módulos (`a2enmod` / `a2dismod`)
 
 ### Habilitar `mod_rewrite` (Obrigatório para arquivos `.htaccess` e frameworks como Laravel/WordPress)
+
 ```bash
 sudo a2enmod rewrite
 sudo systemctl restart apache2
 ```
 
 ### Habilitar módulo SSL (Para conexões seguras HTTPS)
+
 ```bash
 sudo a2enmod ssl
 sudo systemctl restart apache2
 ```
 
 ### Habilitar módulos de Proxy Reverso (Proxy HTTP/WebSocket para Node.js, Python, Docker)
+
 ```bash
 sudo a2enmod proxy proxy_http proxy_wstunnel headers
 sudo systemctl restart apache2
 ```
 
 ### Desabilitar um módulo ativo
+
 ```bash
 sudo a2dismod nome_do_modulo
 sudo systemctl restart apache2
@@ -171,9 +187,10 @@ sudo systemctl restart apache2
 
 ---
 
-## 🔒 Permissões de Arquivos & POSIX ACLs de Herança Automática
+## 🔒 5. Permissões de Arquivos & POSIX ACLs de Herança Automática
 
 ### 1. Ajustar o proprietário Unix e permissões padrão
+
 ```bash
 sudo chown -R www-data:www-data /var/www/meu_site
 sudo find /var/www/meu_site -type d -exec chmod 755 {} \;
@@ -181,6 +198,7 @@ sudo find /var/www/meu_site -type f -exec chmod 644 {} \;
 ```
 
 ### 2. Aplicar POSIX ACLs com Herança Automática (Enterprise)
+>
 > 💡 *Qualquer novo arquivo ou pasta criado dentro de `/var/www/` (mesmo por `root` ou `git`) herdará automaticamente permissão total de acesso para o `www-data`!*
 
 ```bash
@@ -198,6 +216,7 @@ getfacl /var/www/html
 ```
 
 ### 3. Esconder a versão do Apache nos cabeçalhos (Hardening de Segurança)
+
 Edite o arquivo `/etc/apache2/conf-available/security.conf` ou adicione no final do `/etc/apache2/apache2.conf`:
 ```apache
 ServerTokens Prod
@@ -210,9 +229,10 @@ sudo systemctl reload apache2
 
 ---
 
-## 🔍 Diagnóstico e Resolução de Problemas (Troubleshooting)
+## 🔍 6. Diagnóstico e Resolução de Problemas (Troubleshooting)
 
 ### Acompanhar logs de erro e acessos em tempo real
+
 ```bash
 # Log de erros
 sudo tail -f /var/log/apache2/error.log
@@ -226,31 +246,36 @@ sudo cat /var/log/apache2/access.log | grep "192.168.1.50"
 ```
 
 ### Verificar se a porta 80 ou 443 está aberta e escutando
+
 ```bash
 sudo ss -tulpn | grep -E '80|443|apache'
 ```
 
 ### Principais Erros e Soluções:
+
 * **`403 Forbidden`**: Verifique se o diretório tem permissão de leitura (`chmod 755` ou `Require all granted` no VirtualHost) ou se falta um arquivo `index.html` / `index.php`.
 * **`500 Internal Server Error`**: Geralmente causado por sintaxe inválida dentro do arquivo `.htaccess` ou erro no script PHP. Consulte o log `/var/log/apache2/error.log`.
 * **`Port 80 in use`**: Outro serviço (como Nginx ou Lighttpd) está ocupando a porta 80. Use `sudo ss -tulpn | grep :80` para descobrir o processo ocupante.
 
 ---
 
-## 🔐 Certificado SSL Gratuito com Let's Encrypt (Certbot)
+## 🔐 7. Certificado SSL Gratuito com Let's Encrypt (Certbot)
 
 ### 1. Instalar o Certbot para Apache no Ubuntu/Debian
+
 ```bash
 sudo apt update
 sudo apt install -y certbot python3-certbot-apache
 ```
 
 ### 2. Gerar e aplicar o certificado SSL automaticamente
+
 ```bash
 sudo certbot --apache -d meu_dominio.com.br -d www.meu_dominio.com.br
 ```
 
 ### 3. Testar a renovação automática do certificado
+
 ```bash
 sudo certbot renew --dry-run
 ```

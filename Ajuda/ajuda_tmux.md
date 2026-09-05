@@ -1,5 +1,10 @@
 # 🚀 Guia Rápido e Cheat Sheet do tmux
 
+![tmux](https://img.shields.io/badge/tmux-1BB91F?style=flat&logo=tmux&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Terminal](https://img.shields.io/badge/Terminal-informational?style=flat&logo=gnometerminal&logoColor=white)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
 O **tmux** (Terminal Multiplexer) permite criar, acessar e alternar entre várias sessões de terminal na mesma janela. O seu maior benefício em servidores é que **os comandos continuam rodando em segundo plano mesmo se a sua conexão SSH cair**.
 
 > 💡 **Tecla de Atalho Principal (Prefix):**  
@@ -30,7 +35,7 @@ O **tmux** (Terminal Multiplexer) permite criar, acessar e alternar entre vária
 
 ---
 
-### 📑 3. Gerenciando Janelas (Tabs)
+## 📑 3. Gerenciando Janelas (Tabs)
 
 Uma sessão pode ter várias janelas (como abas de um navegador):
 
@@ -46,7 +51,7 @@ Uma sessão pode ter várias janelas (como abas de um navegador):
 
 ---
 
-### 🔲 4. Dividindo a Tela em Painéis (Panes)
+## 🔲 4. Dividindo a Tela em Painéis (Panes)
 
 Divisão da tela em várias sub-janelas ativas simultaneamente:
 
@@ -63,7 +68,7 @@ Divisão da tela em várias sub-janelas ativas simultaneamente:
 
 ---
 
-### 📜 5. Rolagem de Tela e Histórico (Scroll Mode)
+## 📜 5. Rolagem de Tela e Histórico (Scroll Mode)
 
 Como os painéis do tmux controlam o terminal, para subir o histórico de logs:
 

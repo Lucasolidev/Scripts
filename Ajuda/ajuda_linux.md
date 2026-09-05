@@ -6,7 +6,9 @@
 ![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white)
 ![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
 
-## 🖥️ Informações do Sistema
+---
+
+## 🖥️ 1. Informações do Sistema
 
 ### Verificar o sistema operacional e versão detalhada
 ```bash
@@ -23,7 +25,9 @@ uname -a
 hostnamectl
 ```
 
-## 📁 Manipulação de Arquivos & Diretórios
+---
+
+## 📁 2. Manipulação de Arquivos & Diretórios
 
 ### Criar Diretórios (`mkdir`)
 * **Criar pastas alinhadas (estrutura recursiva/pais):** Cria todas as pastas intermediárias caso não existam.
@@ -313,7 +317,9 @@ O `rsync` é mais rápido e eficiente que o `scp` para pastas grandes ou atualiz
   rsync -avzP -n /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
   ```
 
-## 👤 Gerenciamento de Usuários e Grupos
+---
+
+## 👤 3. Gerenciamento de Usuários e Grupos
 
 ### Listar todos os usuários do sistema
 ```bash
@@ -374,7 +380,9 @@ sudo usermod -L nome_usuario
   whoami
   ```
 
-## 📦 Gerenciamento de Pacotes (dpkg & APT)
+---
+
+## 📦 4. Gerenciamento de Pacotes (dpkg & APT)
 
 ### Principais comandos do `dpkg` (Gerenciador local de pacotes `.deb`)
 * **Instalar um pacote `.deb` local:**
@@ -407,7 +415,9 @@ sudo usermod -L nome_usuario
   dpkg -I pacote.deb
   ```
 
-## 🔐 SSH & Segurança
+---
+
+## 🔐 5. SSH & Segurança
 
 ### Gerar novas chaves SSH (Par de chaves Pública/Privada)
 * **Recomendado (Algoritmo ED25519 — mais seguro e rápido):**
@@ -497,7 +507,9 @@ sudo ufw allow 22/tcp comment 'Acesso SSH principal'
 sudo ufw status verbose
 ```
 
-## 💽 Inicialização, Particionamento e Montagem de Novo Disco (EXT4 / FSTAB)
+---
+
+## 💽 6. Inicialização, Particionamento e Montagem de Novo Disco (EXT4 / FSTAB)
 
 Guia passo a passo para inicializar, particionar, formatar e configurar montagem automática persistente de um novo disco rígido / SSD adicionado ao servidor (ex: `/dev/sdb` montado em `/arquivos`):
 
@@ -597,7 +609,7 @@ sudo setfacl -R -d -m u:www-data:rwx,g:www-data:rwx,u:zelio_dev:rwx,g:zelio_dev:
 
 ---
 
-## 💾 Aumento de Armazenamento - Partição Simples (EXT4)
+## 💾 7. Aumento de Armazenamento - Partição Simples (EXT4)
 
 ### 1. Verificar montagens atuais
 ```bash
@@ -634,7 +646,9 @@ resize2fs /dev/sdX1
 df -hT
 ```
 
-## 📦 Aumento de Armazenamento - Volume Lógico (LVM)
+---
+
+## 📦 8. Aumento de Armazenamento - Volume Lógico (LVM)
 
 ### Expandir o Logical Volume (LV) + Sistema de Arquivos em um único comando
 ```bash
@@ -646,7 +660,9 @@ lvextend -r -l +100%FREE /dev/mapper/ubuntu--vg-ubuntu--lv
 pvresize /dev/sdX1
 ```
 
-## 📊 Diagnóstico de Rede & Portas
+---
+
+## 📊 9. Diagnóstico de Rede & Portas
 
 ### Ver conexões ativas, aplicações e portas escutando (substituto moderno do netstat)
 ```bash
@@ -712,7 +728,9 @@ tracepath google.com
 ip a
 ```
 
-## 🧹 Limpeza & Espaço em Disco
+---
+
+## 🧹 10. Limpeza & Espaço em Disco
 
 ### Ver quais arquivos/pastas estão consumindo mais espaço no diretório atual
 ```bash
@@ -729,7 +747,9 @@ sudo apt autoremove --purge && sudo apt clean
 journalctl --disk-usage
 sudo journalctl --vacuum-time=3d
 ```
-## 🔍 Análise de Logs & Erros (tail & journalctl)
+---
+
+## 🔍 11. Análise de Logs & Erros (tail & journalctl)
 
 ### Principais arquivos de log no Ubuntu Server
 * `/var/log/syslog` — Registro geral de eventos do sistema.
@@ -789,7 +809,9 @@ tail -f /var/log/syslog /var/log/auth.log
   sudo journalctl -f
   ```
 
-## 🚀 Processos & Monitoramento
+---
+
+## 🚀 12. Processos & Monitoramento
 
 ### Monitor interativo de CPU e RAM
 ```bash

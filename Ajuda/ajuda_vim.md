@@ -1,6 +1,27 @@
 # 📝 Cheat Sheet - Editor de Texto Vim
 
-## 🚀 Modos de Operação (Básico)
+![Vim](https://img.shields.io/badge/Vim-019733?style=flat&logo=vim&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![Terminal](https://img.shields.io/badge/Terminal-informational?style=flat&logo=gnometerminal&logoColor=white)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
+Guia de referência rápida e atalhos essenciais para navegação, edição e configuração no editor de texto **Vim**.
+
+---
+
+## 📁 1. Arquivos e Diretórios de Configuração
+
+| Caminho / Arquivo | Descrição |
+| :--- | :--- |
+| `~/.vimrc` | Arquivo de configuração pessoal do usuário atual para o Vim. |
+| `/etc/vim/vimrc` | Arquivo global de configuração do Vim aplicado a todos os usuários do sistema. |
+| `~/.vim/` | Diretório de plugins, esquemas de cores e extensões pessoais do Vim. |
+| `~/.viminfo` | Histórico de comandos executados, marcas e registros de sessões anteriores. |
+
+---
+
+## 🚀 2. Modos de Operação (Básico)
 O Vim é um editor modal. Para usá-lo, você precisa alternar entre diferentes modos:
 
 * **Modo Normal:** Modo padrão ao abrir o Vim. Usado para navegar pelo arquivo e rodar atalhos de teclado. Pressione `Esc` para voltar a este modo.
@@ -15,7 +36,7 @@ O Vim é um editor modal. Para usá-lo, você precisa alternar entre diferentes 
 
 ---
 
-## 💾 Salvar e Sair (Comandos de Terminal do Vim)
+## 💾 3. Salvar e Sair (Comandos de Terminal do Vim)
 No **Modo Normal**, digite `:` seguido pelo comando desejado e pressione `Enter`:
 
 * **Salvar o arquivo:**
@@ -38,7 +59,7 @@ No **Modo Normal**, digite `:` seguido pelo comando desejado e pressione `Enter`
 
 ---
 
-## 🔍 Busca e Substituição
+## 🔍 4. Busca e Substituição
 Comandos de busca e substituição executados na linha de comando do Vim:
 
 * **Buscar uma palavra no arquivo:**
@@ -63,7 +84,7 @@ Comandos de busca e substituição executados na linha de comando do Vim:
 
 ---
 
-## 📋 Copiar, Recortar e Colar (Clipboard)
+## 📋 5. Copiar, Recortar e Colar (Clipboard)
 Atalhos executados em **Modo Normal**:
 
 * **Copiar (yank) uma linha inteira:**
@@ -96,7 +117,7 @@ Atalhos executados em **Modo Normal**:
 
 ---
 
-## ✈️ Navegação Rápida (Atalhos de Teclado)
+## ✈️ 6. Navegação Rápida (Atalhos de Teclado)
 Atalhos executados em **Modo Normal**:
 
 * **Ir para o início do arquivo:**
@@ -125,7 +146,7 @@ Atalhos executados em **Modo Normal**:
 
 ---
 
-## ⚙️ Configurações Úteis (Temporárias)
+## ⚙️ 7. Configurações Úteis (Temporárias)
 Comandos digitados no Modo de Comando (`:`) para ajustar o editor na sessão atual:
 
 * **Exibir números de linha:**

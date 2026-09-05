@@ -1,5 +1,11 @@
 # 🗂️ Guia Prático e Comandos de Operação do LDAP / OpenLDAP
 
+![OpenLDAP](https://img.shields.io/badge/OpenLDAP-002B49?style=flat&logo=openldap&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![Security](https://img.shields.io/badge/Security-informational?style=flat&logo=auth0&logoColor=white)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
 Este guia reúne os principais conceitos, arquivos de configuração, logs e comandos para administração de serviços de diretório **LDAP / OpenLDAP (`slapd`)** no Linux, incluindo consultas, criação, modificação e alteração de senhas via arquivos **LDIF**.
 
 ---

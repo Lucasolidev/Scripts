@@ -1,32 +1,26 @@
 # 📊 Guia Prático e Comandos de Operação do Zabbix (Server, Agent & Proxy)
 
+![Zabbix](https://img.shields.io/badge/Zabbix-D40000?style=flat&logo=zabbix&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![Monitoring](https://img.shields.io/badge/Monitoring-Prometheus_--_Zabbix-blue?style=flat)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
 Este guia reúne os comandos essenciais para administração, diagnóstico, monitoramento e teste de métricas usando o **Zabbix Server**, **Zabbix Agent 2** e **Zabbix Proxy**.
 
 ---
 
 ## 📁 1. Arquivos de Configuração e Logs Vitais
 
-### 📄 Arquivos de Configuração
-
-* **`/etc/zabbix/zabbix_agent2.conf`** (ou `zabbix_agentd.conf`)  
-  Arquivo de configuração do **Zabbix Agent 2** no cliente/servidor.
-
-* **`/etc/zabbix/zabbix_proxy.conf`**  
-  Arquivo de configuração do **Zabbix Proxy**.
-
-* **`/etc/zabbix/zabbix_server.conf`**  
-  Arquivo de configuração do **Zabbix Server**.
-
-* **`/etc/zabbix/zabbix_agent2.d/`**  
-  Diretório para incluir arquivos de configuração de plugins e métricas customizadas (`UserParameter`).
-
----
-
-### 📜 Arquivos de Log
-
-* **`/var/log/zabbix/zabbix_agent2.log`** — Log de execução do Zabbix Agent 2.
-* **`/var/log/zabbix/zabbix_proxy.log`** — Log de execução do Zabbix Proxy.
-* **`/var/log/zabbix/zabbix_server.log`** — Log de execução do Zabbix Server.
+| Caminho / Arquivo | Descrição |
+| :--- | :--- |
+| `/etc/zabbix/zabbix_agent2.conf` | Arquivo de configuração do **Zabbix Agent 2** no cliente/servidor. |
+| `/etc/zabbix/zabbix_proxy.conf` | Arquivo de configuração do **Zabbix Proxy**. |
+| `/etc/zabbix/zabbix_server.conf` | Arquivo de configuração do **Zabbix Server**. |
+| `/etc/zabbix/zabbix_agent2.d/` | Diretório para incluir arquivos de configuração e métricas customizadas (`UserParameter`). |
+| `/var/log/zabbix/zabbix_agent2.log` | Log de execução e diagnósticos do Zabbix Agent 2. |
+| `/var/log/zabbix/zabbix_proxy.log` | Log de execução do Zabbix Proxy. |
+| `/var/log/zabbix/zabbix_server.log` | Log de execução principal do Zabbix Server. |
 
 ---
 
