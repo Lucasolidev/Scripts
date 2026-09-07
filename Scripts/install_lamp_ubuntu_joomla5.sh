@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.6
+# Version: 2.8
 # ------------------------------------------------
-VERSION="2.7"
+VERSION="2.8"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -269,6 +269,23 @@ else
     log_info "Senha do Usuario Joomla DB recebida com entrada oculta."
 fi
 
+# Validar os sites ativos antes de qualquer limpeza destrutiva. Em uma
+# reinstalacao, somente o vhost Apache do dominio informado pode existir;
+# sites de outros dominios continuam sendo um bloqueio operacional.
+for enabled_site in /etc/apache2/sites-enabled/* /etc/nginx/sites-enabled/*; do
+    [[ -e "$enabled_site" ]] || continue
+    enabled_name=$(basename -- "$enabled_site")
+    case "$enabled_name" in
+        000-default.conf|default-ssl.conf|default) continue ;;
+    esac
+    if [ "$REINSTALL_MODE" = s ] && [[ "$enabled_site" == /etc/apache2/sites-enabled/* ]] \
+        && grep -Eiq "(ServerName|ServerAlias)[[:space:]]+${DOMAIN_NAME}([[:space:]]|$)|server_name[[:space:]]+[^;]*\\b${DOMAIN_NAME}\\b" "$enabled_site" 2>/dev/null; then
+        log_warning "Vhost Apache existente para ${DOMAIN_NAME} sera reutilizado e reconfigurado."
+        continue
+    fi
+    die "Servidor com site customizado ativo: $enabled_site. Em reinstalacao, desative sites de outros dominios antes de continuar."
+done
+
 if [ "$REINSTALL_MODE" = s ]; then
     print_alert_box "MODO REINSTALACAO DESTRUTIVA: os arquivos de ${JOOMLA_ROOT} e o banco ${JOOMLA_DB_NAME} serao removidos permanentemente apos backup."
     read -r -p "Digite APAGAR ${CLEAN_DOMAIN_ID} para continuar: " DELETE_CONFIRM
@@ -356,11 +373,6 @@ if [[ -n "$TRUSTED_PROXY" ]]; then
     for octet in "${OCTETS[@]}"; do ((10#$octet <= 255)) || die "IPv4 de proxy invalido."; done
 fi
 log_info "Proxy confiavel: ${TRUSTED_PROXY:-nenhum}; restrinja a origem no firewall de borda."
-# Recusar servidores com sites ativos customizados: alteracoes globais exigem migracao planejada.
-for enabled_site in /etc/apache2/sites-enabled/* /etc/nginx/sites-enabled/*; do
-    [[ -e "$enabled_site" ]] || continue
-    case "$(basename "$enabled_site")" in 000-default.conf|default-ssl.conf|default) ;; *) die "Servidor com site customizado ativo: $enabled_site. Use servidor limpo." ;; esac
- done
 log_info "Extensoes opcionais: ${PHP_EXTRA_MODULES[*]:-nenhuma}; uploads adicionais: ${EXTRA_UPLOAD_DIRS[*]}."
 
 draw_separator

@@ -1,9 +1,9 @@
 # 🇯 Guia de instalação e operação segura — Joomla 5 / LAMP
 
 ![Joomla](https://img.shields.io/badge/Joomla-5-5091CD?logo=joomla)
-![Segurança](https://img.shields.io/badge/Instalador-2.3-28A745)
+![Segurança](https://img.shields.io/badge/Instalador-2.8-28A745)
 
-Referência do [install_lamp_ubuntu_joomla5.sh](../install_lamp_ubuntu_joomla5.sh), versão **2.3**. Prepara Apache com PHP-FPM, MariaDB local, Joomla oficial, UFW, Fail2Ban e auditd. O instalador não higieniza uma aplicação comprometida nem substitui a revisão de extensões e dados.
+Referência do [install_lamp_ubuntu_joomla5.sh](../install_lamp_ubuntu_joomla5.sh), versão **2.8**. Prepara Apache com PHP-FPM, MariaDB local, Joomla oficial, UFW, Fail2Ban e auditd. O instalador não higieniza uma aplicação comprometida nem substitui a revisão de extensões e dados.
 
 ## 📁 1. Arquivos e configurações
 
@@ -23,7 +23,7 @@ O nome exato dos arquivos é mostrado pelo instalador. Os identificadores do Vir
 
 ## ⚙️ 2. Preparação e execução
 
-Use **servidor dedicado novo** e destino vazio. O usuário desenvolvedor é opcional: se informado e existente, será proprietário do código; se não existir, será criado com home e senha bloqueada. Configure acesso SSH por chave antes do deploy. O instalador recusa sites personalizados já habilitados e não deve ser executado novamente para atualizar Joomla ou reparar uma instalação. Para migrar, veja o [checklist de recuperação e migração](checklist_pre_migracao_joomla.md).
+Use **servidor dedicado novo** e destino vazio. O usuário desenvolvedor é opcional: se informado e existente, será proprietário do código; se não existir, será criado com home e senha bloqueada. Configure acesso SSH por chave antes do deploy. O instalador recusa sites personalizados já habilitados. Para reinstalar conscientemente o mesmo domínio, use `--reinstall`: o vhost Apache desse domínio será reutilizado, mas arquivos e banco serão apagados somente depois de dois avisos e de um backup validado. Sites de outros domínios devem ser desativados antes de continuar. Para migrar, veja o [checklist de recuperação e migração](checklist_pre_migracao_joomla.md).
 
 Raízes admitidas: diretórios dedicados abaixo de `/var/www/`, `/srv/www/`, ou caminhos de pelo menos dois níveis abaixo de `/mnt/` e `/arquivos/`. O destino é resolvido e validado antes de alterar permissões.
 
