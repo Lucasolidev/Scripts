@@ -1,0 +1,55 @@
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+# Temporary files and directories
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.log
+[Tt]emp/
+[Tt]mp/
+Arquivos/
+Temp_Arquivos/
+# IDEs
+.vscode/
+.idea/
+.vs/
+*.suo
+*.user
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+# Environment secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+# Private keys and credentials
+.ssh/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+credentials.json
+secrets.json
+secrets/

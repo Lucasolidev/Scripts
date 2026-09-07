@@ -6,6 +6,8 @@ Este documento define a especificação arquitetural, diretrizes de design, padr
 
 ## 📌 1. Visão Geral e Propósito
 
+Para instaladores web, documentar versões e origens dos pacotes, pastas mutáveis, bloqueios HTTP correspondentes, manutenção de permissões, conclusão manual do CMS e limitações de proxy/TLS. Separar migração comum de recuperação após comprometimento. Não prometer backup limpo por ausência de indicadores, nem apresentar análise estática como teste de instalação. Manter ajudas e checklists consistentes: nenhum roteiro de restauração deve reabrir escrita permanente no código.
+
 Os arquivos de ajuda (`ajuda_*.md`) são guias operacionais rápidos, *cheat sheets* e referências técnicas voltados para administração de sistemas, DevOps, infraestrutura e desenvolvimento.
 
 O objetivo desta padronização é garantir que todos os guias possuam:

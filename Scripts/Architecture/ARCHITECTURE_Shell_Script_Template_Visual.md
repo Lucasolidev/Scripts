@@ -234,7 +234,11 @@
 >    - Aplicações com autenticação devem oferecer HTTPS antes do uso em produção; habilitar redirecionamento, cookies `Secure` e HSTS somente após um certificado válido estar ativo.
 >    - Quando um controle depender do kernel ou do ambiente (por exemplo, regras do `auditd`), detectar explicitamente ambientes restritos como WSL. Nunca silenciar a falha: informar no resumo final que a proteção ficou indisponível e manter a falha bloqueante nos servidores Linux suportados.
 >    - Se uma instalação web exigir o arquivo de configuração inicial, preferir o fluxo que exporta a configuração para instalação controlada como administrador. Não criar arquivo vazio quando a aplicação o interpretar como configuração válida e nunca liberar escrita do processo web no diretório inteiro de código.
->    - Escrita persistente do processo web em toda a árvore da aplicação só pode ser habilitada mediante autorização explícita para o diretório exato. O script deve avisar que permite instaladores, extensões e atualizações pelo painel, mas reduz a contenção caso o processo web seja comprometido.
+>    - O padrão de produção é código sem escrita pelo processo web. Atualizações pelo painel exigem janela de manutenção com acesso restrito e revogação de ACLs temporárias ao terminar, inclusive para arquivos novos. Não habilitar escrita persistente como padrão de instalação.
+>    - Toda pasta declarada gravável deve receber simultaneamente bloqueio HTTP de scripts, incluindo variantes de extensão, e não interpretar .htaccess. Bloqueio HTTP não impede inclusão interna de arquivos pela aplicação.
+>    - Aplicar limites PHP por pool FPM e selecionar o socket exato; preservar CLI e outras aplicações. Módulos opcionais devem ser selecionados por necessidade, sem classificar uma extensão como vulnerável apenas por existir. Manter cURL para integrações e atualizações.
+>    - Instaladores para servidor novo devem recusar sobreposição de DocumentRoot não vazio e sites personalizados ativos. Falha em configuração ou dependência essencial deve interromper sem anunciar proteção ativa.
+>    - Documentar separadamente o que foi validado estaticamente e o que ainda depende de homologação. ShellCheck não valida configuração Apache/Nginx/FPM, comportamento HTTP ou segurança de mídia migrada.
 > 
 > Aqui está o script original que deve ser adaptado:
 > `[INSIRA O SCRIPT AQUI]`"
