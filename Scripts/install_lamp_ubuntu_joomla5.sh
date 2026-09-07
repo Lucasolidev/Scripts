@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.4
+# Version: 2.5
 # ------------------------------------------------
-VERSION="2.4"
+VERSION="2.5"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -263,7 +263,9 @@ if [ -n "$DEV_USER" ]; then
     if id "$DEV_USER" >/dev/null 2>&1; then
         log_info "Usuario desenvolvedor configurado com acesso total ao diretorio web: ${FG_GREEN}${DEV_USER}${NC}"
     else
-        die "Crie o usuario de deploy antes de executar o instalador."
+        useradd --create-home --shell /bin/bash --user-group "$DEV_USER" || die "Falha ao criar usuario desenvolvedor."
+        passwd --lock "$DEV_USER" > /dev/null 2>&1 || die "Falha ao bloquear senha inicial do usuario."
+        log_success "Usuario desenvolvedor '${DEV_USER}' criado; senha bloqueada. Configure acesso SSH por chave antes do deploy."
     fi
 else
     log_info "Nenhum usuario adicional informado (apenas www-data)."

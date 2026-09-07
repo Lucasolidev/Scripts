@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.2
+# Version: 2.3
 # ------------------------------------------------
-VERSION="2.2"
+VERSION="2.3"
 # ==============================================================================
 # INSTALADOR AUTOMATICO DA PILHA LAMP - UBUNTU
 # ==============================================================================
@@ -96,10 +96,17 @@ validate_root "$WEB_ROOT" || die "Destino resolvido fora das raizes permitidas."
 if [[ -d "$WEB_ROOT" && -n $(find "$WEB_ROOT" -mindepth 1 -print -quit) ]]; then
     die "Destino nao vazio. Instalador para site novo; migre arquivos revisados depois."
 fi
-read -r -p "Usuario de deploy existente [root]: " CODE_OWNER
+read -r -p "Usuario de deploy [root; sera criado se nao existir]: " CODE_OWNER
 CODE_OWNER=${CODE_OWNER:-root}
 [[ "$CODE_OWNER" =~ ^[a-z_][a-z0-9_-]{0,31}$ && "$CODE_OWNER" != www-data ]] || die "Usuario invalido."
-id "$CODE_OWNER" >/dev/null 2>&1 || die "Usuario de deploy inexistente."
+if ! id "$CODE_OWNER" >/dev/null 2>&1; then
+    [[ "$CODE_OWNER" != root ]] || die "A conta root deve existir."
+    useradd --create-home --shell /bin/bash --user-group "$CODE_OWNER" || die "Falha ao criar usuario de deploy."
+    passwd --lock "$CODE_OWNER" > /dev/null 2>&1 || die "Falha ao bloquear senha inicial do usuario."
+    log_success "Usuario de deploy '$CODE_OWNER' criado; senha bloqueada. Configure acesso SSH depois."
+else
+    log_info "Usuario de deploy '$CODE_OWNER' ja existe."
+fi
 read -r -p "Pastas gravaveis separadas por espaco [uploads cache tmp]: " WRITABLE_INPUT
 read -r -a WRITABLE_DIRS <<< "${WRITABLE_INPUT:-uploads cache tmp}"
 WRITABLE_REGEX=""

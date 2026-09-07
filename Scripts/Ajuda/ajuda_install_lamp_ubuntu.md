@@ -1,6 +1,6 @@
 # 🛠️ Guia de instalação LAMP — Ubuntu
 
-Versão **2.1** do [install_lamp_ubuntu.sh](../install_lamp_ubuntu.sh). Prepara Apache2, MariaDB local e PHP-FPM com configuração por site. Use em servidor dedicado novo e diretório vazio; não é atualizador nem ferramenta para higienizar servidor comprometido.
+Versão **2.3** do [install_lamp_ubuntu.sh](../install_lamp_ubuntu.sh). Prepara Apache2, MariaDB local e PHP-FPM com configuração por site. Use em servidor dedicado novo e diretório vazio; não é atualizador nem ferramenta para higienizar servidor comprometido.
 
 ## ⚙️ Execução e parâmetros
 
@@ -10,7 +10,7 @@ chmod +x install_lamp_ubuntu.sh
 sudo ./install_lamp_ubuntu.sh
 ```
 
-O script solicita domínio, destino, usuário de deploy existente, pastas graváveis, módulos PHP opcionais, limite de upload, timeout, HTTPS, firewall, Fail2Ban, senha MariaDB oculta e IPv4 de proxy confiável. No LAMP há opção de phpMyAdmin local.
+O script solicita domínio, destino, usuário de deploy, pastas graváveis, módulos PHP opcionais, limite de upload, timeout, HTTPS, firewall, Fail2Ban, senha MariaDB oculta e IPv4 de proxy confiável. Se o usuário não existir, ele será criado com home e senha bloqueada. No LAMP há opção de phpMyAdmin local.
 
 Ubuntu 22.04 usa PHP 8.3 via PPA ondrej/php; Ubuntu 24.04 usa PHP 8.3 nativo; Ubuntu 26.04 usa PHP 8.5 nativo. A versão é definida por distribuição, sem fallback silencioso ou escolha de uma versão não testada. Homologue as dependências da aplicação.
 
