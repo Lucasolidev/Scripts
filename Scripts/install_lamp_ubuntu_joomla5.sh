@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 3.2
+# Version: 3.3
 # ------------------------------------------------
-VERSION="3.2"
+VERSION="3.3"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -837,15 +837,10 @@ chown -R "${CODE_OWNER}:www-data" "$JOOMLA_ROOT"
 find "$JOOMLA_ROOT" -type d -exec chmod 750 {} +
 find "$JOOMLA_ROOT" -type f -exec chmod 640 {} +
 
-# O instalador web do Joomla precisa criar/atualizar este arquivo uma vez.
-# Ele continua bloqueado para acesso HTTP pelo VirtualHost e deve ser travado
-# novamente pelo administrador depois que a instalacao terminar.
-if [ ! -f "${JOOMLA_ROOT}/configuration.php" ]; then
-    install -o www-data -g www-data -m 660 /dev/null "${JOOMLA_ROOT}/configuration.php"
-    log_warning "configuration.php temporariamente gravavel pelo Apache para concluir a instalacao web."
-else
-    log_info "configuration.php existente preservado; permissao nao foi alterada automaticamente."
-fi
+# O Joomla deve criar configuration.php durante o assistente web. A ACL vale
+# apenas para este diretorio raiz, sem escrita recursiva sobre o codigo.
+setfacl -m u:www-data:rwx,m::rwx "$JOOMLA_ROOT" || die "Falha ao liberar a criacao temporaria de configuration.php."
+log_warning "Assistente Joomla: Apache pode criar configuration.php temporariamente; revogue esta ACL apos concluir a instalacao."
 
 JOOMLA_WRITABLE_DIRS=(
     "cache" "tmp" "logs" "images" "media"
@@ -862,7 +857,7 @@ for relative_dir in "${JOOMLA_WRITABLE_DIRS[@]}"; do
 done
 
 log_success "Codigo somente legivel pelo Apache; escrita limitada a uploads, cache, logs e temporarios."
-log_warning "Apos concluir a instalacao web, trave configuration.php: chown root:www-data e chmod 640."
+log_warning "Apos concluir a instalacao web: remova a ACL do diretorio, aplique chown root:www-data e chmod 640 em configuration.php."
 log_warning "Atualizacoes pelo painel exigem janela de manutencao; veja a ajuda antes de liberar escrita temporaria."
 # ==============================================================================
 # 11. CONFIGURACAO DE ROTINAS AGENDADAS (CRON JOBS DO JOOMLA)
