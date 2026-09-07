@@ -23,7 +23,7 @@ O nome exato dos arquivos é mostrado pelo instalador. Os identificadores do Vir
 
 ## ⚙️ 2. Preparação e execução
 
-Use **servidor dedicado novo**, destino vazio e usuário de deploy existente. O instalador recusa sites personalizados já habilitados e não deve ser executado novamente para atualizar Joomla ou reparar uma instalação. Para migrar, veja o [checklist de recuperação e migração](checklist_pre_migracao_joomla.md).
+Use **servidor dedicado novo** e destino vazio. O usuário desenvolvedor é opcional: se informado e existente, será proprietário do código; se não existir, será criado com home e senha bloqueada. Configure acesso SSH por chave antes do deploy. O instalador recusa sites personalizados já habilitados e não deve ser executado novamente para atualizar Joomla ou reparar uma instalação. Para migrar, veja o [checklist de recuperação e migração](checklist_pre_migracao_joomla.md).
 
 Raízes admitidas: diretórios dedicados abaixo de `/var/www/`, `/srv/www/`, ou caminhos de pelo menos dois níveis abaixo de `/mnt/` e `/arquivos/`. O destino é resolvido e validado antes de alterar permissões.
 
