@@ -261,12 +261,15 @@ systemctl reload "php$PHP_VER-fpm"
 print_header "VIRTUALHOST"
 if [[ "$STACK" == lamp ]]; then
     for mod in dav_fs dav_lock dav cgi cgid include info status autoindex userdir; do
-        if [[ -e /etc/apache2/mods-enabled/$mod.load ]]; then a2dismod "$mod" > /dev/null; fi
+        if [[ -e /etc/apache2/mods-enabled/$mod.load ]]; then
+            log_info "Desativando modulo Apache: $mod"
+            a2dismod -f "$mod" > /dev/null
+        fi
     done
     for conf in /etc/apache2/mods-enabled/php*.load; do
-        [[ ! -e "$conf" ]] || a2dismod "$(basename "$conf" .load)" > /dev/null
+        [[ ! -e "$conf" ]] || a2dismod -f "$(basename "$conf" .load)" > /dev/null
     done
-    a2dismod mpm_prefork > /dev/null
+    a2dismod -f mpm_prefork > /dev/null
     a2enmod mpm_event proxy_fcgi rewrite headers setenvif > /dev/null
     printf 'ServerTokens Prod\nServerSignature Off\nTraceEnable Off\nProxyRequests Off\n' > /etc/apache2/conf-available/web-security.conf
     a2enconf web-security > /dev/null

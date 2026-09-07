@@ -408,7 +408,8 @@ done
 log_info "Desativando modulos desnecessarios/inseguros no Apache (autoindex, status, mpm_prefork)..."
 for mod in dav_fs dav_lock dav cgi cgid include info status autoindex userdir; do
     if [ -e "/etc/apache2/mods-enabled/${mod}.load" ]; then
-        a2dismod "$mod" > /dev/null 2>&1 || die "Falha ao desativar $mod; verifique dependencias."
+        log_info "Desativando modulo Apache: $mod"
+        a2dismod -f "$mod" > /dev/null 2>&1 || die "Falha ao desativar $mod; verifique dependencias."
     fi
 done
 
@@ -569,9 +570,9 @@ php-fpm"${PHP_VER}" -t > /dev/null 2>&1 || die "Configuracao PHP-FPM invalida."
 systemctl enable --now "php${PHP_VER}-fpm" > /dev/null 2>&1 || die "Falha ao ativar PHP-FPM."
 systemctl reload "php${PHP_VER}-fpm" || die "Falha ao recarregar PHP-FPM."
 for php_mod in /etc/apache2/mods-enabled/php*.load; do
-    [ ! -e "$php_mod" ] || a2dismod "$(basename "$php_mod" .load)" > /dev/null
+    [ ! -e "$php_mod" ] || a2dismod -f "$(basename "$php_mod" .load)" > /dev/null
  done
-a2dismod mpm_prefork > /dev/null || die "Falha ao desativar prefork."
+a2dismod -f mpm_prefork > /dev/null || die "Falha ao desativar prefork."
 a2enmod mpm_event proxy_fcgi setenvif > /dev/null || die "Falha ao ativar Event/FPM."
 log_success "PHP-FPM dedicado pronto; CLI preservado, cURL disponivel."
 # ==============================================================================
