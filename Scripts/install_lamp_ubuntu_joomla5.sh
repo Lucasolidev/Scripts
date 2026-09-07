@@ -2,7 +2,7 @@
 # ------------------------------------------------
 # Version: 2.6
 # ------------------------------------------------
-VERSION="2.6"
+VERSION="2.7"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -32,11 +32,19 @@ VERSION="2.6"
 # Execucao recomendada apos revisar localmente a origem e a integridade do arquivo:
 # chmod +x install_lamp_ubuntu_joomla5.sh
 # sudo ./install_lamp_ubuntu_joomla5.sh
+# Reinstalacao destrutiva: sudo ./install_lamp_ubuntu_joomla5.sh --reinstall
 # ==============================================================================
 
 export DEBIAN_FRONTEND=noninteractive
 set -Eeuo pipefail
 umask 077
+
+REINSTALL_MODE="n"
+case "${1:-}" in
+    --reinstall) REINSTALL_MODE="s" ;;
+    "") ;;
+    *) printf 'Uso: %s [--reinstall]\n' "$0" >&2; exit 2 ;;
+esac
 
 RUNTIME_DIR=""
 LOG_TMP=""
@@ -219,8 +227,8 @@ JOOMLA_ROOT=${CUSTOM_DOC_ROOT:-"/var/www/html/${DOMAIN_NAME}"}
 validate_docroot "$JOOMLA_ROOT" || die "Diretorio web invalido ou inseguro: ${JOOMLA_ROOT}"
 JOOMLA_ROOT=$(realpath -m -- "$JOOMLA_ROOT")
 validate_docroot "$JOOMLA_ROOT" || die "Destino resolvido fora das raizes web permitidas."
-if [ -d "$JOOMLA_ROOT" ] && [ -n "$(find "$JOOMLA_ROOT" -mindepth 1 -print -quit)" ]; then
-    die "Diretorio nao vazio. Prepare um destino limpo; nao sobreponha codigo de uma migracao ou instalacao existente."
+if [ -d "$JOOMLA_ROOT" ] && [ -n "$(find "$JOOMLA_ROOT" -mindepth 1 -print -quit)" ] && [ "$REINSTALL_MODE" != s ]; then
+    die "Diretorio nao vazio. Para reinstalacao destrutiva, execute novamente com --reinstall."
 fi
 log_info "Diretorio Web Raiz: ${FG_GREEN}${JOOMLA_ROOT}${NC}"
 
@@ -259,6 +267,27 @@ if [ -z "$JOOMLA_DB_PASS" ]; then
 else
     [ "${#JOOMLA_DB_PASS}" -ge 16 ] || die "A senha do Usuario Joomla DB deve ter pelo menos 16 caracteres."
     log_info "Senha do Usuario Joomla DB recebida com entrada oculta."
+fi
+
+if [ "$REINSTALL_MODE" = s ]; then
+    print_alert_box "MODO REINSTALACAO DESTRUTIVA: os arquivos de ${JOOMLA_ROOT} e o banco ${JOOMLA_DB_NAME} serao removidos permanentemente apos backup."
+    read -r -p "Digite APAGAR ${CLEAN_DOMAIN_ID} para continuar: " DELETE_CONFIRM
+    [ "$DELETE_CONFIRM" = "APAGAR ${CLEAN_DOMAIN_ID}" ] || die "Confirmacao incorreta; nada foi removido."
+    read -r -p "Digite novamente CONFIRMO para autorizar a remocao permanente: " DELETE_CONFIRM_2
+    [ "$DELETE_CONFIRM_2" = "CONFIRMO" ] || die "Confirmacao incorreta; nada foi removido."
+    command -v mysqldump >/dev/null 2>&1 || die "mysqldump ausente; backup do banco obrigatorio."
+    BACKUP_DIR="/root/backup_reinstall_joomla_${CLEAN_DOMAIN_ID}_${LOG_TIMESTAMP}"
+    install -d -m 700 "$BACKUP_DIR"
+    tar --one-file-system --ignore-failed-read -czf "$BACKUP_DIR/site.tar.gz" -C "$(dirname "$JOOMLA_ROOT")" "$(basename "$JOOMLA_ROOT")" || die "Falha no backup dos arquivos; nada removido."
+    [ -s "$BACKUP_DIR/site.tar.gz" ] || die "Backup de arquivos vazio; nada removido."
+    MYSQL_PWD="$DB_ROOT_PASS" mysqldump --protocol=socket --single-transaction --routines --triggers "$JOOMLA_DB_NAME" > "$BACKUP_DIR/database.sql" || die "Falha no dump do banco; nada removido."
+    [ -s "$BACKUP_DIR/database.sql" ] || die "Dump do banco vazio; nada removido."
+    chmod 600 "$BACKUP_DIR/database.sql"
+    log_success "Backups validados em $BACKUP_DIR. A remocao sera limitada ao diretorio e banco informados."
+    rm -rf -- "${JOOMLA_ROOT:?}"/* "${JOOMLA_ROOT:?}"/.[!.]* "${JOOMLA_ROOT:?}"/..?* 2>/dev/null || die "Falha ao limpar o diretorio; backup preservado."
+    MYSQL_PWD="$DB_ROOT_PASS" mariadb --protocol=socket -e "DROP DATABASE IF EXISTS \`$JOOMLA_DB_NAME\`;" || die "Falha ao remover o banco; arquivos ja foram limpos, restaure pelo backup se necessario."
+    unset MYSQL_PWD
+    log_warning "Reinstalacao destrutiva autorizada e executada; backup permanece em $BACKUP_DIR."
 fi
 
 echo -e "\n  ${FG_CYAN}[i]${NC} Usuario do sistema/desenvolvedor para permissoes de escrita SFTP/SSH (opcional)."
