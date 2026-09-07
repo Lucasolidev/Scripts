@@ -143,6 +143,9 @@ if [[ -z "$DB_ROOT_PASS" ]]; then DB_ROOT_PASS=$(od -An -N24 -tx1 /dev/urandom |
 log_info "Credencial recebida/gerada (oculta). Site: $DOMAIN_NAME; PHP $PHP_VER; deploy: $CODE_OWNER."
 log_info "Diretorio: $WEB_ROOT; escrita web: ${WRITABLE_DIRS[*]}; opcionais: ${EXTRA_MODULES[*]:-nenhum}."
 
+echo "Informe somente o IPv4 do proxy reverso ou balanceador que encaminha requisicoes para este servidor."
+echo "Nao informe o IP do visitante. Com Cloudflare, deixe vazio e configure os intervalos oficiais separadamente."
+echo "Se o dominio aponta diretamente para esta maquina, pressione ENTER."
 read -r -p "IPv4 do proxy confiavel [vazio: acesso direto]: " TRUSTED_PROXY
 if [[ -n "$TRUSTED_PROXY" ]]; then
     [[ "$TRUSTED_PROXY" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || die "IPv4 de proxy invalido."

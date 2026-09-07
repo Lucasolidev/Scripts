@@ -307,7 +307,10 @@ for relative_dir in "${EXTRA_UPLOAD_DIRS[@]}"; do
     case "$relative_dir" in administrator|administrator/*|components|components/*|plugins|plugins/*|modules|modules/*|libraries|libraries/*|templates|templates/*|includes|includes/*|cli|cli/*|api|api/*|installation|installation/*) die "Nao conceda escrita a diretorios de codigo." ;; esac
     UPLOAD_REGEX+="|${relative_dir}"
 done
-read -r -p "IPv4 do proxy confiavel [vazio: acesso direto]: " TRUSTED_PROXY
+echo -e "  ${FG_CYAN}[i]${NC} Informe somente o IPv4 do proxy reverso ou balanceador que encaminha requisicoes para este servidor."
+echo -e "  ${FG_CYAN}[i]${NC} Nao informe o IP do visitante. Com Cloudflare, deixe vazio e configure os intervalos oficiais separadamente."
+echo -e "  ${FG_CYAN}[i]${NC} Se o dominio aponta diretamente para esta maquina, pressione ENTER."
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} IPv4 do proxy confiavel [vazio: acesso direto]: ${NC}")" TRUSTED_PROXY
 if [[ -n "$TRUSTED_PROXY" ]]; then
     [[ "$TRUSTED_PROXY" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || die "IPv4 de proxy invalido."
     IFS=. read -r -a OCTETS <<< "$TRUSTED_PROXY"
