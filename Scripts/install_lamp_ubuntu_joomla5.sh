@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 3.3
+# Version: 3.4
 # ------------------------------------------------
-VERSION="3.3"
+VERSION="3.4"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -1041,6 +1041,30 @@ echo -e "    ▶ Tipo ${FG_CYAN}A${NC}  | Nome: ${FG_YELLOW}@${NC} e ${FG_YELLOW
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
 # ==============================================================================
+# Finalizador executado pelo administrador depois do assistente web Joomla.
+FINALIZE_SCRIPT="/root/finalizar_joomla_${CLEAN_DOMAIN_ID}.sh"
+cat > "$FINALIZE_SCRIPT" <<EOF
+#!/bin/bash
+set -Eeuo pipefail
+ROOT="${JOOMLA_ROOT}"
+if [ ! -s "\$ROOT/configuration.php" ] || ! grep -q 'class JConfig' "\$ROOT/configuration.php"; then
+    echo "configuration.php ainda nao foi gerado pelo Joomla; finalize o assistente primeiro." >&2
+    exit 1
+fi
+if [ -d "\$ROOT/installation" ]; then
+    read -r -p "Digite FINALIZAR para remover a pasta installation e aplicar o hardening: " CONFIRM
+    [ "\$CONFIRM" = FINALIZAR ] || { echo "Confirmacao incorreta; nada foi alterado." >&2; exit 1; }
+    rm -rf -- "\$ROOT/installation"
+fi
+setfacl -x u:www-data "\$ROOT" 2>/dev/null || true
+chown root:www-data "\$ROOT/configuration.php"
+chmod 640 "\$ROOT/configuration.php"
+echo "Joomla finalizado: installation removida e configuration.php protegido."
+EOF
+chmod 700 "$FINALIZE_SCRIPT"
+echo -e "  ${BOLD}Finalizacao segura apos o assistente web:${NC}"
+echo -e "    Execute depois de concluir o Joomla: ${FG_CYAN}sudo ${FINALIZE_SCRIPT}${NC}"
+
 # 15. GERACAO E SALVAMENTO DOS ARQUIVOS DE LOG DA INSTALACAO
 # ==============================================================================
 print_header "ARQUIVOS DE LOG DA INSTALACAO"
