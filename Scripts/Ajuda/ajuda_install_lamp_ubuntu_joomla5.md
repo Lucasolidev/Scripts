@@ -1,9 +1,9 @@
 # 🇯 Guia de instalação e operação segura — Joomla 5 / LAMP
 
 ![Joomla](https://img.shields.io/badge/Joomla-5-5091CD?logo=joomla)
-![Segurança](https://img.shields.io/badge/Instalador-2.8-28A745)
+![Segurança](https://img.shields.io/badge/Instalador-2.9-28A745)
 
-Referência do [install_lamp_ubuntu_joomla5.sh](../install_lamp_ubuntu_joomla5.sh), versão **2.8**. Prepara Apache com PHP-FPM, MariaDB local, Joomla oficial, UFW, Fail2Ban e auditd. O instalador não higieniza uma aplicação comprometida nem substitui a revisão de extensões e dados.
+Referência do [install_lamp_ubuntu_joomla5.sh](../install_lamp_ubuntu_joomla5.sh), versão **2.9**. Prepara Apache com PHP-FPM, MariaDB local, Joomla oficial, UFW, Fail2Ban e auditd. O instalador não higieniza uma aplicação comprometida nem substitui a revisão de extensões e dados.
 
 ## 📁 1. Arquivos e configurações
 
@@ -86,7 +86,7 @@ UFW preserva as portas anunciadas por `sshd -T`, libera HTTP e HTTPS quando soli
 Mantenha o site em homologação/manutenção até concluir:
 
 1. Finalizar o instalador Joomla por HTTPS.
-2. Se o Joomla não conseguir gravar `configuration.php`, usar o conteúdo exportado pelo instalador e gravá-lo como administrador, fora de logs/histórico. Aplicar proprietário de deploy, grupo www-data e modo 0640. Não criar um arquivo vazio antecipadamente.
+2. Durante a instalação inicial, o script cria `configuration.php` com modo temporário 0660 para o Apache gravar as configurações. Depois que o Joomla terminar, aplicar `sudo chown root:www-data <raiz_do_joomla>/configuration.php` e `sudo chmod 640 <raiz_do_joomla>/configuration.php`.
 3. Remover o diretório `installation` como administrador após conferir o caminho absoluto exato. O processo web não possui permissão de remoção no diretório raiz.
 4. Validar login, URLs amigáveis, mídias, cache, envio SMTP, integrações e tarefas agendadas.
 5. Publicar somente após concluir a matriz abaixo.
