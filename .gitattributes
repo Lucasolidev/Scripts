@@ -1,4 +1,0 @@
-# Preservar sintaxe Bash no checkout Windows dos instaladores revisados.
-Scripts/install_lamp_ubuntu.sh text eol=lf
-Scripts/install_lemp_ubuntu.sh text eol=lf
-Scripts/install_lamp_ubuntu_joomla5.sh text eol=lf

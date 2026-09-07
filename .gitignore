@@ -53,3 +53,9 @@ id_ed25519.*
 credentials.json
 secrets.json
 secrets/
+
+# Arquivos locais de governanca do Codex/projeto; nao publicar no repositorio.
+/AGENTS.md
+/docs/
+/.gitattributes
+/.agents/
