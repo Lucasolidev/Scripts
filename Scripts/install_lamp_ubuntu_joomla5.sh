@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.3
+# Version: 2.4
 # ------------------------------------------------
-VERSION="2.3"
+VERSION="2.4"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -25,6 +25,9 @@ VERSION="2.3"
 # 14. Integra as portas HTTP (80) e HTTPS (443) ao Firewall UFW e jails Web ao Fail2Ban.
 # 15. Exibe resumo sem segredos e salva credenciais em arquivo root:root com modo 0600.
 # 16. Gera logs privados, sem credenciais, em /root e na Home do usuario.
+#
+# EXECUCAO REMOTA (revise a origem antes de executar):
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/Scripts/install_lamp_ubuntu_joomla5.sh -O install_lamp_ubuntu_joomla5.sh && chmod +x install_lamp_ubuntu_joomla5.sh && sudo ./install_lamp_ubuntu_joomla5.sh
 # ==============================================================================
 # Execucao recomendada apos revisar localmente a origem e a integridade do arquivo:
 # chmod +x install_lamp_ubuntu_joomla5.sh

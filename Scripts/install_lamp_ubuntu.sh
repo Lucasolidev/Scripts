@@ -1,10 +1,26 @@
 #!/bin/bash
-# Version: 2.1
-# Instalacao lamp Ubuntu; revisar antes de executar com sudo.
-# Menor privilegio, PHP-FPM dedicado, credenciais privadas e validacao nativa.
+# ------------------------------------------------
+# Version: 2.2
+# ------------------------------------------------
+VERSION="2.2"
+# ==============================================================================
+# INSTALADOR AUTOMATICO DA PILHA LAMP - UBUNTU
+# ==============================================================================
+# RESUMO DO SCRIPT:
+# - Instala Apache2, MariaDB e PHP-FPM com pool dedicado por site.
+# - Aplica menor privilegio: www-data escreve somente nas pastas declaradas.
+# - Configura UFW, Fail2Ban (SSH e protecao web), HTTPS opcional e logs privados.
+# - Desativa componentes Apache desnecessarios e bloqueia scripts em uploads.
+# - Exige servidor dedicado e DocumentRoot vazio para evitar mistura de arquivos.
+#
+# COMPATIBILIDADE: Ubuntu 22.04 (PHP 8.3 via PPA), 24.04 (PHP 8.3 nativo)
+# e 26.04 (PHP 8.5 nativo). Requer root/sudo e usuario de deploy existente.
+#
+# EXECUCAO REMOTA (revise a origem antes de executar):
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/Scripts/install_lamp_ubuntu.sh -O install_lamp_ubuntu.sh && chmod +x install_lamp_ubuntu.sh && sudo ./install_lamp_ubuntu.sh
+# ==============================================================================
 set -Eeuo pipefail
 umask 077
-VERSION="2.1"
 STACK="lamp"
 NC='\033[0m'; BOLD='\033[1m'; DIM='\033[2m'
 FG_CYAN='\033[36m'; FG_YELLOW='\033[33m'; FG_GREEN='\033[32m'; FG_RED='\033[31m'
