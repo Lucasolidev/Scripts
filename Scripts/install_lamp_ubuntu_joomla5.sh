@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.9
+# Version: 3.0
 # ------------------------------------------------
-VERSION="2.9"
+VERSION="3.0"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -527,7 +527,8 @@ DELETE FROM mysql.user WHERE User='';
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
 CREATE DATABASE IF NOT EXISTS \`${JOOMLA_DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER '${JOOMLA_DB_USER}'@'localhost' IDENTIFIED BY '${SQL_JOOMLA_DB_PASS}';
+CREATE USER IF NOT EXISTS '${JOOMLA_DB_USER}'@'localhost' IDENTIFIED BY '${SQL_JOOMLA_DB_PASS}';
+ALTER USER '${JOOMLA_DB_USER}'@'localhost' IDENTIFIED BY '${SQL_JOOMLA_DB_PASS}';
 GRANT ALL PRIVILEGES ON \`${JOOMLA_DB_NAME}\`.* TO '${JOOMLA_DB_USER}'@'localhost';
 FLUSH PRIVILEGES;
 EOF

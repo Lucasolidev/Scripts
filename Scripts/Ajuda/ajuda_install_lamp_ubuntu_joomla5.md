@@ -1,9 +1,9 @@
 # 🇯 Guia de instalação e operação segura — Joomla 5 / LAMP
 
 ![Joomla](https://img.shields.io/badge/Joomla-5-5091CD?logo=joomla)
-![Segurança](https://img.shields.io/badge/Instalador-2.9-28A745)
+![Segurança](https://img.shields.io/badge/Instalador-3.0-28A745)
 
-Referência do [install_lamp_ubuntu_joomla5.sh](../install_lamp_ubuntu_joomla5.sh), versão **2.9**. Prepara Apache com PHP-FPM, MariaDB local, Joomla oficial, UFW, Fail2Ban e auditd. O instalador não higieniza uma aplicação comprometida nem substitui a revisão de extensões e dados.
+Referência do [install_lamp_ubuntu_joomla5.sh](../install_lamp_ubuntu_joomla5.sh), versão **3.0**. Prepara Apache com PHP-FPM, MariaDB local, Joomla oficial, UFW, Fail2Ban e auditd. O instalador não higieniza uma aplicação comprometida nem substitui a revisão de extensões e dados.
 
 ## 📁 1. Arquivos e configurações
 
