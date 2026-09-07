@@ -297,10 +297,17 @@ if [ "$REINSTALL_MODE" = s ]; then
     install -d -m 700 "$BACKUP_DIR"
     tar --one-file-system --ignore-failed-read -czf "$BACKUP_DIR/site.tar.gz" -C "$(dirname "$JOOMLA_ROOT")" "$(basename "$JOOMLA_ROOT")" || die "Falha no backup dos arquivos; nada removido."
     [ -s "$BACKUP_DIR/site.tar.gz" ] || die "Backup de arquivos vazio; nada removido."
-    MYSQL_PWD="$DB_ROOT_PASS" mysqldump --protocol=socket --single-transaction --routines --triggers "$JOOMLA_DB_NAME" > "$BACKUP_DIR/database.sql" || die "Falha no dump do banco; nada removido."
-    [ -s "$BACKUP_DIR/database.sql" ] || die "Dump do banco vazio; nada removido."
-    chmod 600 "$BACKUP_DIR/database.sql"
-    log_success "Backups validados em $BACKUP_DIR. A remocao sera limitada ao diretorio e banco informados."
+    if ! DB_EXISTS=$(MYSQL_PWD="$DB_ROOT_PASS" mariadb --protocol=socket --batch --skip-column-names -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '${JOOMLA_DB_NAME}';" 2>/dev/null); then
+        die "Falha ao verificar a existencia do banco; nada removido."
+    fi
+    if [ "$DB_EXISTS" = "$JOOMLA_DB_NAME" ]; then
+        MYSQL_PWD="$DB_ROOT_PASS" mysqldump --protocol=socket --single-transaction --routines --triggers "$JOOMLA_DB_NAME" > "$BACKUP_DIR/database.sql" || die "Falha no dump do banco; nada removido."
+        [ -s "$BACKUP_DIR/database.sql" ] || die "Dump do banco vazio; nada removido."
+        chmod 600 "$BACKUP_DIR/database.sql"
+        log_success "Backup de arquivos e banco validado em $BACKUP_DIR. A remocao sera limitada ao diretorio e banco informados."
+    else
+        log_warning "Banco '${JOOMLA_DB_NAME}' nao existe; nenhum dump foi necessario. O backup dos arquivos permanece em $BACKUP_DIR."
+    fi
     rm -rf -- "${JOOMLA_ROOT:?}"/* "${JOOMLA_ROOT:?}"/.[!.]* "${JOOMLA_ROOT:?}"/..?* 2>/dev/null || die "Falha ao limpar o diretorio; backup preservado."
     MYSQL_PWD="$DB_ROOT_PASS" mariadb --protocol=socket -e "DROP DATABASE IF EXISTS \`$JOOMLA_DB_NAME\`;" || die "Falha ao remover o banco; arquivos ja foram limpos, restaure pelo backup se necessario."
     unset MYSQL_PWD
