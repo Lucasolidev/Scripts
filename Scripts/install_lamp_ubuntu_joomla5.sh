@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 3.1
+# Version: 3.2
 # ------------------------------------------------
-VERSION="3.1"
+VERSION="3.2"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -312,13 +312,14 @@ if [ "$REINSTALL_MODE" = s ]; then
     else
         log_warning "Banco '${JOOMLA_DB_NAME}' nao existe; nenhum dump foi necessario. O backup dos arquivos permanece em $BACKUP_DIR."
     fi
-    for vhost_path in \
-        "/etc/apache2/sites-enabled/${DOMAIN_NAME}.conf" \
-        "/etc/apache2/sites-available/${DOMAIN_NAME}.conf"; do
-        if [ -e "$vhost_path" ]; then
-            cp -a -- "$vhost_path" "$BACKUP_DIR/$(basename -- "$vhost_path")" || die "Falha ao salvar o vhost; nada removido."
-        fi
-    done
+    vhost_enabled="/etc/apache2/sites-enabled/${DOMAIN_NAME}.conf"
+    vhost_available="/etc/apache2/sites-available/${DOMAIN_NAME}.conf"
+    if [ -e "$vhost_enabled" ] || [ -L "$vhost_enabled" ]; then
+        cp -a -- "$vhost_enabled" "$BACKUP_DIR/vhost-enabled.conf" || die "Falha ao salvar o vhost habilitado; nada removido."
+    fi
+    if [ -e "$vhost_available" ] || [ -L "$vhost_available" ]; then
+        cp -a -- "$vhost_available" "$BACKUP_DIR/vhost-available.conf" || die "Falha ao salvar o vhost disponivel; nada removido."
+    fi
     if command -v mariadb >/dev/null 2>&1; then
         MYSQL_PWD="$DB_ROOT_PASS" mariadb --protocol=socket -e "DROP DATABASE IF EXISTS \`$JOOMLA_DB_NAME\`; DROP USER IF EXISTS '$JOOMLA_DB_USER'@'localhost';" || die "Falha ao remover o banco ou usuario; arquivos ainda nao foram limpos."
     fi
