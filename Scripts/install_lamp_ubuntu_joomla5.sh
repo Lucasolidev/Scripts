@@ -201,6 +201,7 @@ OS_VERSION=$(awk -F= '$1=="VERSION_ID" {gsub(/"/, "", $2); print $2}' /etc/os-re
 [[ "$OS_ID" == ubuntu && "$OS_VERSION" =~ ^(22|24|26)\.04$ ]] || die "Exige Ubuntu 22.04, 24.04 ou 26.04."
 
 echo -e "  ${FG_CYAN}[i]${NC} Dominio do site Joomla 5 (ex: meusite.com.br ou prototipo.net.br)."
+echo -e "  ${FG_CYAN}[i]${NC} Informe o dominio sem protocolo, porta ou caminho; exemplo: site.exemplo.com."
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Dominio do site: ${NC}")" DOMAIN_NAME
 while ! validate_domain "$DOMAIN_NAME"; do
     log_warning "Informe um dominio DNS valido, sem protocolo, porta, barras ou espacos."
@@ -212,6 +213,7 @@ CLEAN_DOMAIN_ID=$(echo "$DOMAIN_NAME" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:upper:]
 log_info "Dominio definido: ${FG_GREEN}${DOMAIN_NAME}${NC}"
 
 echo -e "\n  ${FG_CYAN}[i]${NC} Diretorio raiz da aplicacao web (permite informar outro disco/ponto de montagem)."
+echo -e "  ${FG_CYAN}[i]${NC} A pasta deve estar vazia; nela sera instalado somente o Joomla revisado."
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Diretorio de instalacao [Padrao: /var/www/html/${DOMAIN_NAME}]: ${NC}")" CUSTOM_DOC_ROOT
 JOOMLA_ROOT=${CUSTOM_DOC_ROOT:-"/var/www/html/${DOMAIN_NAME}"}
 validate_docroot "$JOOMLA_ROOT" || die "Diretorio web invalido ou inseguro: ${JOOMLA_ROOT}"
@@ -223,6 +225,7 @@ fi
 log_info "Diretorio Web Raiz: ${FG_GREEN}${JOOMLA_ROOT}${NC}"
 
 echo -e "\n  ${FG_CYAN}[i]${NC} Configuracao do Banco de Dados MariaDB para o Joomla 5."
+echo -e "  ${FG_CYAN}[i]${NC} Senha administrativa local do MariaDB; sera ocultada e guardada em arquivo root 0600."
 read -r -s -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do MariaDB Root (deixe vazio para gerar aleatoria): ${NC}")" DB_ROOT_PASS
 echo
 if [ -z "$DB_ROOT_PASS" ]; then
@@ -234,17 +237,20 @@ else
 fi
 
 DEFAULT_DB_NAME="joomla_${CLEAN_DOMAIN_ID:0:15}_db"
+echo -e "  ${FG_CYAN}[i]${NC} Nome logico da base; use somente letras, numeros e sublinhado."
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Nome do Banco de Dados [Padrao: ${DEFAULT_DB_NAME}]: ${NC}")" JOOMLA_DB_NAME
 JOOMLA_DB_NAME=${JOOMLA_DB_NAME:-$DEFAULT_DB_NAME}
 validate_db_identifier "$JOOMLA_DB_NAME" || die "Nome de banco invalido. Use somente letras, numeros e sublinhado (maximo 32)."
 log_info "Nome do Banco definido: ${FG_GREEN}${JOOMLA_DB_NAME}${NC}"
 
 DEFAULT_DB_USER="joomla_${CLEAN_DOMAIN_ID:0:15}_usr"
+echo -e "  ${FG_CYAN}[i]${NC} Usuario exclusivo do Joomla, sem acesso remoto e sem permissao de administrador."
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuario do Banco [Padrao: ${DEFAULT_DB_USER}]: ${NC}")" JOOMLA_DB_USER
 JOOMLA_DB_USER=${JOOMLA_DB_USER:-$DEFAULT_DB_USER}
 validate_db_identifier "$JOOMLA_DB_USER" || die "Usuario de banco invalido. Use somente letras, numeros e sublinhado (maximo 32)."
 log_info "Usuario do Banco definido: ${FG_GREEN}${JOOMLA_DB_USER}${NC}"
 
+echo -e "  ${FG_CYAN}[i]${NC} Senha exclusiva do usuario do Joomla; sera gravada somente no arquivo de credenciais root 0600."
 read -r -s -p "$(echo -e "  ${FG_YELLOW}${ARROW} Senha do Usuario do Joomla DB (deixe vazio para gerar aleatoria): ${NC}")" JOOMLA_DB_PASS
 echo
 if [ -z "$JOOMLA_DB_PASS" ]; then
@@ -256,6 +262,7 @@ else
 fi
 
 echo -e "\n  ${FG_CYAN}[i]${NC} Usuario do sistema/desenvolvedor para permissoes de escrita SFTP/SSH (opcional)."
+echo -e "  ${FG_CYAN}[i]${NC} Usuario que sera dono do codigo para SFTP/SSH; se nao existir, sera criado com senha bloqueada."
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Usuario desenvolvedor adicional [Deixe vazio se nao houver]: ${NC}")" DEV_USER
 if [ -n "$DEV_USER" ]; then
     [[ "$DEV_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "Nome de usuario do sistema invalido."
@@ -271,6 +278,7 @@ else
     log_info "Nenhum usuario adicional informado (apenas www-data)."
 fi
 
+echo -e "  ${FG_CYAN}[i]${NC} Ativa HTTPS diretamente; exige DNS apontado e portas 80/443 acessiveis."
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Configurar HTTPS com Let's Encrypt agora? (s/N): ${NC}")" ENABLE_TLS
 ENABLE_TLS=${ENABLE_TLS,,}
 LE_EMAIL=""
@@ -294,11 +302,13 @@ else
 fi
 
 DOWNLOAD_JOOMLA="s"
+echo -e "  ${FG_CYAN}[i]${NC} Instale somente modulos exigidos por extensoes Joomla; deixe vazio se nao souber."
 read -r -p "Extensoes opcionais PHP (soap imagick bcmath apcu redis igbinary), separadas por espaco [nenhuma]: " PHP_EXTRA_INPUT
 read -r -a PHP_EXTRA_MODULES <<< "$PHP_EXTRA_INPUT"
 for module in "${PHP_EXTRA_MODULES[@]}"; do
     case "$module" in soap|imagick|bcmath|apcu|redis|igbinary) ;; *) die "Extensao opcional invalida: $module" ;; esac
 done
+echo -e "  ${FG_CYAN}[i]${NC} Informe somente pastas que recebem uploads; scripts PHP serao bloqueados nelas."
 read -r -p "Pastas adicionais de upload, separadas por espaco [phocadownloadpap]: " EXTRA_UPLOAD_INPUT
 read -r -a EXTRA_UPLOAD_DIRS <<< "${EXTRA_UPLOAD_INPUT:-phocadownloadpap}"
 UPLOAD_REGEX="assets|images|cache|tmp|logs|media|administrator/cache|administrator/logs"

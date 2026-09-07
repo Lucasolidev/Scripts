@@ -86,8 +86,10 @@ OS_ID=$(awk -F= '$1=="ID" {gsub(/"/, "", $2); print $2}' /etc/os-release)
 OS_VERSION=$(awk -F= '$1=="VERSION_ID" {gsub(/"/, "", $2); print $2}' /etc/os-release)
 [[ "$OS_ID" == ubuntu ]] || die "Este instalador exige Ubuntu."
 case "$OS_VERSION" in 22.04|24.04) PHP_VER=8.3 ;; 26.04) PHP_VER=8.5 ;; *) die "Ubuntu nao suportado." ;; esac
+echo "Informe o dominio sem http://, https://, porta ou caminho; exemplo: site.exemplo.com."
 read -r -p "Dominio DNS do site: " DOMAIN_NAME
 [[ "$DOMAIN_NAME" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]] || die "Dominio invalido."
+echo "Informe a pasta onde o site sera instalado. Ela deve estar vazia e em uma raiz permitida."
 read -r -p "Diretorio web [/var/www/$DOMAIN_NAME]: " WEB_ROOT
 WEB_ROOT=${WEB_ROOT:-/var/www/$DOMAIN_NAME}
 validate_root "$WEB_ROOT" || die "Use diretorio dedicado em /var/www, /srv/www, /mnt ou /arquivos."
@@ -96,6 +98,7 @@ validate_root "$WEB_ROOT" || die "Destino resolvido fora das raizes permitidas."
 if [[ -d "$WEB_ROOT" && -n $(find "$WEB_ROOT" -mindepth 1 -print -quit) ]]; then
     die "Destino nao vazio. Instalador para site novo; migre arquivos revisados depois."
 fi
+echo "Esse usuario sera dono do codigo para manutencao; sera criado se nao existir e nao recebera senha inicial."
 read -r -p "Usuario de deploy [root; sera criado se nao existir]: " CODE_OWNER
 CODE_OWNER=${CODE_OWNER:-root}
 [[ "$CODE_OWNER" =~ ^[a-z_][a-z0-9_-]{0,31}$ && "$CODE_OWNER" != www-data ]] || die "Usuario invalido."
@@ -107,6 +110,7 @@ if ! id "$CODE_OWNER" >/dev/null 2>&1; then
 else
     log_info "Usuario de deploy '$CODE_OWNER' ja existe."
 fi
+echo "Informe somente pastas que precisam receber uploads/cache/temporarios. Elas nao poderao executar PHP por HTTP."
 read -r -p "Pastas gravaveis separadas por espaco [uploads cache tmp]: " WRITABLE_INPUT
 read -r -a WRITABLE_DIRS <<< "${WRITABLE_INPUT:-uploads cache tmp}"
 WRITABLE_REGEX=""
@@ -115,17 +119,21 @@ for relative in "${WRITABLE_DIRS[@]}"; do
     case "$relative" in plugins|plugins/*|components|components/*|libraries|libraries/*|templates|templates/*|administrator|cli|api) die "Nao conceda escrita a diretorios de codigo." ;; esac
     WRITABLE_REGEX+="${WRITABLE_REGEX:+|}$relative"
 done
-read -r -p "PHP opcionais: soap imagick bcmath apcu redis igbinary [nenhum]: " EXTRA_INPUT
+echo "Use modulos opcionais apenas se sua aplicacao exigir: soap, imagick, bcmath, apcu, redis ou igbinary."
+read -r -p "PHP opcionais [nenhum]: " EXTRA_INPUT
 read -r -a EXTRA_MODULES <<< "$EXTRA_INPUT"
 for module in "${EXTRA_MODULES[@]}"; do
     case "$module" in soap|imagick|bcmath|apcu|redis|igbinary) ;; *) die "Modulo opcional invalido." ;; esac
 done
+echo "Limite por arquivo enviado pelo site; escolha conforme suas midias e politica de armazenamento."
 read -r -p "Upload maximo em MB [64]: " UPLOAD_MB
 UPLOAD_MB=${UPLOAD_MB:-64}
 [[ "$UPLOAD_MB" =~ ^[1-9][0-9]{0,3}$ ]] || die "Upload deve ser de 1 a 9999 MB."
+echo "Tempo maximo de uma requisicao PHP; valores muito altos facilitam consumo de recursos."
 read -r -p "Tempo maximo PHP em segundos [300]: " EXEC_TIME
 EXEC_TIME=${EXEC_TIME:-300}
 [[ "$EXEC_TIME" =~ ^[1-9][0-9]{0,3}$ ]] || die "Timeout invalido."
+echo "Ativa certificado e redirecionamento HTTPS direto neste servidor; exige DNS apontado e portas 80/443 acessiveis."
 read -r -p "Configurar HTTPS com Let's Encrypt? (s/N): " ENABLE_TLS
 LE_EMAIL=""
 if [[ "${ENABLE_TLS,,}" == s ]]; then
@@ -133,9 +141,12 @@ if [[ "${ENABLE_TLS,,}" == s ]]; then
     [[ "$LE_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || die "Email invalido."
 fi
 INSTALL_PHPMYADMIN=n
-if [[ "$STACK" == lamp ]]; then read -r -p "Instalar phpMyAdmin somente local? (s/N): " INSTALL_PHPMYADMIN; fi
+if [[ "$STACK" == lamp ]]; then echo "Instala o phpMyAdmin, acessivel somente localmente por tunel SSH."; read -r -p "Instalar phpMyAdmin somente local? (s/N): " INSTALL_PHPMYADMIN; fi
+echo "Aplica bloqueio de entrada e preserva as portas SSH detectadas; revise regras de rede antes de ativar."
 read -r -p "Configurar UFW? (S/n): " CONFIGURE_UFW
+echo "Ativa bloqueio automatico de IPs com tentativas suspeitas em SSH e no servidor web."
 read -r -p "Configurar Fail2Ban SSH e protecao web? (S/n): " CONFIGURE_FAIL2BAN
+echo "Senha administrativa local do MariaDB; sera ocultada e guardada somente em arquivo root 0600."
 read -r -s -p "Senha MariaDB root [vazio: gerar]: " DB_ROOT_PASS
 printf '\n'
 if [[ -z "$DB_ROOT_PASS" ]]; then DB_ROOT_PASS=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n'); fi
