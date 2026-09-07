@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.3
+# Version: 2.4
 # ------------------------------------------------
-VERSION="2.3"
+VERSION="2.4"
 # ==============================================================================
 # INSTALADOR AUTOMATICO DA PILHA LAMP - UBUNTU
 # ==============================================================================
@@ -173,7 +173,7 @@ for enabled_site in /etc/apache2/sites-enabled/* /etc/nginx/sites-enabled/*; do
 # 3. REPOSITORIOS E PACOTES
 print_header "PACOTES"
 apt-get update -y > /dev/null 2>&1
-install_packages ca-certificates curl acl openssl
+install_packages ca-certificates curl acl openssl openssh-server
 case "$OS_VERSION" in
     22.04)
         install_packages software-properties-common
@@ -398,6 +398,7 @@ EOF
 fi
 if [[ "${CONFIGURE_UFW,,}" != n ]]; then
     install_packages ufw
+    systemctl enable --now ssh > /dev/null 2>&1 || systemctl enable --now sshd > /dev/null 2>&1 || die "Nao foi possivel iniciar o servico SSH."
     command -v sshd >/dev/null || die "SSH nao detectado; firewall exige revisao manual."
     SSH_PORTS=$(sshd -T | awk '$1=="port" {print $2}')
     [[ -n "$SSH_PORTS" ]] || die "Nenhuma porta SSH detectada."
@@ -409,6 +410,7 @@ if [[ "${CONFIGURE_UFW,,}" != n ]]; then
 fi
 if [[ "${CONFIGURE_FAIL2BAN,,}" != n ]]; then
     install_packages fail2ban
+    systemctl enable --now ssh > /dev/null 2>&1 || systemctl enable --now sshd > /dev/null 2>&1 || die "Nao foi possivel iniciar o servico SSH."
     command -v sshd >/dev/null || die "SSH nao detectado para Fail2Ban."
     SSH_PORTS=$(sshd -T | awk '$1=="port" {printf "%s%s", sep, $2; sep=","}')
     printf '[sshd]\nenabled = true\nbackend = systemd\nport = %s\n' "$SSH_PORTS" > /etc/fail2ban/jail.d/web-sshd.local

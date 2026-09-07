@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.5
+# Version: 2.6
 # ------------------------------------------------
-VERSION="2.5"
+VERSION="2.6"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -364,6 +364,7 @@ PRE_REQ_PACKAGES=(
     "audispd-plugins"
     "ufw"
     "fail2ban"
+    "openssh-server"
 )
 
 if [ "$ENABLE_TLS" = "s" ]; then
@@ -857,6 +858,7 @@ fi
 print_header "INTEGRACAO DE SEGURANCA DE BORDA (UFW & FAIL2BAN)"
 
 log_info "Aplicando politica UFW de menor exposicao sem bloquear o SSH..."
+systemctl enable --now ssh > /dev/null 2>&1 || systemctl enable --now sshd > /dev/null 2>&1 || die "Nao foi possivel iniciar o servico SSH."
 SSH_PORTS=$(sshd -T | awk '$1 == "port" { print $2 }')
 [ -n "$SSH_PORTS" ] || die "Nao foi possivel detectar portas SSH."
 ufw default deny incoming > /dev/null
