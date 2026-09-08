@@ -25,7 +25,10 @@ readonly ZABBIX_LOG_FILE="/var/log/zabbix/zabbix_agentd.log"
 readonly ZABBIX_PID_FILE="/var/run/zabbix/zabbix_agentd.pid"
 
 # ==============================================================================
-# 1 - FUNÇÕES DE HIGHLIGHT E LOGGING
+# 1 - INICIALIZAÇÃO E FUNÇÕES BASE
+# ==============================================================================
+
+# 1.1 - FUNÇÕES DE HIGHLIGHT E LOGGING
 # ==============================================================================
 # Paleta de Cores e Estilos (ANSI Escape Codes)
 readonly NC='\033[0m'
@@ -82,7 +85,7 @@ OS_CODENAME=""
 ZABBIX_REPO_URL=""
 
 # ==============================================================================
-# VALIDAÇÃO DE PRIVILÉGIOS E INICIALIZAÇÃO DE LOGS PADRONIZADOS
+# 1.2 - VALIDAÇÃO DE PRIVILÉGIOS E INICIALIZAÇÃO DE LOGS PADRONIZADOS
 # ==============================================================================
 if [[ "$(id -u)" -ne 0 ]]; then
     log_error "Este script requer privilégios de superusuário. Execute como root (sudo)."

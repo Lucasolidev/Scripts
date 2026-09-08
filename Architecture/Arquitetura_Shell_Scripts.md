@@ -107,19 +107,25 @@
 >    - **Firewall UFW**: Ativar regras de proteção de borda.
 >    - **Limpeza do Sistema**: Executar `apt-get autoremove -y` e `apt-get autoclean -y` ao final das instalações.
 > 
-> 8. **Estrutura Sequencial e Numerada de Etapas (Separadores Padronizados)**:
->    - Todas as etapas lógicas de execução do script devem ser claramente identificadas por blocos de comentários numerados sequencialmente com linhas separadoras de `=` antes de cada etapa:
+> 8. **Estrutura Sequencial e Numerada de Etapas (Seções e Subseções)**:
+>    - Todas as etapas lógicas de execução do script devem ser claramente identificadas por blocos de comentários numerados sequencialmente. Use números inteiros para grandes blocos e decimais (ex: 1.1, 1.2) para sub-etapas do mesmo contexto.
+>    - Padrão de Separadores Obrigatório:
 >      ```bash
 >      # ==============================================================================
->      # 1 - FUNÇÕES DE HIGHLIGHT E LOGGING
+>      # 1 - INICIALIZAÇÃO E FUNÇÕES BASE
 >      # ==============================================================================
->      ```
->      ```bash
+>      
+>      # 1.1 - FUNÇÕES DE HIGHLIGHT E LOGGING
+>      ... (código) ...
+>      
+>      # 1.2 - VALIDAÇÃO DE PRIVILÉGIOS E LOGS PADRONIZADOS
+>      ... (código) ...
+>      
 >      # ==============================================================================
 >      # 2 - COLETA DE PARÂMETROS
 >      # ==============================================================================
 >      ```
->      (e assim por diante para cada etapa: `# 3 - ...`, ..., `# N - GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG`). Isso facilita a auditoria, leitura visual e manutenção do código.
+>      Isso facilita a auditoria, leitura visual hierárquica e manutenção do código.
 > 
 > 9. **Gestão de Permissões Granulares e POSIX ACLs (Herança Web & Desenvolvedores)**:
 >    - **Travessia com Menor Privilégio**: Nunca aplique `chmod o+x` indiscriminadamente em toda a árvore pai. Quando necessário, conceda somente travessia ao usuário ou grupo do serviço com ACL específica, por exemplo `setfacl -m u:www-data:--x <diretorio>`, após validar e resolver o caminho absoluto.
