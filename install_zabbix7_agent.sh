@@ -1,10 +1,10 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.1
+# Version: 1.2
 # ------------------------------------------------
-VERSION="1.1"
+VERSION="1.2"
 # ==============================================================================
-# SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO ZABBIX AGENT 7.0 - UBUNTU 24.04
+# SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO ZABBIX AGENT 7.0 LTS - UBUNTU 24.04 / 26.04
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh -O install_zabbix7_agent.sh && sudo chmod +x install_zabbix7_agent.sh && sudo ./install_zabbix7_agent.sh
@@ -17,7 +17,8 @@ set -Eeuo pipefail
 # ==============================================================================
 readonly DEFAULT_HOSTNAME="Cliente_ServBkp"
 readonly DEFAULT_SERVER="192.168.1.254"
-readonly ZABBIX_REPO_URL="https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb"
+readonly ZABBIX_REPO_URL_2404="https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb"
+readonly ZABBIX_REPO_URL_2604="https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu26.04_all.deb"
 readonly ZABBIX_CONF_DIR="/etc/zabbix"
 readonly ZABBIX_CONF_FILE="${ZABBIX_CONF_DIR}/zabbix_agentd.conf"
 readonly ZABBIX_LOG_FILE="/var/log/zabbix/zabbix_agentd.log"
@@ -75,6 +76,10 @@ HOSTNAME_VAL=""
 SERVER_VAL=""
 CONFIRMAR=""
 PACOTES_INSTALADOS=()
+OS_DISTRO=""
+OS_VERSION=""
+OS_CODENAME=""
+ZABBIX_REPO_URL=""
 
 # ==============================================================================
 # VALIDAÇÃO DE PRIVILÉGIOS E INICIALIZAÇÃO DE LOGS PADRONIZADOS
@@ -83,6 +88,34 @@ if [[ "$(id -u)" -ne 0 ]]; then
     log_error "Este script requer privilégios de superusuário. Execute como root (sudo)."
     exit 1
 fi
+
+# Detecção e Validação do Sistema Operacional (Ubuntu 24.04 ou 26.04)
+if [[ -f /etc/os-release ]]; then
+    OS_DISTRO=$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+    OS_VERSION=$(grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+    OS_CODENAME=$(grep '^VERSION_CODENAME=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+else
+    log_error "Não foi possível determinar o sistema operacional (/etc/os-release ausente)."
+    exit 1
+fi
+
+if [[ "$OS_DISTRO" != "ubuntu" ]]; then
+    log_error "Distribuição não suportada: '${OS_DISTRO}'. Este script é exclusivo para Ubuntu."
+    exit 1
+fi
+
+case "$OS_VERSION" in
+    "24.04")
+        ZABBIX_REPO_URL="$ZABBIX_REPO_URL_2404"
+        ;;
+    "26.04")
+        ZABBIX_REPO_URL="$ZABBIX_REPO_URL_2604"
+        ;;
+    *)
+        log_error "Versão do Ubuntu não suportada: '${OS_VERSION}' (${OS_CODENAME}). Versões homologadas: 24.04 LTS (Noble) ou 26.04 LTS (Resolute)."
+        exit 1
+        ;;
+esac
 
 LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
 LOG_FILENAME="relatorio_install_zabbix7_agent_${LOG_TIMESTAMP}.log"
@@ -108,6 +141,8 @@ exec > >(tee -a "$LOG_TMP") 2>&1
 # 2 - COLETA DE PARÂMETROS
 # ==============================================================================
 print_header "COLETA DE PARÂMETROS"
+
+log_info "Sistema detectado: ${FG_GREEN}Ubuntu ${OS_VERSION} (${OS_CODENAME})${NC}"
 
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o Hostname (Padrão: ${DEFAULT_HOSTNAME}): ${NC}")" input_hostname
 HOSTNAME_VAL="${input_hostname:-$DEFAULT_HOSTNAME}"
@@ -159,12 +194,12 @@ fi
 # 4 - DOWNLOAD E INSTALAÇÃO DO REPOSITÓRIO ZABBIX 7.0
 # ==============================================================================
 print_header "INSTALAÇÃO DO ZABBIX AGENT"
-log_info "Configurando repositório oficial Zabbix 7.0 LTS..."
+log_info "Configurando repositório oficial Zabbix 7.0 LTS para Ubuntu ${OS_VERSION} (${OS_CODENAME})..."
 
 DEB_PACKAGE="${RUNTIME_DIR}/zabbix-release.deb"
 if wget -q "$ZABBIX_REPO_URL" -O "$DEB_PACKAGE"; then
     if dpkg -i "$DEB_PACKAGE" >/dev/null 2>&1; then
-        log_success "Repositório Zabbix 7.0 configurado."
+        log_success "Repositório Zabbix 7.0 configurado para Ubuntu ${OS_VERSION}."
         PACOTES_INSTALADOS+=("zabbix-release")
     else
         log_error "Falha ao instalar pacote do repositório Zabbix via dpkg."
@@ -274,6 +309,7 @@ print_header "RESUMO DA INSTALAÇÃO"
 echo -e "  ${FG_GREEN}${BOLD}✔ PROCESSO FINALIZADO COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional${NC}"
+echo -e "  ${BOLD}Sistema Operacional:${NC}   ${FG_CYAN}Ubuntu ${OS_VERSION} (${OS_CODENAME})${NC}"
 echo -e "  ${BOLD}Versão do Script:${NC}      ${FG_WHITE}v${VERSION}${NC}"
 
 LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
