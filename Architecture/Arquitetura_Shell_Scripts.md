@@ -107,8 +107,19 @@
 >    - **Firewall UFW**: Ativar regras de proteção de borda.
 >    - **Limpeza do Sistema**: Executar `apt-get autoremove -y` e `apt-get autoclean -y` ao final das instalações.
 > 
-> 8. **Estrutura Sequencial e Numerada de Etapas**:
->    Todas as etapas lógicas de execução do script devem ser claramente identificadas por cabeçalhos e comentários numerados sequencialmente (ex: `# 1. VERIFICAÇÃO DE PRIVILÉGIOS`, `# 2. COLETA DE PARÂMETROS`, ..., `# N. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG`). Isso facilita a auditoria, leitura e manutenção do código.
+> 8. **Estrutura Sequencial e Numerada de Etapas (Separadores Padronizados)**:
+>    - Todas as etapas lógicas de execução do script devem ser claramente identificadas por blocos de comentários numerados sequencialmente com linhas separadoras de `=` antes de cada etapa:
+>      ```bash
+>      # ==============================================================================
+>      # 1 - FUNÇÕES DE HIGHLIGHT E LOGGING
+>      # ==============================================================================
+>      ```
+>      ```bash
+>      # ==============================================================================
+>      # 2 - COLETA DE PARÂMETROS
+>      # ==============================================================================
+>      ```
+>      (e assim por diante para cada etapa: `# 3 - ...`, ..., `# N - GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG`). Isso facilita a auditoria, leitura visual e manutenção do código.
 > 
 > 9. **Gestão de Permissões Granulares e POSIX ACLs (Herança Web & Desenvolvedores)**:
 >    - **Travessia com Menor Privilégio**: Nunca aplique `chmod o+x` indiscriminadamente em toda a árvore pai. Quando necessário, conceda somente travessia ao usuário ou grupo do serviço com ACL específica, por exemplo `setfacl -m u:www-data:--x <diretorio>`, após validar e resolver o caminho absoluto.

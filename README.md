@@ -81,6 +81,6 @@ wget https://raw.githubusercontent.com/lucasolidev/scripts/main/auditoria_servid
 ---
 
 ## 📐 Padrões de Código e Templates
-* 📄 **[Template Padrão Shell Script](Architecture/ARCHITECTURE_Shell_Script_Template_Visual.md)** — Modelo padrão com paleta de cores ANSI, logs, hardening e cabeçalhos visuais para scripts Bash.
-* 📄 **[Template Padrão PowerShell Script](Architecture/ARCHITECTURE_PowerShell_Script_Template_Visual.md)** — Modelo padrão para scripts de automação em PowerShell.
-* 📐 **[Padrão de Guias de Ajuda](Architecture/ARCHITECTURE_AJUDA.md)** — Especificação e padronização para a criação de novos manuais e cheat sheets.
+* 📄 **[Template Padrão Shell Script](Architecture/Arquitetura_Shell_Scripts.md)** — Modelo padrão com paleta de cores ANSI, logs, hardening e cabeçalhos visuais para scripts Bash.
+* 📄 **[Template Padrão PowerShell Script](Architecture/Arquitetura_PowerShell_Scripts.md)** — Modelo padrão para scripts de automação em PowerShell.
+* 📐 **[Padrão de Guias de Ajuda](Architecture/Arquitetura_Ajuda.md)** — Especificação e padronização para a criação de novos manuais e cheat sheets.
