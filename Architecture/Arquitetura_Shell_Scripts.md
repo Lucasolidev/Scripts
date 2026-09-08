@@ -206,8 +206,9 @@
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 >    ```
 > 
-> 13. **Cabeçalho de Metadados e Comentários**:
->    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual que está sendo criado nas URLs de exemplo:
+> 13. **Cabeçalho de Metadados, Comentários e Versionamento**:
+>    Todo script deve começar com o seguinte bloco de metadados padrão, certificando-se de alterar a string `NOME_DO_SCRIPT_AQUI.sh` e a descrição para refletir os dados reais do script atual.
+>    **Regra de Versionamento:** Utilize sempre o padrão de versionamento de dois dígitos (`MAJOR.MINOR`). É estritamente proibido o uso de `PATCH` (ex: incorreto `VERSION="1.1.0"` | correto `VERSION="1.1"`, `VERSION="1.2"`).
 >    ```bash
 >    #!/bin/bash
 >    # ------------------------------------------------

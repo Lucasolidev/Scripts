@@ -1,18 +1,20 @@
 #!/bin/bash
+# ------------------------------------------------
+# Version: 1.1.0
+# ------------------------------------------------
+VERSION="1.1.0"
 # ==============================================================================
 # SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO ZABBIX AGENT 7.0 - UBUNTU 24.04
 # ==============================================================================
-# Versão: 1.1.0
 # Execução recomendada (copiar e colar comando único):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh -O install_zabbix7_agent.sh && sudo chmod +x install_zabbix7_agent.sh && sudo ./install_zabbix7_agent.sh
 # ==============================================================================
 
-set -euo pipefail
+set -Eeuo pipefail
 
 # ==============================================================================
 # CONSTANTES E CONFIGURAÇÕES GLOBAIS
 # ==============================================================================
-readonly VERSION="1.1.0"
 readonly DEFAULT_HOSTNAME="Cliente_ServBkp"
 readonly DEFAULT_SERVER="192.168.1.254"
 readonly ZABBIX_REPO_URL="https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb"
@@ -21,6 +23,9 @@ readonly ZABBIX_CONF_FILE="${ZABBIX_CONF_DIR}/zabbix_agentd.conf"
 readonly ZABBIX_LOG_FILE="/var/log/zabbix/zabbix_agentd.log"
 readonly ZABBIX_PID_FILE="/var/run/zabbix/zabbix_agentd.pid"
 
+# ==============================================================================
+# 1 - FUNÇÕES DE HIGHLIGHT E LOGGING
+# ==============================================================================
 # Paleta de Cores e Estilos (ANSI Escape Codes)
 readonly NC='\033[0m'
 readonly BOLD='\033[1m'
@@ -34,15 +39,6 @@ readonly FG_WHITE='\033[37m'
 
 readonly ARROW="❯"
 
-# Variáveis de Execução
-HOSTNAME_VAL=""
-SERVER_VAL=""
-CONFIRMAR=""
-TMP_DIR=""
-
-# ==============================================================================
-# FUNÇÕES DE FORMATAÇÃO E LOGS
-# ==============================================================================
 draw_separator() {
     echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
 }
@@ -54,125 +50,167 @@ print_header() {
     draw_separator
 }
 
+get_service_status() {
+    local service="$1"
+    if systemctl is-active --quiet "$service" 2>/dev/null; then
+        echo -e "${FG_GREEN}Ativo${NC}"
+    else
+        echo -e "${FG_YELLOW}Inativo${NC}"
+    fi
+}
+
 log_info()    { echo -e "  ${FG_CYAN}[i]${NC}  ${BOLD}INFO:${NC}      $1"; }
 log_success() { echo -e "  ${FG_GREEN}[+]${NC}  ${FG_GREEN}${BOLD}SUCESSO:${NC}   $1"; }
 log_warning() { echo -e "  ${FG_YELLOW}[!]${NC}  ${FG_YELLOW}${BOLD}ATENÇÃO:${NC}   $1"; }
 log_error()   { echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"; }
+log_skipped() { echo -e "  ${FG_RED}[-]${NC}  ${FG_RED}${BOLD}PULADO:${NC}    $1"; }
+
+print_alert_box() {
+    local msg="$1"
+    echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
+}
+
+# Variáveis de Execução
+HOSTNAME_VAL=""
+SERVER_VAL=""
+CONFIRMAR=""
+PACOTES_INSTALADOS=()
 
 # ==============================================================================
-# TRATAMENTO DE LIMPEZA E ERROS
+# VALIDAÇÃO DE PRIVILÉGIOS E INICIALIZAÇÃO DE LOGS PADRONIZADOS
 # ==============================================================================
+if [[ "$(id -u)" -ne 0 ]]; then
+    log_error "Este script requer privilégios de superusuário. Execute como root (sudo)."
+    exit 1
+fi
+
+LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
+LOG_FILENAME="relatorio_install_zabbix7_agent_${LOG_TIMESTAMP}.log"
+LOG_LATEST="relatorio_install_zabbix7_agent_latest.log"
+umask 077
+RUNTIME_DIR=$(mktemp -d -p /tmp install_zabbix7_agent.XXXXXXXX) || exit 1
+chmod 700 "$RUNTIME_DIR"
+LOG_TMP="${RUNTIME_DIR}/${LOG_FILENAME}"
+touch "$LOG_TMP" && chmod 600 "$LOG_TMP"
+
 cleanup() {
     local exit_code=$?
-    if [[ -n "${TMP_DIR:-}" && -d "$TMP_DIR" ]]; then
-        rm -rf "$TMP_DIR"
-    fi
+    rm -rf -- "$RUNTIME_DIR"
     if [[ $exit_code -ne 0 ]]; then
         echo ""
         log_error "Ocorreu uma falha durante a execução (Código de saída: ${exit_code})."
     fi
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM HUP
+exec > >(tee -a "$LOG_TMP") 2>&1
 
 # ==============================================================================
-# ETAPAS DO PROCESSO
+# 2 - COLETA DE PARÂMETROS
 # ==============================================================================
-check_privileges() {
-    if [[ "$(id -u)" -ne 0 ]]; then
-        log_error "Este script requer privilégios de superusuário. Execute como root (sudo)."
-        exit 1
+print_header "COLETA DE PARÂMETROS"
+
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o Hostname (Padrão: ${DEFAULT_HOSTNAME}): ${NC}")" input_hostname
+HOSTNAME_VAL="${input_hostname:-$DEFAULT_HOSTNAME}"
+log_info "Hostname definido: ${FG_GREEN}${HOSTNAME_VAL}${NC}"
+
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (Padrão: ${DEFAULT_SERVER}): ${NC}")" input_server
+SERVER_VAL="${input_server:-$DEFAULT_SERVER}"
+log_info "Servidor Zabbix definido: ${FG_GREEN}${SERVER_VAL}${NC}"
+
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar estas configurações ao arquivo final? [S/n]: ${NC}")" input_confirm
+CONFIRMAR="${input_confirm:-S}"
+log_info "Aplicar configurações customizadas: ${FG_GREEN}${CONFIRMAR}${NC}"
+
+draw_separator
+log_info "Parâmetros coletados. Iniciando instalação..."
+
+# ==============================================================================
+# 3 - VERIFICAÇÃO DE DEPENDÊNCIAS BÁSICAS
+# ==============================================================================
+print_header "VERIFICAÇÃO DE DEPENDÊNCIAS"
+log_info "Verificando dependências essenciais do sistema..."
+
+DEPS=("wget" "curl")
+DEPS_TO_INSTALL=()
+for dep in "${DEPS[@]}"; do
+    if ! command -v "$dep" >/dev/null 2>&1; then
+        DEPS_TO_INSTALL+=("$dep")
     fi
-}
+done
 
-check_dependencies() {
-    log_info "Verificando dependências básicas..."
-    local deps=("wget" "curl")
-    local missing=()
-    for dep in "${deps[@]}"; do
-        if ! command -v "$dep" >/dev/null 2>&1; then
-            missing+=("$dep")
+if [[ ${#DEPS_TO_INSTALL[@]} -gt 0 ]]; then
+    log_info "Atualizando índices de pacotes..."
+    apt-get update -y >/dev/null 2>&1
+    for pkg in "${DEPS_TO_INSTALL[@]}"; do
+        log_info "Instalando dependência ${pkg}..."
+        if apt-get install -y "$pkg" >/dev/null 2>&1; then
+            log_success "Dependência instalada: ${pkg}."
+            PACOTES_INSTALADOS+=("$pkg")
+        else
+            log_error "Falha ao instalar a dependência: ${pkg}."
+            exit 1
         fi
     done
+else
+    log_success "Todas as dependências essenciais já estão presentes."
+fi
 
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        log_info "Instalando dependências ausentes: ${missing[*]}..."
-        apt-get update -y >/dev/null 2>&1
-        apt-get install -y "${missing[@]}" >/dev/null 2>&1 || {
-            log_error "Falha ao instalar dependências (${missing[*]})."
-            exit 1
-        }
-    fi
-}
+# ==============================================================================
+# 4 - DOWNLOAD E INSTALAÇÃO DO REPOSITÓRIO ZABBIX 7.0
+# ==============================================================================
+print_header "INSTALAÇÃO DO ZABBIX AGENT"
+log_info "Configurando repositório oficial Zabbix 7.0 LTS..."
 
-collect_inputs() {
-    print_header "COLETA DE PARÂMETROS"
-
-    read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o Hostname (Padrão: ${DEFAULT_HOSTNAME}): ${NC}")" input_hostname
-    HOSTNAME_VAL="${input_hostname:-$DEFAULT_HOSTNAME}"
-
-    read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (Padrão: ${DEFAULT_SERVER}): ${NC}")" input_server
-    SERVER_VAL="${input_server:-$DEFAULT_SERVER}"
-
-    read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar estas configurações ao arquivo final? [S/n]: ${NC}")" input_confirm
-    CONFIRMAR="${input_confirm:-S}"
-
-    draw_separator
-    log_info "Parâmetros coletados. Iniciando instalação..."
-}
-
-setup_repository() {
-    print_header "INSTALAÇÃO DO ZABBIX AGENT"
-    log_info "Configurando repositório oficial do Zabbix 7.0 LTS..."
-
-    TMP_DIR="$(mktemp -d)"
-    local deb_package="${TMP_DIR}/zabbix-release.deb"
-
-    if wget -q "$ZABBIX_REPO_URL" -O "$deb_package"; then
-        if dpkg -i "$deb_package" >/dev/null 2>&1; then
-            log_success "Pacote do repositório Zabbix instalado."
-        else
-            log_error "Falha ao instalar o pacote do repositório com dpkg."
-            exit 1
-        fi
+DEB_PACKAGE="${RUNTIME_DIR}/zabbix-release.deb"
+if wget -q "$ZABBIX_REPO_URL" -O "$DEB_PACKAGE"; then
+    if dpkg -i "$DEB_PACKAGE" >/dev/null 2>&1; then
+        log_success "Repositório Zabbix 7.0 configurado."
+        PACOTES_INSTALADOS+=("zabbix-release")
     else
-        log_error "Falha ao baixar o pacote do repositório em: ${ZABBIX_REPO_URL}"
+        log_error "Falha ao instalar pacote do repositório Zabbix via dpkg."
         exit 1
     fi
-}
+else
+    log_error "Falha ao realizar download do repositório Zabbix em: ${ZABBIX_REPO_URL}"
+    exit 1
+fi
 
-install_agent() {
-    log_info "Atualizando listas de pacotes e instalando zabbix-agent..."
-    apt-get update -y >/dev/null 2>&1
-    if apt-get install -y zabbix-agent >/dev/null 2>&1; then
-        log_success "Zabbix Agent instalado com sucesso."
-    else
-        log_error "Falha ao instalar o pacote zabbix-agent via apt-get."
-        exit 1
+# ==============================================================================
+# 5 - INSTALAÇÃO DO PACOTE ZABBIX AGENT
+# ==============================================================================
+log_info "Atualizando repositórios locais..."
+apt-get update -y >/dev/null 2>&1
+
+log_info "Instalando pacote zabbix-agent..."
+if apt-get install -y zabbix-agent >/dev/null 2>&1; then
+    log_success "Pacote zabbix-agent instalado com sucesso."
+    PACOTES_INSTALADOS+=("zabbix-agent")
+else
+    log_error "Falha na instalação do pacote zabbix-agent."
+    exit 1
+fi
+
+log_info "Configurando diretórios e permissões do Zabbix..."
+mkdir -p /var/log/zabbix
+mkdir -p /var/run/zabbix
+chown -R zabbix:zabbix /var/log/zabbix
+chown -R zabbix:zabbix /var/run/zabbix
+log_success "Diretórios e permissões aplicados."
+
+# ==============================================================================
+# 6 - CONFIGURAÇÃO DO SERVIÇO ZABBIX AGENT
+# ==============================================================================
+print_header "CONFIGURAÇÃO DO SERVIÇO"
+
+if [[ "$CONFIRMAR" =~ ^[Ss]$ ]]; then
+    if [[ -f "$ZABBIX_CONF_FILE" ]]; then
+        BACKUP_FILE="${ZABBIX_CONF_FILE}.bak.$(date +%Y%m%d_%H%M%S)"
+        cp "$ZABBIX_CONF_FILE" "$BACKUP_FILE"
+        log_info "Backup da configuração anterior salvo em: ${BACKUP_FILE}"
     fi
 
-    log_info "Configurando diretórios e permissões do Zabbix..."
-    mkdir -p /var/log/zabbix
-    mkdir -p /var/run/zabbix
-    chown -R zabbix:zabbix /var/log/zabbix
-    chown -R zabbix:zabbix /var/run/zabbix
-    log_success "Diretórios e permissões aplicados."
-}
-
-configure_agent() {
-    print_header "CONFIGURAÇÃO DO SERVIÇO"
-
-    if [[ "$CONFIRMAR" =~ ^[Ss]$ ]]; then
-        # Backup da configuração original caso exista
-        if [[ -f "$ZABBIX_CONF_FILE" ]]; then
-            local timestamp
-            timestamp="$(date +%Y%m%d_%H%M%S)"
-            local backup_file="${ZABBIX_CONF_FILE}.bak.${timestamp}"
-            cp "$ZABBIX_CONF_FILE" "$backup_file"
-            log_info "Backup da configuração anterior salvo em: ${backup_file}"
-        fi
-
-        log_info "Gerando arquivo de configuração customizado..."
-        cat <<EOF > "$ZABBIX_CONF_FILE"
+    log_info "Gerando arquivo de configuração customizado..."
+    cat <<EOF > "$ZABBIX_CONF_FILE"
 ### Agente Zabbix ###
 
 Hostname=${HOSTNAME_VAL}
@@ -189,83 +227,99 @@ Timeout=30
 # Endereco IP WAN
 UserParameter=net.ipaddress,curl -s -L -k http://www.geset.com.br/suporte/ip.php
 EOF
-        log_success "Configurações aplicadas em ${ZABBIX_CONF_FILE}."
-    else
-        log_warning "Configuração customizada pulada pelo usuário. O arquivo existente foi mantido."
-    fi
-}
-
-configure_firewall() {
-    if command -v ufw >/dev/null 2>&1; then
-        log_info "UFW detectado. Verificando porta 10050/tcp..."
-        if ufw allow 10050/tcp comment 'Zabbix Agent Port' >/dev/null 2>&1; then
-            log_success "Regra de firewall (10050/tcp) configurada no UFW."
-        else
-            log_warning "Não foi possível aplicar a regra no UFW."
-        fi
-    else
-        log_warning "UFW não está instalado ou ativo. Pulando etapa de firewall."
-    fi
-}
-
-start_service() {
-    log_info "Habilitando e reiniciando o serviço zabbix-agent..."
-    chown -R zabbix:zabbix /var/run/zabbix
-
-    if systemctl enable zabbix-agent >/dev/null 2>&1 && systemctl restart zabbix-agent >/dev/null 2>&1; then
-        log_success "Serviço Zabbix Agent habilitado e iniciado."
-    else
-        log_error "Falha ao iniciar o serviço zabbix-agent."
-        exit 1
-    fi
-}
-
-show_summary() {
-    print_header "RESUMO DO SISTEMA - ZABBIX AGENT v${VERSION}"
-    log_success "Processo de instalação e configuração concluído com sucesso!"
-
-    local status
-    status="$(systemctl is-active zabbix-agent 2>/dev/null || echo 'inativo')"
-
-    echo -e "\n  ${FG_CYAN}${BOLD}Status do Serviço:${NC}"
-    echo -e "  ${DIM}────────────────────────────────────────${NC}"
-    echo -e "  ${FG_WHITE}Serviço      : ${NC}zabbix-agent"
-    echo -e "  ${FG_WHITE}Status Ativo : ${NC}${status}"
-    echo -e "  ${FG_WHITE}Configuração : ${NC}${ZABBIX_CONF_FILE}"
-
-    echo -e "\n  ${FG_CYAN}${BOLD}Logs do Zabbix Agent:${NC}"
-    echo -e "  ${DIM}────────────────────────────────────────${NC}"
-    echo -e "  ${FG_WHITE}Arquivo de Log : ${NC}${FG_YELLOW}${ZABBIX_LOG_FILE}${NC}"
-    echo -e "  ${FG_WHITE}Ver logs       : ${NC}${FG_GREEN}sudo cat ${ZABBIX_LOG_FILE}${NC}"
-    echo -e "  ${FG_WHITE}Acompanhar log : ${NC}${FG_GREEN}sudo tail -f ${ZABBIX_LOG_FILE}${NC}"
-
-    echo -e "\n  ${FG_CYAN}${BOLD}Últimas linhas do log:${NC}"
-    sleep 2
-    if [[ -f "$ZABBIX_LOG_FILE" ]]; then
-        tail -n 5 "$ZABBIX_LOG_FILE" 2>/dev/null | sed 's/^/    /' || echo "    (Nenhum log gravado até o momento)"
-    else
-        echo "    (Arquivo de log ainda não foi gerado)"
-    fi
-
-    echo ""
-    draw_separator
-    echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
-}
+    log_success "Configurações aplicadas em ${ZABBIX_CONF_FILE}."
+else
+    log_warning "Configuração customizada pulada pelo usuário. Arquivo original mantido."
+fi
 
 # ==============================================================================
-# PONTO DE ENTRADA PRINCIPAL
+# 7 - CONFIGURAÇÃO DE REGRAS DE FIREWALL (UFW)
 # ==============================================================================
-main() {
-    clear
-    check_privileges
-    check_dependencies
-    collect_inputs
-    setup_repository
-    install_agent
-    configure_agent
-    configure_firewall
-    start_service
-    show_summary
-}
+if command -v ufw >/dev/null 2>&1; then
+    log_info "UFW detectado. Verificando regra para porta 10050/tcp..."
+    if ufw allow 10050/tcp comment 'Zabbix Agent Port' >/dev/null 2>&1; then
+        log_success "Regra 10050/tcp configurada no UFW."
+    else
+        log_warning "Não foi possível aplicar regra no UFW."
+    fi
+else
+    log_skipped "UFW não detectado. Etapa de firewall pulada."
+fi
 
-main "$@"
+# ==============================================================================
+# 8 - HABILITAÇÃO E INICIALIZAÇÃO DO SERVIÇO
+# ==============================================================================
+log_info "Habilitando e reiniciando o serviço zabbix-agent..."
+chown -R zabbix:zabbix /var/run/zabbix
+
+if systemctl enable zabbix-agent >/dev/null 2>&1 && systemctl restart zabbix-agent >/dev/null 2>&1; then
+    log_success "Zabbix Agent habilitado e iniciado no systemd."
+else
+    log_error "Falha ao iniciar o serviço zabbix-agent."
+    exit 1
+fi
+
+# ==============================================================================
+# 9 - LIMPEZA DO SISTEMA
+# ==============================================================================
+log_info "Executando limpeza de pacotes desnecessários..."
+apt-get autoremove -y >/dev/null 2>&1 || true
+apt-get autoclean -y >/dev/null 2>&1 || true
+log_success "Limpeza de pacotes concluída."
+
+# ==============================================================================
+# 10 - RESUMO DA INSTALAÇÃO
+# ==============================================================================
+print_header "RESUMO DA INSTALAÇÃO"
+echo -e "  ${FG_GREEN}${BOLD}✔ PROCESSO FINALIZADO COM SUCESSO!${NC}\n"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional${NC}"
+echo -e "  ${BOLD}Versão do Script:${NC}      ${FG_WHITE}v${VERSION}${NC}"
+
+LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-Nenhum}${NC}"
+echo -e "  ${BOLD}Serviço Principal:${NC}     $(get_service_status zabbix-agent)"
+echo -e "  ${BOLD}Configuração:${NC}          ${FG_WHITE}${ZABBIX_CONF_FILE}${NC}"
+echo -e "  ${BOLD}Log do Serviço:${NC}        ${FG_YELLOW}${ZABBIX_LOG_FILE}${NC}"
+echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
+
+echo -e "\n  ${FG_CYAN}${BOLD}Comandos Rápidos para Verificação de Logs:${NC}"
+echo -e "  ${FG_WHITE}Ver logs do Agent    : ${NC}${FG_GREEN}sudo cat ${ZABBIX_LOG_FILE}${NC}"
+echo -e "  ${FG_WHITE}Acompanhar Agent     : ${NC}${FG_GREEN}sudo tail -f ${ZABBIX_LOG_FILE}${NC}"
+echo -e "  ${FG_WHITE}Ver log da Instalação: ${NC}${FG_GREEN}sudo cat /root/${LOG_FILENAME}${NC}"
+
+echo -e "\n  ${FG_CYAN}${BOLD}Últimas linhas do log do Zabbix Agent:${NC}"
+sleep 2
+if [[ -f "$ZABBIX_LOG_FILE" ]]; then
+    tail -n 5 "$ZABBIX_LOG_FILE" 2>/dev/null | sed 's/^/    /' || echo "    (Nenhum log gravado até o momento)"
+else
+    echo "    (Arquivo de log ainda não foi gerado)"
+fi
+
+# ==============================================================================
+# 11 - GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
+# ==============================================================================
+print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
+
+# Salva cópias no diretório /root
+cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
+cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
+chmod 600 "/root/${LOG_FILENAME}" "/root/${LOG_LATEST}" 2>/dev/null || true
+log_success "Log salvo em: /root/${LOG_FILENAME}"
+log_success "Atalho do último log: /root/${LOG_LATEST}"
+
+# Se executado via sudo, salva também na pasta home do usuário real
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+    REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    if [ -d "$REAL_USER_HOME" ]; then
+        cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
+        cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
+        chmod 600 "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
+        chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
+        log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
+    fi
+fi
+
+draw_separator
+echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"

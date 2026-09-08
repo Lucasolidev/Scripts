@@ -5,8 +5,9 @@
 > 1. **Ausencia Absoluta de Acentuacao**:
 >    Para garantir compatibilidade com versoes antigas do Windows Server e do PowerShell (que utilizam codificacoes legadas como CP850/OEM), **remova todos os acentos** de strings impressas (Write-Host) e de comentarios ao longo do script. Nao use 'ç', 'á', 'é', 'ã', etc.
 >
-> 2. **Cabecalho de Metadados (Documentation Block)**:
->    O script deve obrigatoriamente iniciar com o bloco padrao de metadados do PowerShell:
+> 2. **Cabecalho de Metadados (Documentation Block) e Versionamento**:
+>    O script deve obrigatoriamente iniciar com o bloco padrao de metadados do PowerShell.
+>    **Regra de Versionamento:** Utilize sempre o padrao de versionamento de dois digitos (`MAJOR.MINOR`). E estritamente proibido o uso de `PATCH` (ex: incorreto `1.1.0` | correto `1.1`, `1.2`).
 >    ```powershell
 >    <#
 >    .SYNOPSIS
