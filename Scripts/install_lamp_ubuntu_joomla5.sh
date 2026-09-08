@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 3.4
+# Version: 3.5
 # ------------------------------------------------
-VERSION="3.4"
+VERSION="3.5"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -1063,7 +1063,9 @@ echo "Joomla finalizado: installation removida e configuration.php protegido."
 EOF
 chmod 700 "$FINALIZE_SCRIPT"
 echo -e "  ${BOLD}Finalizacao segura apos o assistente web:${NC}"
-echo -e "    Execute depois de concluir o Joomla: ${FG_CYAN}sudo ${FINALIZE_SCRIPT}${NC}"
+echo -e "    ${FG_YELLOW}${BOLD}NAO encerre a implantacao sem executar o comando abaixo apos concluir o Joomla:${NC}"
+echo -e "    ${FG_CYAN}sudo ${FINALIZE_SCRIPT}${NC}"
+echo -e "    Ele remove a pasta installation e reaplica o hardening do configuration.php."
 
 # 15. GERACAO E SALVAMENTO DOS ARQUIVOS DE LOG DA INSTALACAO
 # ==============================================================================

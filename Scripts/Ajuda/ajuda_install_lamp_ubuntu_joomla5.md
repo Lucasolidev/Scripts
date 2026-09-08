@@ -1,9 +1,9 @@
 # 🇯 Guia de instalação e operação segura — Joomla 5 / LAMP
 
 ![Joomla](https://img.shields.io/badge/Joomla-5-5091CD?logo=joomla)
-![Segurança](https://img.shields.io/badge/Instalador-3.4-28A745)
+![Segurança](https://img.shields.io/badge/Instalador-3.5-28A745)
 
-Referência do [install_lamp_ubuntu_joomla5.sh](../install_lamp_ubuntu_joomla5.sh), versão **3.4**. Prepara Apache com PHP-FPM, MariaDB local, Joomla oficial, UFW, Fail2Ban e auditd. O instalador não higieniza uma aplicação comprometida nem substitui a revisão de extensões e dados.
+Referência do [install_lamp_ubuntu_joomla5.sh](../install_lamp_ubuntu_joomla5.sh), versão **3.5**. Prepara Apache com PHP-FPM, MariaDB local, Joomla oficial, UFW, Fail2Ban e auditd. O instalador não higieniza uma aplicação comprometida nem substitui a revisão de extensões e dados.
 
 ## 📁 1. Arquivos e configurações
 
@@ -88,6 +88,16 @@ Mantenha o site em homologação/manutenção até concluir:
 1. Finalizar o instalador Joomla por HTTPS.
 2. Durante a instalação inicial, o script libera ao Apache somente a criação de arquivos no diretório raiz do Joomla, para que o próprio assistente gere `configuration.php`. Depois que o Joomla terminar, aplicar `sudo setfacl -x u:www-data <raiz_do_joomla>`, `sudo chown root:www-data <raiz_do_joomla>/configuration.php` e `sudo chmod 640 <raiz_do_joomla>/configuration.php`.
 3. Ao final, o script cria um finalizador protegido em `/root/finalizar_joomla_<identificador>.sh`. Execute-o depois do assistente web; ele verifica `configuration.php`, remove `installation` após confirmação e aplica o hardening automaticamente.
+
+### Finalização obrigatória após o assistente web
+
+O instalador termina antes da configuração pelo navegador. Depois de concluir o banco, o usuário administrador e as telas finais do Joomla, **não deixe a instalação aberta**. Execute o comando exibido no resumo final, por exemplo:
+
+```bash
+sudo /root/finalizar_joomla_pastoraldacrianca_org_br.sh
+```
+
+Digite `FINALIZAR` quando solicitado. O comando verifica se `configuration.php` foi gravado, remove a pasta `installation`, revoga a ACL temporária do Apache e aplica `root:www-data` com modo `640` no arquivo de configuração. Se o assistente ainda não terminou, o finalizador recusa a operação e não altera nada.
 3. Remover o diretório `installation` como administrador após conferir o caminho absoluto exato. O processo web não possui permissão de remoção no diretório raiz.
 4. Validar login, URLs amigáveis, mídias, cache, envio SMTP, integrações e tarefas agendadas.
 5. Publicar somente após concluir a matriz abaixo.
