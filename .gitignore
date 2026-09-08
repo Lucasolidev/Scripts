@@ -4,6 +4,7 @@ Thumbs.db:encryptable
 ehthumbs.db
 [Dd]esktop.ini
 $RECYCLE.BIN/
+
 # Temporary files and directories
 *.tmp
 *.temp
@@ -13,14 +14,14 @@ $RECYCLE.BIN/
 *.log
 [Tt]emp/
 [Tt]mp/
-Arquivos/
-Temp_Arquivos/
-# IDEs
+
+# IDEs and Editors
 .vscode/
 .idea/
 .vs/
 *.suo
 *.user
+
 # Python
 __pycache__/
 *.py[cod]
@@ -33,13 +34,13 @@ env/
 .coverage
 htmlcov/
 *.egg-info/
-# Environment secrets
+
+# Environment secrets and credentials
 .env
 .env.*
 !.env.example
 !.env.sample
 !.env.template
-# Private keys and credentials
 .ssh/
 *.pem
 *.key
@@ -53,9 +54,3 @@ id_ed25519.*
 credentials.json
 secrets.json
 secrets/
-
-# Arquivos locais de governanca do Codex/projeto; nao publicar no repositorio.
-/AGENTS.md
-/docs/
-/.gitattributes
-/.agents/
