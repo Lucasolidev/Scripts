@@ -27,7 +27,7 @@ VERSION="3.5"
 # 16. Gera logs privados, sem credenciais, em /root e na Home do usuario.
 #
 # EXECUCAO REMOTA (revise a origem antes de executar):
-# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/Scripts/install_lamp_ubuntu_joomla5.sh -O install_lamp_ubuntu_joomla5.sh && chmod +x install_lamp_ubuntu_joomla5.sh && sudo ./install_lamp_ubuntu_joomla5.sh
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/install_lamp_ubuntu_joomla5.sh -O install_lamp_ubuntu_joomla5.sh && chmod +x install_lamp_ubuntu_joomla5.sh && sudo ./install_lamp_ubuntu_joomla5.sh
 # ==============================================================================
 # Execucao recomendada apos revisar localmente a origem e a integridade do arquivo:
 # chmod +x install_lamp_ubuntu_joomla5.sh

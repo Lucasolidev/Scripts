@@ -17,7 +17,7 @@ VERSION="2.4"
 # e 26.04 (PHP 8.5 nativo). Requer root/sudo e usuario de deploy existente.
 #
 # EXECUCAO REMOTA (revise a origem antes de executar):
-# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/Scripts/install_lamp_ubuntu.sh -O install_lamp_ubuntu.sh && chmod +x install_lamp_ubuntu.sh && sudo ./install_lamp_ubuntu.sh
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/install_lamp_ubuntu.sh -O install_lamp_ubuntu.sh && chmod +x install_lamp_ubuntu.sh && sudo ./install_lamp_ubuntu.sh
 # ==============================================================================
 set -Eeuo pipefail
 umask 077

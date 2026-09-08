@@ -19,7 +19,7 @@ O objetivo desta padronização é garantir que todos os guias possuam:
 
 ## 📁 2. Nomenclatura e Localização dos Arquivos
 
-* **Diretório Padrão**: Todos os arquivos de ajuda devem residir em `Scripts/`.
+* **Diretório Padrão**: Todos os arquivos de ajuda devem residir em `Ajuda/`.
 * **Convenção de Nome**: `ajuda_<tecnologia_ou_contexto>.md` (em minúsculas, usando `snake_case`).
 * **Exemplos**:
   * `ajuda_apache2.md`
@@ -140,7 +140,7 @@ Copie e utilize o prompt a seguir ao solicitar que uma IA ou colaborador crie um
 ```text
 Crie um arquivo de ajuda markdown no padrão do projeto para a tecnologia [NOME DA TECNOLOGIA] (ex: PostgreSQL, Kubernetes, Redis).
 
-O arquivo deve ser salvo como `Scripts/ajuda_[TECNOLOGIA_LOWERCASE].md` e seguir estritamente as diretrizes abaixo:
+O arquivo deve ser salvo como `Ajuda/ajuda_[TECNOLOGIA_LOWERCASE].md` e seguir estritamente as diretrizes abaixo:
 
 1. TÍTULO E BADGES:
    - Título H1 com Emoji relativo + "# [EMOJI] Cheat Sheet - Administração [TECNOLOGIA] ([SO/Ambiente])" ou "# [EMOJI] Guia Prático e Comandos de Operação do [TECNOLOGIA]".
@@ -168,7 +168,7 @@ O arquivo deve ser salvo como `Scripts/ajuda_[TECNOLOGIA_LOWERCASE].md` e seguir
 
 Antes de finalizar qualquer novo arquivo `ajuda_*.md`, verifique:
 
-- [ ] O nome do arquivo segue o padrão `Scripts/ajuda_<tecnologia>.md`?
+- [ ] O nome do arquivo segue o padrão `Ajuda/ajuda_<tecnologia>.md`?
 - [ ] Possui badges do Shields.io funcionando e alinhados abaixo do H1?
 - [ ] As seções H2 possuem emojis relevantes, números organizados e divisores `---`?
 - [ ] A tabela de diretórios e arquivos vitais foi incluída?
