@@ -175,6 +175,58 @@ O comando `chmod` (change mode) define quem pode ler (`r`), escrever (`w`) ou ex
   chmod g-r arquivo.txt    # Remove permissão de leitura do grupo (group)
   ```
 
+### ⚠️ Redirecionamento com Sudo (`>` vs `tee`) — A Pegadinha do "Permissão Negada"
+
+Um erro clássico no Linux ao tentar gravar em arquivos protegidos do sistema (como em `/sys/`, `/proc/` ou `/etc/`) é executar:
+
+```bash
+# ❌ ERRO TÍPICO:
+sudo echo 1 > /sys/class/block/sda/device/rescan
+# Retorno imediato do terminal:
+# -bash: /sys/class/block/sda/device/rescan: Permissão negada
+```
+
+#### ❓ Por que esse comando dá "Permissão negada" mesmo usando `sudo`?
+O erro de permissão ocorre porque o operador de redirecionamento (`>`) é **interpretado e executado pelo seu terminal (shell do usuário comum)** antes mesmo de o comando `sudo` ser chamado!
+
+1. O shell divide a linha em duas etapas:
+   - Ele tenta abrir `/sys/class/block/sda/device/rescan` para escrita usando as permissões do seu **usuário atual** (sem privilégios).
+   - Como esse arquivo exige privilégios de `root`, o shell é barrado imediatamente com **Permissão negada**.
+2. O `sudo echo 1` **nem chega a rodar**!
+
+---
+
+#### ✅ Como executar corretamente com privilégios de root:
+
+* **1. Método Padrão e Recomendado (Usando `tee` via Pipe):**
+  O `echo 1` roda no usuário comum e envia a saída via pipe (`|`) para o `tee`, que está rodando como root via `sudo` e consegue gravar no arquivo:
+  ```bash
+  # Sobrescrever o arquivo (equivalente a >):
+  echo 1 | sudo tee /sys/class/block/sda/device/rescan
+
+  # Anexar ao final do arquivo sem apagar o anterior (equivalente a >>):
+  echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
+
+  # Dica: Para não poluir a tela com a saída duplicada do tee, descarte para /dev/null:
+  echo 1 | sudo tee /sys/class/block/sda/device/rescan > /dev/null
+  ```
+
+* **2. Método Alternativo com Subshell (`sh -c` ou `bash -c`):**
+  Ao abrir uma nova instância de shell via `sudo`, todo o processo de redirecionamento roda sob o usuário root:
+  ```bash
+  sudo sh -c 'echo 1 > /sys/class/block/sda/device/rescan'
+  ```
+
+* **3. Gravar blocos inteiros de configuração com HereDoc elevado:**
+  ```bash
+  sudo bash -c 'cat <<EOF > /etc/exemplo.conf
+  parametro1=ativo
+  parametro2=100
+  EOF'
+  ```
+
+---
+
 ### Compactação & Descompactação (`tar`, `zip`, `unzip`, `gzip`, `bzip2`)
 Guia rápido para empacotar, compactar e extrair arquivos:
 
@@ -616,9 +668,18 @@ sudo setfacl -R -d -m u:www-data:rwx,g:www-data:rwx,u:zelio_dev:rwx,g:zelio_dev:
 df -hT
 ```
 
-### 2. Forçar o Kernel a reconhecer o novo tamanho do disco (ex: sdc)
+### 2. Forçar o Kernel a reconhecer o novo tamanho do disco (ex: sda ou sdc)
+> ⚠️ **Atenção:** Nunca use `sudo echo 1 > ...`, pois o shell do usuário comum avalia o `>` antes de chamar o `sudo`, gerando o erro `-bash: ...: Permissão negada`. Utilize o utilitário `tee`:
+
 ```bash
-echo 1 > /sys/class/block/sdc/device/rescan
+# Método correto com tee (recomendado):
+echo 1 | sudo tee /sys/class/block/sdc/device/rescan
+
+# Ou via subshell com sudo:
+sudo sh -c 'echo 1 > /sys/class/block/sdc/device/rescan'
+
+# Dica: Forçar o rescan de TODOS os discos e controladoras SCSI de uma vez só:
+echo "- - -" | sudo tee /sys/class/scsi_host/host*/scan
 ```
 
 ### 3. Confirmar se o disco principal cresceu no lsblk
