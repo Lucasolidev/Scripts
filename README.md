@@ -20,12 +20,16 @@ Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e ut
 * ⚙️ **[Guia de Pós-Instalação & Utilitários](Ajuda/ajuda_pos_install_server.md)** — Manual de uso de todos os utilitários instalados (`btop`, `iotop`, `sysstat`, `lynis`, `mtr`, `iperf3`, `nmap`, `jq`, `ufw`, `fail2ban`, `tmux`, etc.) e configurações do servidor.
 * 🐳 **[Guia de Ajuda Docker & Compose](Ajuda/ajuda_docker.md)** — Comandos de contêineres, imagens, volumes, redes e orquestração com Docker Compose.
 * 📊 **[Guia de Ajuda Zabbix](Ajuda/ajuda_zabbix.md)** — Monitoramento, `zabbix_get`, `zabbix_sender`, `zabbix_proxy`, agente 2 e `UserParameter`.
-* 🛢️ **[Guia de Ajuda MariaDB & MySQL](Ajuda/ajuda_mariadb_mysql.md)** — Administração SQL, permissões, backups (`mariadb-dump`), restore, otimização e reset de root.
+* 🛢️ **[Guia de Ajuda MariaDB & MySQL](Ajuda/ajuda_mariadb_mysql.md)** — Administração SQL, permissões, migração pela rede com `scp`/`rsync`/SSH pipeline, integridade com `mariadb-dump`, restore e otimização.
+* 🐘 **[Guia de Ajuda PostgreSQL](Ajuda/ajuda_postgresql.md)** — Administração de roles/bancos, resolução de `pg_hba.conf`, backup com `pg_dump`/`pg_dumpall`, restauração multithread com `pg_restore`, migração via rede e queries de diagnóstico.
+* 🏛️ **[Guia de Ajuda Oracle Database & IBM DB2](Ajuda/ajuda_oracle_db2.md)** — Operação corporativa, controle de instâncias e listeners, criação de usuários, export/import com `expdp`/`impdp`, `db2start`/`db2stop`, `db2 backup`/`restore` e migração com `db2move`.
+* 🌐 **[Guia de Ajuda DNS BIND9 & DHCP](Ajuda/ajuda_dns_bind9_dhcp.md)** — Servidor de nomes BIND9 (zonas diretas e reversas, `named-checkconf`, `named-checkzone`), ISC-DHCP-Server (escopos, faixas, reservas por MAC e diagnóstico).
+* 🔐 **[Guia de Ajuda FreeRADIUS](Ajuda/ajuda_freeradius.md)** — Autenticação RADIUS, clientes NAS em `clients.conf`, usuários locais, diagnóstico avançado com `freeradius -X` e testes com `radtest`.
 * 🛡️ **[Guia de Ajuda Firewall UFW & IPTables](Ajuda/ajuda_ufw_iptables.md)** — Regras de firewall, liberação por IP/porta, redirecionamento NAT (Port Forwarding) e `ss`/`tcpdump`.
 * 🔒 **[Guia de Ajuda Fail2Ban](Ajuda/ajuda_fail2ban.md)** — Prevenção de intrusão e brute force, status de jails, unban/ban de IPs, whitelists (`ignoreip`) e logs.
 * 🌿 **[Guia de Ajuda Git & GitHub](Ajuda/ajuda_git.md)** — Workflow diário, gerenciamento de branches, `stash`, desfazer commits, `reset --hard` e remotos.
-* 🐘 **[Guia de Ajuda Samba](Ajuda/ajuda_samba.md)** — Comandos de servidor (Standalone e AD DC), `samba-tool`, `smbstatus`, comandos de cliente Linux/Windows e permissões POSIX ACL.
-* 🗂️ **[Guia de Ajuda LDAP / OpenLDAP](Ajuda/ajuda_ldap.md)** — Estrutura DIT, consultas com `ldapsearch`, inclusões com `ldapadd`, alterações com `ldapmodify`, `ldappasswd` e arquivos LDIF.
+* 🐘 **[Guia de Ajuda Samba](Ajuda/ajuda_samba.md)** — Servidor Standalone, Active Directory AD DC, integração de domínio, particularidades de permissões Linux vs Samba, máscaras de herança, `samba-tool` e `smbstatus`.
+* 🗂️ **[Guia de Ajuda LDAP / OpenLDAP](Ajuda/ajuda_ldap.md)** — Matriz de parâmetros da CLI (`-x`, `-D`, `-W`, `-H`, `-b`), consultas rápidas com `ldapsearch`, inserção/modificação inline via HereDoc, troca e reset de senha e backup com `slapcat`/`slapadd`.
 * 🚀 **[Guia de Ajuda Nginx + PHP-FPM](Ajuda/ajuda_nginx.md)** — Estrutura de diretórios, blocos `server`, Reverse Proxy, PHP-FPM, timeouts e solução de erros (413, 502, 504).
 * 🌐 **[Guia de Ajuda Apache2](Ajuda/ajuda_apache2.md)** — Estrutura de diretórios, `a2enmod`, `a2ensite`, suporte a `.htaccess`, POSIX ACLs, VirtualHosts e diagnóstico.
 * 🏮 **[Guia de Ajuda Pilha LAMP](Ajuda/ajuda_install_lamp_ubuntu.md)** — Manual de operação do servidor LAMP (Apache 2.4, MariaDB 11.4 LTS, PHP-FPM, POSIX ACLs e diagnóstico).

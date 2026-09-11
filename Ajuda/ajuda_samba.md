@@ -84,7 +84,125 @@ Os logs do Samba por padrão ficam localizados no diretório `/var/log/samba/`.
 
 ---
 
-## 👥 4. Gerenciamento de Usuários (Samba Standalone / Servidor de Arquivos)
+## 🧠 4. Particularidades Críticas do Samba (Checklist Anti-Pegadinhas em Provas)
+
+### ⚖️ 4.1 Dualidade de Permissões (Samba vs Sistema de Arquivos Linux)
+> ⚠️ **REGRA DE OURO:** A permissão efetiva de um usuário é a intersecção **mais restritiva** entre a diretiva do `smb.conf` e o sistema de arquivos local do Linux (`ext4`/`xfs`).
+
+| Cenário | No `smb.conf` | No Linux (`chmod`/`chown`) | Resultado para o Usuário |
+| :--- | :--- | :--- | :--- |
+| **A** | `read only = no` (pode escrever) | `drwxr-xr-x` (somente dono escreve) | ❌ **Negado** (`Permission Denied` no cliente) |
+| **B** | `read only = yes` (somente leitura) | `drwxrwxrwx` (aberto no disco) | ❌ **Negado** (Samba barra a escrita) |
+| **C** | `read only = no` + `write list = @ti` | `drwxrwxr-x` + dono `root:ti` | ✅ **Permitido** (escrita autorizada) |
+
+* **Como garantir que arquivos criados pelo Windows não quebrem as permissões:**
+  ```ini
+  [Compartilhamento]
+     path = /dados/arquivos
+     writable = yes
+     read only = no
+     # Força que novos arquivos e pastas ganhem permissão de grupo
+     create mask = 0775
+     force create mode = 0775
+     directory mask = 0775
+     force directory mode = 0775
+     # (Opcional) Forçar todos os arquivos a pertencerem a um grupo comum:
+     force group = ti
+  ```
+
+---
+
+### 🏛️ 4.2 Standalone vs AD-DC vs Membro de Domínio (Não Misture os Serviços!)
+
+1. **Servidor Standalone (Compartilhamento de Arquivos Local):**
+   * **Serviços:** `smbd` (porta 445/139) e `nmbd` (porta 137/138).
+   * **Usuários:** O usuário **deve existir no Linux** (`/etc/passwd`).
+     ```bash
+     sudo useradd -M -s /usr/sbin/nologin novousuario
+     sudo smbpasswd -a novousuario
+     ```
+
+2. **Controlador de Domínio (Samba Active Directory DC):**
+   * **Serviços:** **APENAS** `samba-ad-dc`. Os serviços `smbd`, `nmbd` e `winbind` **devem ser desativados e mascarados**:
+     ```bash
+     sudo systemctl stop smbd nmbd winbind
+     sudo systemctl disable --now smbd nmbd winbind
+     sudo systemctl mask smbd nmbd winbind
+     sudo systemctl enable --now samba-ad-dc
+     ```
+   * **Usuários:** Criados exclusivamente via `samba-tool user create` (não usam `/etc/passwd`).
+   * **Conflito com DNS Local (Ubuntu):** O Samba AD DC possui servidor DNS interno na porta 53. Se o `systemd-resolved` estiver usando a porta 53:
+     ```bash
+     sudo systemctl disable --now systemd-resolved
+     sudo rm /etc/resolv.conf
+     echo "nameserver 127.0.0.1" | sudo tee /etc/resolv.conf
+     ```
+
+3. **Ingressar o Linux em um Domínio AD como Membro (Domain Member):**
+   ```bash
+   # Obter ticket Kerberos do Administrador do domínio:
+   kinit Administrator@MEUDOMINIO.LOCAL
+
+   # Ingressar a máquina Linux no Active Directory:
+   sudo net ads join -U Administrator
+
+   # Validar se o ingresso foi bem sucedido:
+   sudo net ads testjoin
+   ```
+
+---
+
+### 🛡️ 4.3 SELinux e Firewall (Cenários RHEL, CentOS, Rocky Linux ou UFW)
+
+* **Se o SELinux estiver ativo (`Enforcing`), libere os compartilhamentos do Samba:**
+  ```bash
+  # Liberar compartilhamento de diretórios em geral:
+  sudo setsebool -P samba_export_all_rw on
+  # Ou rotular a pasta específica:
+  sudo semanage fcontext -a -t samba_share_t "/dados/compartilhamento(/.*)?"
+  sudo restorecon -Rv /dados/compartilhamento
+  ```
+
+* **Liberar Portas de Rede no UFW (Servidor Standalone):**
+  ```bash
+  sudo ufw allow 137,138/udp
+  sudo ufw allow 139,445/tcp
+  ```
+
+---
+
+### 🔍 4.4 Testes Rápidos de Diagnóstico (Linha de Comando)
+
+* **Testar sintaxe do smb.conf:**
+  ```bash
+  testparm -s
+  ```
+
+* **Listar compartilhamentos do servidor sem senha (anônimo):**
+  ```bash
+  smbclient -L //localhost -U%
+  ```
+
+* **Testar autenticação de um usuário e listar compartilhamentos:**
+  ```bash
+  smbclient -L //localhost -U nome_usuario
+  ```
+
+* **Acessar diretamente um compartilhamento via terminal estilo FTP:**
+  ```bash
+  smbclient //localhost/ArquivosTI -U nome_usuario -c "ls"
+  ```
+
+* **Montar temporariamente para testar se grava:**
+  ```bash
+  sudo mount -t cifs //127.0.0.1/ArquivosTI /mnt -o username=nome_usuario,password='<senha>'
+  touch /mnt/teste.txt && rm /mnt/teste.txt
+  sudo umount /mnt
+  ```
+
+---
+
+## 👥 5. Gerenciamento de Usuários (Samba Standalone / Servidor de Arquivos)
 
 No Samba Standalone, o usuário deve primeiro existir no Linux (`/etc/passwd`) e depois ser adicionado à base de senhas do Samba (`smbpasswd`).
 
@@ -120,7 +238,7 @@ No Samba Standalone, o usuário deve primeiro existir no Linux (`/etc/passwd`) e
 
 ---
 
-## 👑 5. Gerenciamento de Usuários e Grupos no Samba Active Directory (`samba-tool`)
+## 👑 6. Gerenciamento de Usuários e Grupos no Samba Active Directory (`samba-tool`)
 
 Quando o Samba está configurado como **Active Directory DC**, utiliza-se a ferramenta oficial **`samba-tool`**.
 
@@ -183,7 +301,7 @@ Quando o Samba está configurado como **Active Directory DC**, utiliza-se a ferr
 
 ---
 
-## 📊 6. Monitoramento de Conexões e Arquivos Abertos (`smbstatus`)
+## 📊 7. Monitoramento de Conexões e Arquivos Abertos (`smbstatus`)
 
 O comando `smbstatus` mostra quem está conectado no servidor em tempo real e quais arquivos estão abertos/bloqueados.
 
@@ -209,7 +327,7 @@ O comando `smbstatus` mostra quem está conectado no servidor em tempo real e qu
 
 ---
 
-## 💻 7. Comandos do Cliente (Client-Side)
+## 💻 8. Comandos do Cliente (Client-Side)
 
 ### 🐧 No Cliente Linux
 
@@ -292,7 +410,7 @@ nbtstat -A 192.168.1.8
 
 ---
 
-## 🔒 8. Permissões POSIX ACL no Linux para o Samba
+## 🔒 9. Permissões POSIX ACL no Linux para o Samba
 
 Para garantir que novos arquivos e pastas criados por usuários do Windows/Linux herdem as permissões corretas no disco do Linux:
 
@@ -311,7 +429,7 @@ getfacl /var/www/arquivos
 
 ---
 
-## 📋 9. Modelo de `smb.conf` de Produção (Servidor de Arquivos)
+## 📋 10. Modelo de `smb.conf` de Produção (Servidor de Arquivos)
 
 Aqui está um exemplo de `/etc/samba/smb.conf` pronto e seguro para Servidor de Arquivos:
 

@@ -133,42 +133,153 @@ Conectado ao prompt do MariaDB (`mysql>`), use os comandos abaixo:
 
 ---
 
-## 💾 6. Backup e Restauração (`mariadb-dump` / `mysqldump`)
+## 💾 6. Backup, Restauração e Migração Completa pela Rede
 
-### 📦 Fazendo Backup (Dump)
+### 📦 6.1 Fazendo Backup (Dump)
 
-* **Fazer backup de UM BANCO ESPECÍFICO para um arquivo `.sql`:**
+* **Backup padrão de UM BANCO com flags recomendadas de integridade (Sem travar tabelas InnoDB):**
   ```bash
-  mariadb-dump -u root -p meubanco > backup_meubanco.sql
-  # Ou mysqldump:
-  mysqldump -u root -p meubanco > backup_meubanco.sql
+  mariadb-dump -u root -p --single-transaction --quick --routines --triggers --events meubanco > backup_meubanco.sql
+  # Ou usando mysqldump:
+  mysqldump -u root -p --single-transaction --quick --routines --triggers --events meubanco > backup_meubanco.sql
+  ```
+  > 💡 *`--single-transaction` garante consistência sem bloquear escritas no InnoDB; `--quick` lê linha por linha sem esgotar a RAM; `--routines --triggers --events` preserva procedures e gatilhos.*
+
+* **Backup compactado diretamente em `.sql.gz` (Economiza banda e espaço em disco):**
+  ```bash
+  mariadb-dump -u root -p --single-transaction --quick meubanco | gzip > backup_meubanco.sql.gz
   ```
 
-* **Fazer backup compactado diretamente em `.sql.gz`:**
+* **Backup de TODOS OS BANCOS do servidor:**
   ```bash
-  mariadb-dump -u root -p meubanco | gzip > backup_meubanco.sql.gz
+  mariadb-dump -u root -p --all-databases --single-transaction --quick --routines --triggers --events > backup_todos_bancos.sql
   ```
 
-* **Fazer backup de TODOS OS BANCOS do servidor:**
+* **Backup apenas da estrutura (sem dados / DDL):**
   ```bash
-  mariadb-dump -u root -p --all-databases > backup_todos_bancos.sql
+  mariadb-dump -u root -p --no-data meubanco > estrutura_meubanco.sql
+  ```
+
+* **Backup apenas dos dados (sem CREATE TABLE / DML):**
+  ```bash
+  mariadb-dump -u root -p --no-create-info meubanco > dados_meubanco.sql
+  ```
+
+---
+
+### 🌐 6.2 Copiando o Dump pela Rede para Outro Servidor Linux
+
+Após gerar o arquivo de dump (`backup_meubanco.sql` ou `.sql.gz`), transfira para o servidor de destino:
+
+#### Opção A: Usando `scp` (Secure Copy)
+* **Cópia simples de arquivo único:**
+  ```bash
+  scp backup_meubanco.sql.gz <usuario_remoto>@<ip_destino>:/tmp/
+  ```
+
+* **Cópia via `scp` com porta SSH não-padrão (ex: 2222) e compressão de rede (`-C`):**
+  ```bash
+  scp -P 2222 -C backup_meubanco.sql.gz <usuario_remoto>@<ip_destino>:/tmp/
+  ```
+
+#### Opção B: Usando `rsync` (Recomendado para dumps grandes - exibe progresso e permite continuar se cair)
+* **Cópia com barra de progresso em tempo real (`-P` ou `--progress`) e compressão (`-z`):**
+  ```bash
+  rsync -avzP backup_meubanco.sql.gz <usuario_remoto>@<ip_destino>:/tmp/
+  ```
+
+* **Cópia via `rsync` especificando porta SSH não padrão:**
+  ```bash
+  rsync -avzP -e "ssh -p 2222" backup_meubanco.sql.gz <usuario_remoto>@<ip_destino>:/tmp/
   ```
 
 ---
 
-### 📥 Restaurando Backup (Restore)
+### 🚀 6.3 Migração Direta via Tubulação SSH (Sem Gravar Arquivo Intermediário no Disco!)
+Se você tem pouco espaço em disco ou quer agilizar a prova prática, pode extrair o dump no servidor de origem e injetar diretamente no MariaDB/MySQL do servidor destino em um único comando:
 
-* **Restaurar um arquivo `.sql` em um banco existente:**
+* **Dump no servidor local ➔ Restore direto no servidor remoto:**
   ```bash
-  mariadb -u root -p meubanco < backup_meubanco.sql
+  mariadb-dump -u root -p --single-transaction meubanco | ssh <usuario_remoto>@<ip_destino> "mariadb -u root -p<senha_destino> meubanco_destino"
   ```
 
-* **Restaurar um arquivo `.sql.gz` compactado:**
+* **Se a porta SSH remota for diferente:**
   ```bash
-  gunzip < backup_meubanco.sql.gz | mariadb -u root -p meubanco
+  mariadb-dump -u root -p --single-transaction meubanco | ssh -p 2222 <usuario_remoto>@<ip_destino> "mariadb -u root -p<senha_destino> meubanco_destino"
   ```
 
 ---
+
+### 📥 6.4 Restaurando o Backup no Servidor de Destino
+
+No servidor de destino, antes de importar, garanta que o banco de dados e usuário existam:
+
+1. **Criar o banco no destino (caso ainda não exista):**
+   ```bash
+   mysql -u root -p -e "CREATE DATABASE meubanco CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+   ```
+
+2. **Restaurar a partir de arquivo `.sql` comum:**
+   ```bash
+   mariadb -u root -p meubanco < /tmp/backup_meubanco.sql
+   # Ou com mysql:
+   mysql -u root -p meubanco < /tmp/backup_meubanco.sql
+   ```
+
+3. **Restaurar a partir de arquivo compactado `.sql.gz` diretamente:**
+   ```bash
+   gunzip < /tmp/backup_meubanco.sql.gz | mariadb -u root -p meubanco
+   # Ou com zcat:
+   zcat /tmp/backup_meubanco.sql.gz | mysql -u root -p meubanco
+   ```
+
+4. **Restaurar backup completo (`--all-databases`):**
+   ```bash
+   mariadb -u root -p < /tmp/backup_todos_bancos.sql
+   ```
+
+---
+
+### ✅ 6.5 Validação Pós-Migração e Integridade
+
+* **Verificar tabelas importadas e quantidade de registros:**
+  ```bash
+  mysql -u root -p -e "USE meubanco; SHOW TABLES;"
+  mysql -u root -p -e "SELECT count(*) FROM meubanco.<tabela_principal>;"
+  ```
+
+* **Checagem e otimização de integridade das tabelas (`mysqlcheck`):**
+  ```bash
+  mysqlcheck -u root -p --check --optimize meubanco
+  ```
+
+---
+
+### 🔓 6.6 Habilitar Conexão Remota ao Banco (Se Exigido na Prova)
+
+Por padrão o MariaDB/MySQL escuta apenas em `127.0.0.1`. Se a prova pedir para uma aplicação em outro servidor conectar no banco:
+
+1. Edite o arquivo de configuração (`/etc/mysql/mariadb.conf.d/50-server.cnf` ou `/etc/mysql/mysql.conf.d/mysqld.cnf`):
+   ```ini
+   # Alterar de:
+   bind-address = 127.0.0.1
+   # Para escutar em todas as interfaces:
+   bind-address = 0.0.0.0
+   ```
+2. Reinicie o serviço:
+   ```bash
+   sudo systemctl restart mariadb # ou mysql
+   ```
+3. Garanta que o usuário tenha permissão para conectar a partir do IP remoto ou de qualquer IP (`%`):
+   ```sql
+   CREATE USER 'meuusuario'@'%' IDENTIFIED BY '<senha_segura>';
+   GRANT ALL PRIVILEGES ON meubanco.* TO 'meuusuario'@'%';
+   FLUSH PRIVILEGES;
+   ```
+4. Libere a porta no firewall:
+   ```bash
+   sudo ufw allow 3306/tcp
+   ```
 
 ## 📊 7. Diagnóstico e Monitoramento de Performance
 

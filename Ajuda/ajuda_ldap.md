@@ -88,27 +88,36 @@ O LDAP organiza os dados em uma árvore chamada **DIT (Directory Information Tre
 
 ---
 
-## 🔍 5. Comandos de Consulta e Busca (`ldapsearch`)
+---
 
-O comando `ldapsearch` é a ferramenta principal para buscar objetos na árvore LDAP.
+## 🧭 5. Colinha Mestra de Parâmetros da CLI LDAP
 
-### 💡 Parâmetros Mais Usados:
-* `-x`: Autenticação simples (em vez de SASL).
-* `-H`: URI do servidor LDAP (ex: `ldap://127.0.0.1` ou `ldaps://ldap.empresa.com.br`).
-* `-b`: Base DN onde a busca deve começar.
-* `-D`: Bind DN (usuário usado para autenticar no LDAP).
-* `-W`: Solicita a senha do Bind DN no terminal de forma oculta.
+| Parâmetro | Significado / Função | Exemplo de Uso |
+| :--- | :--- | :--- |
+| **`-x`** | **Autenticação Simples** (desativa SASL, obrigatório na maioria das provas) | `ldapsearch -x ...` |
+| **`-D <DN>`** | **Bind DN** (usuário que está autenticando) | `-D "cn=admin,dc=empresa,dc=com,dc=br"` |
+| **`-W`** | **Solicita a Senha** interativamente (oculta no terminal) | `ldapsearch -x -D ... -W` |
+| **`-w <senha>`** | **Informa a Senha Inline** (evita prompt, útil em scripts) | `-w '<senha_admin>'` |
+| **`-H <URI>`** | **URI do Servidor** (protocolo + IP/Host + porta) | `-H ldap://127.0.0.1:389` ou `ldaps://host:636` |
+| **`-b <DN>`** | **Search Base** (ponto inicial da árvore para a busca) | `-b "dc=empresa,dc=com,dc=br"` |
+| **`-s <escopo>`** | **Escopo da Busca** (`base` = só o DN, `one` = 1 nível abaixo, `sub` = recursivo total) | `-s sub` ou `-s one` |
+| **`-LLL`** | **Saída Limpa** (remove comentários `#`, versão LDIF e linhas extras) | `ldapsearch -x -LLL ...` |
+| **`-f <arq>`** | **Arquivo LDIF** de entrada para inserção ou modificação | `ldapadd -f novo.ldif` |
+| **`-c`** | **Modo Contínuo** (continua executando mesmo se encontrar erros) | `ldapadd -c -f lote.ldif` |
+| **`-S`** | **Prompt de Nova Senha** (exclusivo do `ldappasswd`) | `ldappasswd -S ...` |
+| **`-s <senha>`** | **Nova Senha Inline** (exclusivo do `ldappasswd`) | `ldappasswd -s '<nova_senha>' ...` |
+| **`-Y EXTERNAL`** | **Autenticação SASL Local** via socket root (não pede senha!) | `ldapmodify -Y EXTERNAL -H ldapi:///` |
 
 ---
 
-### 📋 Exemplos Práticos de Busca
+## 🔍 6. Comandos de Consulta e Busca (`ldapsearch`)
 
-* **1. Buscar TODOS os objetos da base (Anônimo ou Autenticado):**
+* **1. Buscar TODOS os objetos da base (com saída limpa sem comentários):**
   ```bash
-  ldapsearch -x -b "dc=empresa,dc=com,dc=br" -H ldap://127.0.0.1
+  ldapsearch -x -LLL -b "dc=empresa,dc=com,dc=br" -H ldap://127.0.0.1
   ```
 
-* **2. Buscar autenticando como administrador (Bind DN):**
+* **2. Buscar autenticando como administrador (Bind DN) com prompt de senha:**
   ```bash
   ldapsearch -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -b "dc=empresa,dc=com,dc=br" -H ldap://127.0.0.1
   ```
@@ -118,67 +127,172 @@ O comando `ldapsearch` é a ferramenta principal para buscar objetos na árvore 
   ldapsearch -x -b "ou=usuarios,dc=empresa,dc=com,dc=br" "(uid=joao)"
   ```
 
-* **4. Buscar apenas contas de usuários Linux (`posixAccount`):**
+* **4. Filtros Combinados (Lógica AND `&` / OR `|` / NOT `!`):**
   ```bash
-  ldapsearch -x -b "dc=empresa,dc=com,dc=br" "(objectClass=posixAccount)"
+  # AND: Usuário que seja posixAccount E tenha UID joao
+  ldapsearch -x -b "dc=empresa,dc=com,dc=br" "(&(objectClass=posixAccount)(uid=joao))"
+
+  # OR: Usuários do setor TI OU Diretoria
+  ldapsearch -x -b "dc=empresa,dc=com,dc=br" "(|(ou=TI)(ou=Diretoria))"
+
+  # NOT: Contas que NÃO têm o shell /bin/false
+  ldapsearch -x -b "dc=empresa,dc=com,dc=br" "(&(objectClass=posixAccount)(!(loginShell=/bin/false)))"
   ```
 
-* **5. Buscar todos os membros de um grupo específico:**
-  ```bash
-  ldapsearch -x -b "ou=grupos,dc=empresa,dc=com,dc=br" "(cn=TI)"
-  ```
-
-* **6. Retornar apenas atributos específicos (ex: nome e e-mail):**
+* **5. Retornar apenas atributos específicos (ex: nome, e-mail e UID Number):**
   ```bash
   ldapsearch -x -b "ou=usuarios,dc=empresa,dc=com,dc=br" "(uid=joao)" cn mail uidNumber
   ```
 
----
-
-## 📝 6. Inserção, Modificação e Troca de Senha (`ldapadd`, `ldapmodify`, `ldappasswd`)
-
-### ➕ 1. Adicionar Objetos (`ldapadd`)
-
-Para criar objetos, cria-se um arquivo de texto no formato **.ldif** e executa-se o `ldapadd`:
-
-```bash
-ldapadd -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -f novo_objeto.ldif -H ldap://127.0.0.1
-```
-
----
-
-### ✏️ 2. Modificar Objetos (`ldapmodify`)
-
-Para alterar ou adicionar atributos em objetos existentes:
-
-```bash
-ldapmodify -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -f alteracao.ldif -H ldap://127.0.0.1
-```
-
----
-
-### 🔑 3. Alterar Senha de Usuário (`ldappasswd`)
-
-O utilitário `ldappasswd` permite alterar a senha de um usuário diretamente:
-
-* **Alterar senha de um usuário solicitando a nova senha interativamente:**
+* **6. Exportar resultado da busca diretamente para arquivo LDIF:**
   ```bash
-  ldappasswd -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -S "uid=joao,ou=usuarios,dc=empresa,dc=com,dc=br"
+  ldapsearch -x -LLL -b "dc=empresa,dc=com,dc=br" "(objectClass=posixAccount)" > usuarios_exportados.ldif
+  ```
+
+---
+
+## 📝 7. Inserção, Modificação e Troca de Senha (`ldapadd`, `ldapmodify`, `ldappasswd`)
+
+### ➕ 1. Adicionar Objetos Rapidamente via Terminal (HereDoc - Sem Criar Arquivo Separado)
+Para agilizar em provas práticas, você pode injetar o LDIF diretamente na CLI:
+
+```bash
+ldapadd -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -H ldap://127.0.0.1 <<EOF
+dn: uid=mariasilva,ou=usuarios,dc=empresa,dc=com,dc=br
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+cn: Maria Silva
+sn: Silva
+uid: mariasilva
+uidNumber: 10005
+gidNumber: 10001
+homeDirectory: /home/mariasilva
+loginShell: /bin/bash
+mail: maria.silva@empresa.com.br
+userPassword: <senha_usuario>
+EOF
+```
+
+---
+
+### ✏️ 2. Modificar Atributos de Objetos Existentes (`ldapmodify`)
+
+* **Alterar/Substituir um atributo existente (`replace`):**
+  ```bash
+  ldapmodify -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -H ldap://127.0.0.1 <<EOF
+  dn: uid=mariasilva,ou=usuarios,dc=empresa,dc=com,dc=br
+  changetype: modify
+  replace: mail
+  mail: maria.novoemail@empresa.com.br
+  EOF
+  ```
+
+* **Adicionar um novo atributo a um objeto (`add`):**
+  ```bash
+  ldapmodify -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -H ldap://127.0.0.1 <<EOF
+  dn: uid=mariasilva,ou=usuarios,dc=empresa,dc=com,dc=br
+  changetype: modify
+  add: telephoneNumber
+  telephoneNumber: +55 11 99999-8888
+  EOF
+  ```
+
+* **Remover um atributo de um objeto (`delete`):**
+  ```bash
+  ldapmodify -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -H ldap://127.0.0.1 <<EOF
+  dn: uid=mariasilva,ou=usuarios,dc=empresa,dc=com,dc=br
+  changetype: modify
+  delete: telephoneNumber
+  EOF
+  ```
+
+---
+
+### 🔑 3. Gerenciamento e Troca de Senhas (`ldappasswd` e `slappasswd`)
+
+* **Alterar senha de usuário solicitando interativamente no terminal:**
+  ```bash
+  ldappasswd -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -S "uid=mariasilva,ou=usuarios,dc=empresa,dc=com,dc=br"
+  ```
+
+* **Alterar senha de usuário informando a nova senha inline (`-s`):**
+  ```bash
+  ldappasswd -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -s '<nova_senha>' "uid=mariasilva,ou=usuarios,dc=empresa,dc=com,dc=br"
+  ```
+
+* **Gerar Hash de Senha Seguro (SSHA) no terminal:**
+  ```bash
+  slappasswd -s '<minha_senha>'
+  # Saída: {SSHA}d41d8cd98f00b204e9800998ecf8427e...
+  ```
+
+* **Resetar a Senha do Admin do OpenLDAP via Socket Local (Sem Saber a Senha Antiga):**
+  ```bash
+  # 1. Gere o novo hash:
+  NOVO_HASH=$(slappasswd -s '<nova_senha_admin>')
+
+  # 2. Aplique direto no cn=config usando o usuário root do Linux via ldapi:
+  sudo ldapmodify -Y EXTERNAL -H ldapi:/// <<EOF
+  dn: olcDatabase={1}mdb,cn=config
+  changetype: modify
+  replace: olcRootPW
+  olcRootPW: $NOVO_HASH
+  EOF
   ```
 
 ---
 
 ### ❌ 4. Deletar Objetos (`ldapdelete`)
 
-Para apagar um objeto da árvore LDAP informando seu DN completo:
+* **Remover um usuário ou grupo pelo DN completo:**
+  ```bash
+  ldapdelete -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W "uid=mariasilva,ou=usuarios,dc=empresa,dc=com,dc=br"
+  ```
 
-```bash
-ldapdelete -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W "uid=joao,ou=usuarios,dc=empresa,dc=com,dc=br"
-```
+* **Remover recursivamente (árvore com sub-objetos - `-r`):**
+  ```bash
+  ldapdelete -x -D "cn=admin,dc=empresa,dc=com,dc=br" -W -r "ou=antiga,dc=empresa,dc=com,dc=br"
+  ```
 
 ---
 
-## 📄 7. Modelos de Arquivos LDIF (Prontos para Uso)
+### 📦 5. Backup e Restauração de Baixo Nível (`slapcat` e `slapadd`)
+
+* **Backup completo do banco de dados de usuários (`slapcat`):**
+  ```bash
+  sudo slapcat -n 1 -l /backup/backup_dados_ldap.ldif
+  ```
+
+* **Backup da configuração dinâmica `cn=config`:**
+  ```bash
+  sudo slapcat -n 0 -l /backup/backup_config_ldap.ldif
+  ```
+
+* **Restauração Offline com `slapadd` (Procedimento Seguro de Recuperação):**
+  ```bash
+  # 1. Pare o serviço slapd obrigatoriamente:
+  sudo systemctl stop slapd
+
+  # 2. Limpe os arquivos antigos do banco de dados (faça backup antes se necessário):
+  sudo rm -rf /var/lib/ldap/*
+
+  # 3. Importe o arquivo LDIF:
+  sudo slapadd -n 1 -l /backup/backup_dados_ldap.ldif
+
+  # 4. Ajuste as permissões vitais do diretório:
+  sudo chown -R openldap:openldap /var/lib/ldap/
+
+  # 5. Inicie o serviço novamente:
+  sudo systemctl start slapd
+  ```
+
+---
+
+## 📄 8. Modelos de Arquivos LDIF (Prontos para Uso)
 
 ### 📂 Modelo 1: Criar Unidade Organizacional (OU) (`ou_usuarios.ldif`)
 ```ldif
@@ -218,7 +332,7 @@ gidNumber: 10001
 homeDirectory: /home/joao
 loginShell: /bin/bash
 mail: joao@empresa.com.br
-userPassword: {SSHA}SenhaCriptografadaAqui
+userPassword: <hash_ou_senha_aqui>
 ```
 
 ---
@@ -233,7 +347,7 @@ mail: joao.silva@novoemail.com.br
 
 ---
 
-## 🐧 8. Validação no Cliente Linux (SSSD / PAM / NSS)
+## 🐧 9. Validação no Cliente Linux (SSSD / PAM / NSS)
 
 Se uma máquina Linux estiver configurada para autenticar usuários via LDAP (usando **SSSD** ou `nslcd`), use estes comandos para testar:
 
