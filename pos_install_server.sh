@@ -362,12 +362,13 @@ EOF
   log_success "Fail2Ban ativado com whitelist (ignoreip) e proteção SSH (5 tentativas)."
 fi
 
-if [ -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
-  log_info "Garantindo atualizações automáticas de segurança ativas..."
-  sed -i 's/APT::Periodic::Update-Package-Lists "0";/APT::Periodic::Update-Package-Lists "1";/' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || true
-  sed -i 's/APT::Periodic::Unattended-Upgrade "0";/APT::Periodic::Unattended-Upgrade "1";/' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || true
-  log_success "Atualizações de segurança automáticas (unattended-upgrades) validadas."
-fi
+log_info "Configurando atualizações automáticas de segurança (unattended-upgrades)..."
+cat <<EOF > /etc/apt/apt.conf.d/20auto-upgrades
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+systemctl enable --now unattended-upgrades > /dev/null 2>&1 || true
+log_success "Atualizações de segurança automáticas (unattended-upgrades) ativas e validadas."
 
 # ==============================================================================
 # AUDITD - AUDITORIA DO KERNEL, ROTAÇÃO DE LOGS E MONITORAMENTO DE INTEGRIDADE
