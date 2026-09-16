@@ -17,7 +17,7 @@ set -Eeuo pipefail
 # ==============================================================================
 # CONSTANTES E CONFIGURAÇÕES GLOBAIS
 # ==============================================================================
-readonly DEFAULT_UPS_NAME="Canacampo_Nobreak"
+readonly DEFAULT_UPS_NAME="Cliente_Nobreak"
 readonly DEFAULT_UPS_DRIVER="usbhid-ups"
 readonly DEFAULT_UPS_PORT="auto"
 readonly DEFAULT_UPS_DESC="APC Smart-UPS BR 2200VA"
@@ -151,7 +151,7 @@ echo -e "  ${DIM}Iniciando execução em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 print_header "COLETA DE PARÂMETROS"
 
 # 2.1 - Nome do Nobreak
-echo -e "  Defina o identificador do Nobreak no NUT (sem espaços, ex: Canacampo_Nobreak, AMO_Nobreak)."
+echo -e "  Defina o identificador do Nobreak no NUT (sem espaços, ex: Cliente_Nobreak, Nobreak_CPD)."
 echo -ne "  ${FG_YELLOW}${ARROW} Nome do Nobreak [${DEFAULT_UPS_NAME}]: ${NC}"
 read -r UPS_NAME_INPUT
 UPS_NAME_VAL="${UPS_NAME_INPUT:-$DEFAULT_UPS_NAME}"
@@ -399,7 +399,7 @@ cat <<'EOF' > "${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh"
 
 set -e
 
-UPS="${1:-Canacampo_Nobreak}"
+UPS="${1:-Cliente_Nobreak}"
 METRIC="${2:-status}"
 NOMINAL_POWER="${3:-2200}"
 

@@ -45,16 +45,16 @@ lsusb
 ### 2.2 Consultar todas as métricas do Nobreak em tempo real (`upsc`)
 ```bash
 # Consultar todas as variáveis reportadas pelo nobreak:
-upsc Canacampo_Nobreak@localhost
+upsc Cliente_Nobreak@localhost
 
 # Consultar uma métrica específica (ex: carga da bateria):
-upsc Canacampo_Nobreak@localhost battery.charge
+upsc Cliente_Nobreak@localhost battery.charge
 
 # Consultar a tensão da rede elétrica:
-upsc Canacampo_Nobreak@localhost input.voltage
+upsc Cliente_Nobreak@localhost input.voltage
 
 # Consultar o status operacional (OL = On Line, OB = On Battery, LB = Low Battery):
-upsc Canacampo_Nobreak@localhost ups.status
+upsc Cliente_Nobreak@localhost ups.status
 ```
 
 ---
@@ -65,16 +65,16 @@ Você pode testar localmente como o agente do Zabbix responderá antes mesmo de 
 
 ```bash
 # Teste de status operacional:
-zabbix_agentd -t 'nut.get[Canacampo_Nobreak,ups.status]'
+zabbix_agentd -t 'nut.get[Cliente_Nobreak,ups.status]'
 
 # Teste de tensão de entrada:
-zabbix_agentd -t 'nut.get[Canacampo_Nobreak,input.voltage]'
+zabbix_agentd -t 'nut.get[Cliente_Nobreak,input.voltage]'
 
 # Teste de carga em Watts calculada:
-zabbix_agentd -t 'nut.power_watts[Canacampo_Nobreak,2200]'
+zabbix_agentd -t 'nut.power_watts[Cliente_Nobreak,2200]'
 
 # Teste de código numérico para o gráfico de status:
-zabbix_agentd -t 'nut.ups_status_code[Canacampo_Nobreak]'
+zabbix_agentd -t 'nut.ups_status_code[Cliente_Nobreak]'
 ```
 
 ---
@@ -86,10 +86,10 @@ zabbix_agentd -t 'nut.ups_status_code[Canacampo_Nobreak]'
 3. No canto superior direito, clique em **Import**.
 4. Selecione o arquivo [`zbx_nut_ups_template.yaml`](../zbx_nut_ups_template.yaml).
 5. Deixe marcadas as opções padrão e clique em **Import**.
-6. Acesse **Data collection** ➔ **Hosts**, localize o seu Host (`Canacampo_Nobreak` ou o servidor onde o nobreak está conectado) e adicione o template:
+6. Acesse **Data collection** ➔ **Hosts**, localize o seu Host (`Cliente_Nobreak` ou o servidor onde o nobreak está conectado) e adicione o template:
    * **Template associado:** `APC & Universal UPS by NUT (Zabbix Agent)`.
 7. Na aba **Macros** do Host, você pode ajustar:
-   * `{$UPS_NAME}`: Nome dado ao nobreak no arquivo `/etc/nut/ups.conf` (padrão: `Canacampo_Nobreak`).
+   * `{$UPS_NAME}`: Nome dado ao nobreak no arquivo `/etc/nut/ups.conf` (padrão: `Cliente_Nobreak`).
    * `{$UPS_NOMINAL_POWER}`: Potência do equipamento em Watts (padrão: `2200`).
 
 ---

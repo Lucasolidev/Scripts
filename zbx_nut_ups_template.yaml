@@ -275,7 +275,7 @@ zabbix_export:
               value: Status
       macros:
         - macro: '{$UPS_NAME}'
-          value: 'Canacampo_Nobreak'
+          value: 'Cliente_Nobreak'
           description: 'Nome do nobreak configurado no /etc/nut/ups.conf'
         - macro: '{$UPS_NOMINAL_POWER}'
           value: '2200'
