@@ -152,7 +152,7 @@ print_header "COLETA DE PARÂMETROS"
 
 # 2.1 - Nome do Nobreak
 echo -e "  Defina o identificador do Nobreak no NUT (sem espaços, ex: Canacampo_Nobreak)."
-read -r -p "  ${FG_YELLOW}${ARROW} Nome do Nobreak [${DEFAULT_UPS_NAME}]: ${NC}" UPS_NAME_INPUT
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Nome do Nobreak [${DEFAULT_UPS_NAME}]: ${NC}")" UPS_NAME_INPUT
 UPS_NAME_VAL="${UPS_NAME_INPUT:-$DEFAULT_UPS_NAME}"
 UPS_NAME_VAL=$(echo "$UPS_NAME_VAL" | tr -cd 'a-zA-Z0-9_-')
 if [[ -z "$UPS_NAME_VAL" ]]; then
@@ -163,17 +163,17 @@ log_info "Nome do Nobreak definido: ${FG_GREEN}${UPS_NAME_VAL}${NC}"
 # 2.2 - Driver do Nobreak
 echo -e "\n  Defina o driver de comunicação do nobreak (consulte a HCL do NUT)."
 echo -e "  ${DIM}Dica: 'usbhid-ups' atende APC Smart-UPS (SMC2200BI-BR) e maioria das marcas USB.${NC}"
-read -r -p "  ${FG_YELLOW}${ARROW} Driver do Nobreak [${DEFAULT_UPS_DRIVER}]: ${NC}" UPS_DRIVER_INPUT
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Driver do Nobreak [${DEFAULT_UPS_DRIVER}]: ${NC}")" UPS_DRIVER_INPUT
 UPS_DRIVER_VAL="${UPS_DRIVER_INPUT:-$DEFAULT_UPS_DRIVER}"
 log_info "Driver do Nobreak definido: ${FG_GREEN}${UPS_DRIVER_VAL}${NC}"
 
 # 2.3 - Descrição do Nobreak
-read -r -p "  ${FG_YELLOW}${ARROW} Descrição do Nobreak [${DEFAULT_UPS_DESC}]: ${NC}" UPS_DESC_INPUT
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Descrição do Nobreak [${DEFAULT_UPS_DESC}]: ${NC}")" UPS_DESC_INPUT
 UPS_DESC_VAL="${UPS_DESC_INPUT:-$DEFAULT_UPS_DESC}"
 log_info "Descrição definida: ${FG_GREEN}${UPS_DESC_VAL}${NC}"
 
 # 2.4 - Potência Nominal em Watts
-read -r -p "  ${FG_YELLOW}${ARROW} Potência Nominal em Watts [${DEFAULT_NOMINAL_POWER}]: ${NC}" UPS_POWER_INPUT
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Potência Nominal em Watts [${DEFAULT_NOMINAL_POWER}]: ${NC}")" UPS_POWER_INPUT
 UPS_POWER_VAL="${UPS_POWER_INPUT:-$DEFAULT_NOMINAL_POWER}"
 if ! [[ "$UPS_POWER_VAL" =~ ^[0-9]+$ ]]; then
     UPS_POWER_VAL="$DEFAULT_NOMINAL_POWER"
@@ -187,7 +187,7 @@ log_info "O servidor ${FG_GREEN}NÃO SERÁ DESLIGADO${NC} automaticamente pelo N
 
 # 2.6 - Confirmação para Prosseguir
 echo -e ""
-read -r -p "  ${FG_YELLOW}${ARROW} Deseja aplicar as configurações acima e prosseguir? (S/n): ${NC}" CONFIRMAR
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar as configurações acima e prosseguir? (S/n): ${NC}")" CONFIRMAR
 CONFIRMAR="${CONFIRMAR:-S}"
 if [[ ! "$CONFIRMAR" =~ ^[Ss]$ ]]; then
     log_warning "Operação cancelada pelo operador."
