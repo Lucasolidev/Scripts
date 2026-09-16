@@ -15,6 +15,7 @@ Guia de referência e auditoria do **auditd** (Linux Audit Daemon) para rastream
 | :--- | :--- |
 | `/etc/audit/auditd.conf` | Arquivo principal de configuração do daemon, limites e rotação de logs. |
 | `/etc/audit/rules.d/` | Diretório contendo as regras de auditoria modulares (`*.rules`). |
+| `/etc/audit/rules.d/server_security.rules` | Regras de monitoramento do sistema (identidades, sudoers, ssh, rede, cron, privs). |
 | `/etc/audit/rules.d/web_security.rules` | Regras específicas de monitoramento do diretório web e configurações do Apache/PHP. |
 | `/etc/audit/audit.rules` | Arquivo consolidado de regras ativas carregadas no kernel. |
 | `/var/log/audit/audit.log` | Arquivo bruto contendo todos os eventos de auditoria registrados. |
@@ -84,7 +85,32 @@ sudo du -sh /var/log/audit/
 
 > 💡 *Sempre utilize o parâmetro `-i` (interpret) para traduzir IDs numéricos de UID, GID, syscalls e timestamps em texto legível.*
 
-### Consultas por Chave/Tag (`-k`)
+### Consultas pelas Tags de Servidor (`server_security.rules`)
+
+```bash
+# 1. Buscar alteracoes em contas de usuarios, senhas e grupos (/etc/passwd, /etc/shadow...)
+sudo ausearch -k auth_mod -i
+
+# 2. Buscar alteracoes em permissoes e regras de SUDO (/etc/sudoers, /etc/sudoers.d/...)
+sudo ausearch -k sudo_mod -i
+
+# 3. Buscar alteracoes nas configuracoes do servico SSH (/etc/ssh/sshd_config...)
+sudo ausearch -k ssh_mod -i
+
+# 4. Buscar alteracoes em rede e firewall (/etc/hosts, /etc/netplan, /etc/ufw/...)
+sudo ausearch -k net_mod -i
+
+# 5. Buscar alteracoes em agendamentos de tarefas (/etc/cron*, crontab...)
+sudo ausearch -k cron_mod -i
+
+# 6. Buscar criacao/alteracao de servicos persistentes no systemd (/etc/systemd/system/...)
+sudo ausearch -k systemd_mod -i
+
+# 7. Rastrear execucoes de binarios criticos com elevacao de privilégio (sudo, su, passwd)
+sudo ausearch -k priv_escalation -i
+```
+
+### Consultas pelas Tags de Servidor Web (`web_security.rules`)
 
 ```bash
 # Buscar todas as alterações registradas no diretório web
@@ -171,7 +197,51 @@ sudo aureport --summary -i
 
 ---
 
-## 🛡️ 5. Configuração de Regras de Auditoria Web (`web_security.rules`)
+## 🛡️ 5. Configuração das Regras de Auditoria do Servidor (`server_security.rules`)
+
+Para auditar componentes vitais do sistema operacional (identidade, privilégios, rede e persistência), o arquivo `/etc/audit/rules.d/server_security.rules` contém:
+
+```ini
+# 1. Identidade, Contas de Usuarios e Grupos
+-w /etc/passwd -p wa -k auth_mod
+-w /etc/shadow -p wa -k auth_mod
+-w /etc/group -p wa -k auth_mod
+-w /etc/gshadow -p wa -k auth_mod
+-w /etc/security/ -p wa -k auth_mod
+
+# 2. Privilegios Administrativos e Regras Sudo
+-w /etc/sudoers -p wa -k sudo_mod
+-w /etc/sudoers.d/ -p wa -k sudo_mod
+
+# 3. Configuracoes do Servico SSH
+-w /etc/ssh/sshd_config -p wa -k ssh_mod
+-w /etc/ssh/sshd_config.d/ -p wa -k ssh_mod
+
+# 4. Configuracoes de Rede e Regras de Firewall
+-w /etc/hosts -p wa -k net_mod
+-w /etc/resolv.conf -p wa -k net_mod
+-w /etc/netplan/ -p wa -k net_mod
+-w /etc/network/ -p wa -k net_mod
+-w /etc/ufw/ -p wa -k net_mod
+
+# 5. Agendamentos de Tarefas e Persistencia do Sistema
+-w /etc/crontab -p wa -k cron_mod
+-w /etc/cron.d/ -p wa -k cron_mod
+-w /etc/cron.daily/ -p wa -k cron_mod
+-w /etc/cron.hourly/ -p wa -k cron_mod
+-w /etc/cron.monthly/ -p wa -k cron_mod
+-w /etc/cron.weekly/ -p wa -k cron_mod
+-w /etc/systemd/system/ -p wa -k systemd_mod
+
+# 6. Binarios Criticos de Execucao e Escalada de Privilegios
+-w /usr/bin/sudo -p x -k priv_escalation
+-w /usr/bin/su -p x -k priv_escalation
+-w /usr/bin/passwd -p x -k priv_escalation
+```
+
+---
+
+## 🌐 6. Configuração de Regras de Auditoria Web (`web_security.rules`)
 
 Para auditar o diretório da aplicação web e os arquivos de configuração do servidor LAMP, mantenha o arquivo `/etc/audit/rules.d/web_security.rules` com a seguinte estrutura:
 
@@ -199,7 +269,7 @@ Para auditar o diretório da aplicação web e os arquivos de configuração do 
 
 ---
 
-## 💡 6. Como Interpretar os Logs do Auditd
+## 💡 7. Como Interpretar os Logs do Auditd
 
 Ao inspecionar a saída do `ausearch`, preste atenção aos quatro campos principais:
 
