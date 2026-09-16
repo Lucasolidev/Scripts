@@ -13,6 +13,10 @@
     Requer privilegios de Administrador para agendar o reinicio.
 #>
 
+#Requires -Version 5.1
+
+[CmdletBinding()]
+[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Script interativo de console com interface visual para o operador')]
 param(
     [Parameter(Mandatory = $false, Position = 0)]
     [string]$Horario
