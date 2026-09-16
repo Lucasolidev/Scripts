@@ -7,7 +7,7 @@ VERSION="1.2"
 # SCRIPT DE INSTALAÇÃO E CONFIGURAÇÃO DO ZABBIX AGENT 7.0 LTS - UBUNTU 24.04 / 26.04
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/install_zabbix7_agent.sh -O install_zabbix7_agent.sh && sudo chmod +x install_zabbix7_agent.sh && sudo ./install_zabbix7_agent.sh
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/install_zabbix7_agent.sh -O install_zabbix7_agent.sh && sudo chmod +x install_zabbix7_agent.sh && sudo ./install_zabbix7_agent.sh
 # ==============================================================================
 
 set -Eeuo pipefail
