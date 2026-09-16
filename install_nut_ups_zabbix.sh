@@ -151,8 +151,9 @@ echo -e "  ${DIM}Iniciando execução em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
 print_header "COLETA DE PARÂMETROS"
 
 # 2.1 - Nome do Nobreak
-echo -e "  Defina o identificador do Nobreak no NUT (sem espaços, ex: Canacampo_Nobreak)."
-read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Nome do Nobreak [${DEFAULT_UPS_NAME}]: ${NC}")" UPS_NAME_INPUT
+echo -e "  Defina o identificador do Nobreak no NUT (sem espaços, ex: Canacampo_Nobreak, AMO_Nobreak)."
+echo -ne "  ${FG_YELLOW}${ARROW} Nome do Nobreak [${DEFAULT_UPS_NAME}]: ${NC}"
+read -r UPS_NAME_INPUT
 UPS_NAME_VAL="${UPS_NAME_INPUT:-$DEFAULT_UPS_NAME}"
 UPS_NAME_VAL=$(echo "$UPS_NAME_VAL" | tr -cd 'a-zA-Z0-9_-')
 if [[ -z "$UPS_NAME_VAL" ]]; then
@@ -161,19 +162,35 @@ fi
 log_info "Nome do Nobreak definido: ${FG_GREEN}${UPS_NAME_VAL}${NC}"
 
 # 2.2 - Driver do Nobreak
-echo -e "\n  Defina o driver de comunicação do nobreak (consulte a HCL do NUT)."
-echo -e "  ${DIM}Dica: 'usbhid-ups' atende APC Smart-UPS (SMC2200BI-BR) e maioria das marcas USB.${NC}"
-read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Driver do Nobreak [${DEFAULT_UPS_DRIVER}]: ${NC}")" UPS_DRIVER_INPUT
-UPS_DRIVER_VAL="${UPS_DRIVER_INPUT:-$DEFAULT_UPS_DRIVER}"
+echo -e "\n  ${BOLD}Defina o driver de comunicação do nobreak (NUT Driver):${NC}"
+echo -e "    ${FG_GREEN}1)${NC} ${BOLD}usbhid-ups${NC}  ➔ (Padrão/Recomendado) Para APC Smart-UPS (SMC2200BI-BR), Back-UPS, Eaton, CyberPower e Tripp Lite via USB."
+echo -e "    ${FG_GREEN}2)${NC} ${BOLD}blazer_usb${NC}  ➔ Para nobreaks nacionais (SMS, Ragtech, NHS, TS Shara) com protocolo Megatec via USB."
+echo -e "    ${FG_GREEN}3)${NC} ${BOLD}apcsmart${NC}    ➔ Para nobreaks APC legados que utilizam cabo Serial RS-232."
+echo -e "    ${FG_GREEN}4)${NC} ${BOLD}Outro${NC}       ➔ Digite manualmente o nome de qualquer outro driver da lista HCL do NUT."
+echo -ne "  ${FG_YELLOW}${ARROW} Escolha o driver [1=${DEFAULT_UPS_DRIVER}]: ${NC}"
+read -r UPS_DRIVER_INPUT
+case "${UPS_DRIVER_INPUT:-1}" in
+    1|"${DEFAULT_UPS_DRIVER}"|"") UPS_DRIVER_VAL="${DEFAULT_UPS_DRIVER}" ;;
+    2|"blazer_usb")               UPS_DRIVER_VAL="blazer_usb" ;;
+    3|"apcsmart")                 UPS_DRIVER_VAL="apcsmart" ;;
+    *)                            UPS_DRIVER_VAL="$UPS_DRIVER_INPUT" ;;
+esac
 log_info "Driver do Nobreak definido: ${FG_GREEN}${UPS_DRIVER_VAL}${NC}"
 
 # 2.3 - Descrição do Nobreak
-read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Descrição do Nobreak [${DEFAULT_UPS_DESC}]: ${NC}")" UPS_DESC_INPUT
+echo -e "\n  ${BOLD}Descrição / Rótulo Amigável do Nobreak:${NC}"
+echo -e "  ${DIM}Texto descritivo livre para identificar o equipamento (ex: modelo ou localização física).${NC}"
+echo -e "  ${DIM}Exemplos: 'APC Smart-UPS BR 2200VA', 'Nobreak Rack CPD', 'APC Sala de Servidores'.${NC}"
+echo -ne "  ${FG_YELLOW}${ARROW} Descrição do Nobreak [${DEFAULT_UPS_DESC}]: ${NC}"
+read -r UPS_DESC_INPUT
 UPS_DESC_VAL="${UPS_DESC_INPUT:-$DEFAULT_UPS_DESC}"
 log_info "Descrição definida: ${FG_GREEN}${UPS_DESC_VAL}${NC}"
 
 # 2.4 - Potência Nominal em Watts
-read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Potência Nominal em Watts [${DEFAULT_NOMINAL_POWER}]: ${NC}")" UPS_POWER_INPUT
+echo -e "\n  ${BOLD}Potência Nominal do Equipamento (Watts):${NC}"
+echo -e "  ${DIM}Utilizado para calcular o consumo em Watts e Amperes no Zabbix (SMC2200BI-BR = 2200W).${NC}"
+echo -ne "  ${FG_YELLOW}${ARROW} Potência Nominal em Watts [${DEFAULT_NOMINAL_POWER}]: ${NC}"
+read -r UPS_POWER_INPUT
 UPS_POWER_VAL="${UPS_POWER_INPUT:-$DEFAULT_NOMINAL_POWER}"
 if ! [[ "$UPS_POWER_VAL" =~ ^[0-9]+$ ]]; then
     UPS_POWER_VAL="$DEFAULT_NOMINAL_POWER"
@@ -187,7 +204,8 @@ log_info "O servidor ${FG_GREEN}NÃO SERÁ DESLIGADO${NC} automaticamente pelo N
 
 # 2.6 - Confirmação para Prosseguir
 echo -e ""
-read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar as configurações acima e prosseguir? (S/n): ${NC}")" CONFIRMAR
+echo -ne "  ${FG_YELLOW}${ARROW} Deseja aplicar as configurações acima e prosseguir? (S/n): ${NC}"
+read -r CONFIRMAR
 CONFIRMAR="${CONFIRMAR:-S}"
 if [[ ! "$CONFIRMAR" =~ ^[Ss]$ ]]; then
     log_warning "Operação cancelada pelo operador."
