@@ -69,6 +69,15 @@ sudo fail2ban-client status nginx-botsearch
 sudo fail2ban-client status apache-auth
 ```
 
+### Consultar Whitelist Ativa (`ignoreip`) em uma Jail
+```bash
+# Consultar a lista de IPs e sub-redes ignoradas pela jail do SSH (sshd)
+sudo fail2ban-client get sshd ignoreip
+
+# Consultar a whitelist de qualquer outra jail ativa
+sudo fail2ban-client get <NOME_DA_JAIL> ignoreip
+```
+
 ---
 
 ## 🔓 4. Desbloqueio e Banimento Manual de IPs
@@ -113,7 +122,8 @@ sudo nano /etc/fail2ban/jail.local
 ```ini
 [DEFAULT]
 # IPs e Sub-redes em Whitelist que NUNCA devem ser banidos (separados por espaço)
-ignoreip = 127.0.0.1/8 ::1 192.168.1.0/24 200.201.202.203
+# Dica: adicione sua sub-rede de gerência (ex: 192.168.0.0/22 cobre 192.168.0.1 a 192.168.3.254)
+ignoreip = 127.0.0.1/8 ::1 192.168.0.0/22 10.0.0.0/8 172.16.0.0/12
 
 # Tempo que o IP ficará banido (ex: 1h = 1 hora, 1d = 1 dia, -1 = permanente)
 bantime  = 1h
@@ -140,10 +150,12 @@ port     = ssh
 # Se você alterou a porta padrão do SSH (ex: 2222), declare abaixo:
 # port   = 2222
 mode     = aggressive
-maxretry = 3
-findtime = 15m
-bantime  = 24h
+maxretry = 5
+findtime = 10m
+bantime  = 1h
 ```
+
+> 💡 **Nota sobre cálculo de CIDR**: Se a sua rede corporativa/doméstica operar em máscara `/22`, declarar `192.168.0.0/22` protege toda a faixa contínua de IPs (192.168.0.1 até 192.168.3.254). Se quiser proteger apenas uma faixa padrão classe C, utilize `192.168.1.0/24`.
 
 ### Recarregar Configurações do Fail2Ban
 ```bash

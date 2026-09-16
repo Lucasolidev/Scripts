@@ -1,26 +1,27 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.0
+# Version: 2.1
 # ------------------------------------------------
-VERSION="2.0"
+VERSION="2.1"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (exige Root/Sudo) e captura logs de auditoria em /root e na Home.
 # 2. Atualiza os espelhos do APT e aplica patches de segurança do sistema (opcional).
-# 3. Instala utilitários vitais (curl, vim, ncdu, btop, htop, tmux, fail2ban, dnsutils, net-tools, unattended-upgrades, mtr, iperf3, nmap, tcpdump, iotop, jq, tree, rsync, unzip, p7zip, sysstat, lynis).
+# 3. Instala utilitários vitais (curl, vim, ncdu, btop, htop, tmux, fail2ban, auditd, audispd-plugins, dnsutils, net-tools, unattended-upgrades, mtr, iperf3, nmap, tcpdump, iotop, jq, tree, rsync, unzip, p7zip, sysstat, lynis).
 # 4. Ajusta locales (en_US/pt_BR UTF-8), fuso horário (America/Sao_Paulo + NTP) e layout de teclado (ABNT2 + US-Intl).
 # 5. Aplica proteção de memória compartilhada em RAM (/dev/shm) montada com 'noexec,nosuid,nodev' no /etc/fstab contra botnets/webshells.
 # 6. Configura aliases de produtividade e segurança no Shell (ll='ls -alFh', rm, cp, mv, df, free, ports, myip, update, clean, reload).
 # 7. Endurece o SSH (Hardening): Desabilita login de Root (opcional), impede senhas em branco e aplica timeout de ociosidade de 10 min.
-# 8. Configura a jaula do Fail2Ban (força bruta SSH) e ativa atualizações automáticas de segurança (unattended-upgrades).
-# 9. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset' (sudo).
-# 10. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
-# 11. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH (22/tcp) e Zabbix Agent (10050/tcp).
-# 12. Configura e personaliza o editor Vim com tema Sonokai, Airline e plugins com suporte multi-usuário (/root, /etc/skel, /home).
-# 13. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, IP, Uptime, RAM e Disco.
-# 14. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
+# 8. Configura o Auditd com rotação de logs e regras ativas para monitorar identidades, sudoers, ssh, rede e persistência.
+# 9. Configura a jaula do Fail2Ban (força bruta SSH) e ativa atualizações automáticas de segurança (unattended-upgrades).
+# 10. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset' (sudo).
+# 11. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
+# 12. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH (22/tcp) e Zabbix Agent (10050/tcp).
+# 13. Configura e personaliza o editor Vim com tema Sonokai, Airline e plugins com suporte multi-usuário (/root, /etc/skel, /home).
+# 14. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, IP, Uptime, RAM e Disco.
+# 15. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
 # wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh -O pos_install_server.sh && chmod +x pos_install_server.sh && sudo ./pos_install_server.sh
@@ -71,6 +72,10 @@ get_service_status() {
     else
         echo -e "${FG_YELLOW}Inativo${NC}"
     fi
+}
+
+is_wsl() {
+    grep -qiE '(microsoft|wsl)' /proc/sys/kernel/osrelease 2>/dev/null
 }
 
 log_info() {
@@ -201,7 +206,7 @@ apt-get update -y > /dev/null 2>&1
 VIRT_TYPE=$(systemd-detect-virt 2>/dev/null || echo "none")
 
 # Lista base de utilitários
-PACOTES=(curl ncdu btop locales htop tmux fail2ban dnsutils net-tools unattended-upgrades ufw vim mtr-tiny iperf3 nmap tcpdump iotop jq tree rsync unzip p7zip-full sysstat lynis)
+PACOTES=(curl ncdu btop locales htop tmux fail2ban auditd audispd-plugins dnsutils net-tools unattended-upgrades ufw vim mtr-tiny iperf3 nmap tcpdump iotop jq tree rsync unzip p7zip-full sysstat lynis)
 
 # Instala apenas o agente de VM compatível com o hipervisor em execução
 if [[ "$VIRT_TYPE" =~ ^(kvm|qemu|bochs)$ ]]; then
@@ -340,8 +345,12 @@ log_success "Hardening no SSH concluído (Sem senhas em branco e timeout de ocio
 print_header "PROTEÇÃO FAIL2BAN E ATUALIZAÇÕES AUTOMÁTICAS"
 
 if command -v fail2ban-client >/dev/null 2>&1; then
-  log_info "Configurando jaula do Fail2Ban para proteção do SSH..."
+  log_info "Configurando jaula do Fail2Ban com whitelist para proteção do SSH..."
   cat <<EOF > /etc/fail2ban/jail.local
+[DEFAULT]
+# Whitelist: loopback local e sub-redes privadas seguras (ajuste conforme sua rede)
+ignoreip = 127.0.0.1/8 ::1 192.168.0.0/22 10.0.0.0/8 172.16.0.0/12
+
 [sshd]
 enabled = true
 port = ssh
@@ -350,7 +359,7 @@ findtime = 600
 bantime = 3600
 EOF
   systemctl restart fail2ban > /dev/null 2>&1
-  log_success "Fail2Ban ativado (Bloqueia IPs após 5 tentativas incorretas no SSH)."
+  log_success "Fail2Ban ativado com whitelist (ignoreip) e proteção SSH (5 tentativas)."
 fi
 
 if [ -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
@@ -358,6 +367,80 @@ if [ -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
   sed -i 's/APT::Periodic::Update-Package-Lists "0";/APT::Periodic::Update-Package-Lists "1";/' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || true
   sed -i 's/APT::Periodic::Unattended-Upgrade "0";/APT::Periodic::Unattended-Upgrade "1";/' /etc/apt/apt.conf.d/20auto-upgrades 2>/dev/null || true
   log_success "Atualizações de segurança automáticas (unattended-upgrades) validadas."
+fi
+
+# ==============================================================================
+# AUDITD - AUDITORIA DO KERNEL, ROTAÇÃO DE LOGS E MONITORAMENTO DE INTEGRIDADE
+# ==============================================================================
+AUDIT_STATUS="Inativo"
+if command -v auditd >/dev/null 2>&1; then
+  log_info "Configurando rotação e retenção de logs do Auditd (/etc/audit/auditd.conf)..."
+  if [ -f /etc/audit/auditd.conf ]; then
+    sed -i 's/^#\?max_log_file =.*/max_log_file = 50/' /etc/audit/auditd.conf
+    sed -i 's/^#\?num_logs =.*/num_logs = 10/' /etc/audit/auditd.conf
+    sed -i 's/^#\?max_log_file_action =.*/max_log_file_action = ROTATE/' /etc/audit/auditd.conf
+    sed -i 's/^#\?space_left =.*/space_left = 100/' /etc/audit/auditd.conf
+    sed -i 's/^#\?space_left_action =.*/space_left_action = SYSLOG/' /etc/audit/auditd.conf
+    sed -i 's/^#\?admin_space_left_action =.*/admin_space_left_action = SUSPEND/' /etc/audit/auditd.conf
+    log_success "Parâmetros de rotação e proteção de disco configurados no auditd.conf."
+  fi
+
+  log_info "Criando regras de auditoria para diretórios e arquivos críticos..."
+  mkdir -p /etc/audit/rules.d
+  cat <<'EOF' > /etc/audit/rules.d/server_security.rules
+# ==============================================================================
+# REGRAS DE AUDITORIA DE SEGURANCA - LINUX SERVER (AUDITD)
+# Monitoramento de identidade, autenticacao, rede, persistencia e escalada
+# ==============================================================================
+
+# 1. Identidade, Contas de Usuarios e Grupos
+-w /etc/passwd -p wa -k auth_mod
+-w /etc/shadow -p wa -k auth_mod
+-w /etc/group -p wa -k auth_mod
+-w /etc/gshadow -p wa -k auth_mod
+-w /etc/security/ -p wa -k auth_mod
+
+# 2. Privilegios Administrativos e Regras Sudo
+-w /etc/sudoers -p wa -k sudo_mod
+-w /etc/sudoers.d/ -p wa -k sudo_mod
+
+# 3. Configuracoes do Servico SSH
+-w /etc/ssh/sshd_config -p wa -k ssh_mod
+-w /etc/ssh/sshd_config.d/ -p wa -k ssh_mod
+
+# 4. Configuracoes de Rede e Regras de Firewall
+-w /etc/hosts -p wa -k net_mod
+-w /etc/resolv.conf -p wa -k net_mod
+-w /etc/netplan/ -p wa -k net_mod
+-w /etc/network/ -p wa -k net_mod
+-w /etc/ufw/ -p wa -k net_mod
+
+# 5. Agendamentos de Tarefas e Persistencia do Sistema
+-w /etc/crontab -p wa -k cron_mod
+-w /etc/cron.d/ -p wa -k cron_mod
+-w /etc/cron.daily/ -p wa -k cron_mod
+-w /etc/cron.hourly/ -p wa -k cron_mod
+-w /etc/cron.monthly/ -p wa -k cron_mod
+-w /etc/cron.weekly/ -p wa -k cron_mod
+-w /etc/systemd/system/ -p wa -k systemd_mod
+
+# 6. Binarios Criticos de Execucao e Escalada de Privilegios
+-w /usr/bin/sudo -p x -k priv_escalation
+-w /usr/bin/su -p x -k priv_escalation
+-w /usr/bin/passwd -p x -k priv_escalation
+EOF
+
+  log_info "Carregando regras de auditoria no kernel..."
+  if is_wsl; then
+    AUDIT_STATUS="Indisponivel no WSL (kernel sem suporte a regras auditd)"
+    log_warning "WSL detectado: kernel WSL não suporta regras de auditoria; auditd em tempo real desativado apenas neste ambiente."
+  else
+    augenrules --load > /dev/null 2>&1 || log_warning "Falha ao carregar as regras com augenrules."
+    systemctl enable --now auditd > /dev/null 2>&1 || true
+    service auditd restart > /dev/null 2>&1 || true
+    AUDIT_STATUS="Ativo (Monitorando identidades, sudo, ssh, rede e persistência)"
+    log_success "Auditd configurado e ativo com rotação de logs e regras carregadas."
+  fi
 fi
 
 # ==============================================================================
@@ -670,6 +753,7 @@ else
 fi
 echo -e "  ${BOLD}Fail2Ban (Brute-Force):${NC}$(get_service_status fail2ban)"
 echo -e "  ${BOLD}Atualiz. de Segurança:${NC} $(get_service_status unattended-upgrades)"
+echo -e "  ${BOLD}Auditd (Integridade):${NC}  ${FG_GREEN}${AUDIT_STATUS}${NC}"
 echo -e "  ${BOLD}Editor Vim:${NC}            $( [ -f /root/.vimrc ] && echo -e "${FG_GREEN}Configurado (Tema Sonokai / Airline)${NC}" || echo -e "${FG_YELLOW}Padrão${NC}")"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
 echo -e "  ${BOLD}Banner no Login:${NC}       $( [ -f /etc/profile.d/motd_banner.sh ] && echo -e "${FG_GREEN}Ativo (/etc/profile.d/motd_banner.sh)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
