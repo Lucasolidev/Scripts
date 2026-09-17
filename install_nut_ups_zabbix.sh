@@ -401,14 +401,23 @@ cat <<'EOF' > "${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh"
 
 set -e
 
-UPS="${1:-Cliente_Nobreak}"
+UPS="${1:-}"
 METRIC="${2:-status}"
 NOMINAL_POWER="${3:-2200}"
+
+# Auto-detecção inteligente do Nobreak se o parâmetro estiver vazio, com macro não resolvida ou nome padrão
+# shellcheck disable=SC2016
+if [ -z "$UPS" ] || [ "$UPS" = '{$UPS_NAME}' ] || [ "$UPS" = 'Cliente_Nobreak' ] || ! upsc "$UPS" >/dev/null 2>&1; then
+    DETECTED_UPS=$(upsc -l 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n')
+    if [ -n "$DETECTED_UPS" ]; then
+        UPS="$DETECTED_UPS"
+    fi
+fi
 
 case "$METRIC" in
     discovery)
         # Descoberta LLD em formato JSON para o Zabbix
-        UPS_LIST=$(upsc -l 2>/dev/null || echo "")
+        UPS_LIST=$(upsc -l 2>/dev/null | grep -v -E '(Init SSL|^$)' || echo "")
         echo -n '{"data":['
         FIRST=1
         for u in $UPS_LIST; do
@@ -420,7 +429,7 @@ case "$METRIC" in
         ;;
     all_json)
         # Exporta todas as variáveis em formato JSON em uma única consulta
-        upsc "$UPS" 2>/dev/null | awk -F': ' '
+        upsc "$UPS" 2>/dev/null | grep -v 'Init SSL' | awk -F': ' '
         BEGIN { printf "{" }
         {
             gsub(/"/, "\\\"", $2);
@@ -431,7 +440,7 @@ case "$METRIC" in
         ;;
     power_watts)
         # Calcula a potência real estimada em Watts a partir da carga (%) e da potência nominal
-        LOAD=$(upsc "$UPS" ups.load 2>/dev/null || echo "0")
+        LOAD=$(upsc "$UPS" ups.load 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "0")
         if [[ "$LOAD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
             echo "$LOAD" "$NOMINAL_POWER" | awk '{printf "%.1f", ($1 / 100.0) * $2}'
         else
@@ -440,8 +449,8 @@ case "$METRIC" in
         ;;
     load_amps)
         # Calcula corrente estimada em Amperes: Watts / Tensão de saída
-        LOAD=$(upsc "$UPS" ups.load 2>/dev/null || echo "0")
-        OUT_V=$(upsc "$UPS" output.voltage 2>/dev/null || echo "127")
+        LOAD=$(upsc "$UPS" ups.load 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "0")
+        OUT_V=$(upsc "$UPS" output.voltage 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "127")
         if [[ "$LOAD" =~ ^[0-9]+(\.[0-9]+)?$ ]] && [[ "$OUT_V" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( $(echo "$OUT_V > 0" | bc -l 2>/dev/null || echo 0) )); then
             echo "$LOAD" "$NOMINAL_POWER" "$OUT_V" | awk '{watts = ($1 / 100.0) * $2; printf "%.1f", watts / $3}'
         else
@@ -451,7 +460,7 @@ case "$METRIC" in
     battery_status_code)
         # Mapeia o status da bateria para códigos compatíveis com os templates APC SNMP
         # 1=unknown, 2=batteryNormal, 3=batteryLow, 4=batteryInFault
-        BSTATUS=$(upsc "$UPS" ups.status 2>/dev/null || echo "")
+        BSTATUS=$(upsc "$UPS" ups.status 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "")
         if [[ "$BSTATUS" =~ "LB" ]]; then
             echo "3" # batteryLow
         elif [[ "$BSTATUS" =~ "RB" ]]; then
@@ -464,7 +473,7 @@ case "$METRIC" in
         ;;
     ups_status_code)
         # Mapeia o status do UPS: 1=unknown, 2=onLine, 3=onBattery, 4=onBoost, 5=sleeping, 6=onBypass, 7=rebooting
-        STATUS=$(upsc "$UPS" ups.status 2>/dev/null || echo "")
+        STATUS=$(upsc "$UPS" ups.status 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "")
         if [[ "$STATUS" =~ "OL" ]]; then
             echo "2" # onLine
         elif [[ "$STATUS" =~ "OB" ]]; then
@@ -481,7 +490,7 @@ case "$METRIC" in
         ;;
     *)
         # Consulta direta de qualquer chave do NUT (ex: battery.charge, input.voltage)
-        VAL=$(upsc "$UPS" "$METRIC" 2>/dev/null || echo "")
+        VAL=$(upsc "$UPS" "$METRIC" 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "")
         if [ -n "$VAL" ]; then
             echo "$VAL"
         else
