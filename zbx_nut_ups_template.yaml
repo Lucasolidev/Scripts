@@ -5,8 +5,8 @@ zabbix_export:
       name: 'Templates/Power'
   templates:
     - uuid: 4b29c9a8d3e24a7ba5e1d4b68e7c109f
-      template: 'APC & Universal UPS by NUT (Zabbix Agent)'
-      name: 'APC & Universal UPS by NUT (Zabbix Agent)'
+      template: 'APC and Universal UPS by NUT'
+      name: 'APC and Universal UPS by NUT (Zabbix Agent)'
       description: |
         Template para monitoramento de nobreaks APC (Smart-UPS SMC2200BI-BR e outros) e qualquer fabricante compatível com o NUT (Network UPS Tools) via Zabbix Agent 7.0.
         
@@ -72,12 +72,12 @@ zabbix_export:
               value: Power
           triggers:
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6
-              expression: 'last(/APC & Universal UPS by NUT (Zabbix Agent)/nut.get[{$UPS_NAME},battery.charge]) < 20'
+              expression: 'last(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},battery.charge]) < 20'
               name: 'Nobreak ({$UPS_NAME}): Bateria em Nível Crítico (< 20%)'
               priority: HIGH
               description: 'A bateria do nobreak está abaixo de 20% de capacidade.'
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b7
-              expression: 'last(/APC & Universal UPS by NUT (Zabbix Agent)/nut.get[{$UPS_NAME},battery.charge]) < 10'
+              expression: 'last(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},battery.charge]) < 10'
               name: 'Nobreak ({$UPS_NAME}): Bateria Esgotando (< 10%)'
               priority: DISASTER
               description: 'A bateria do nobreak está prestes a se esgotar completamente.'
@@ -96,11 +96,11 @@ zabbix_export:
               value: Power
           triggers:
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b8
-              expression: 'last(/APC & Universal UPS by NUT (Zabbix Agent)/nut.battery_status_code[{$UPS_NAME}]) = 3'
+              expression: 'last(/APC and Universal UPS by NUT/nut.battery_status_code[{$UPS_NAME}]) = 3'
               name: 'Nobreak ({$UPS_NAME}): Alerta de Bateria Baixa'
               priority: AVERAGE
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b9
-              expression: 'last(/APC & Universal UPS by NUT (Zabbix Agent)/nut.battery_status_code[{$UPS_NAME}]) = 4'
+              expression: 'last(/APC and Universal UPS by NUT/nut.battery_status_code[{$UPS_NAME}]) = 4'
               name: 'Nobreak ({$UPS_NAME}): Necessária Substituição da Bateria'
               priority: HIGH
         - uuid: c1a1e007a1b24a3c8d5e6f7a8b9c0d1e
@@ -117,7 +117,7 @@ zabbix_export:
               value: Power
           triggers:
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5c0
-              expression: 'min(/APC & Universal UPS by NUT (Zabbix Agent)/nut.get[{$UPS_NAME},battery.temperature],5m) > 42'
+              expression: 'min(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},battery.temperature],5m) > 42'
               name: 'Nobreak ({$UPS_NAME}): Alta Temperatura na Bateria (> 42°C)'
               priority: WARNING
         - uuid: c1a1e008a1b24a3c8d5e6f7a8b9c0d1e
@@ -182,7 +182,7 @@ zabbix_export:
               value: Power
           triggers:
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5c1
-              expression: 'last(/APC & Universal UPS by NUT (Zabbix Agent)/nut.get[{$UPS_NAME},input.voltage]) < 90 and last(/APC & Universal UPS by NUT (Zabbix Agent)/nut.ups_status_code[{$UPS_NAME}]) = 3'
+              expression: 'last(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},input.voltage]) < 90 and last(/APC and Universal UPS by NUT/nut.ups_status_code[{$UPS_NAME}]) = 3'
               name: 'Nobreak ({$UPS_NAME}): Falta de Energia da Concessionária (Operando em Bateria)'
               priority: HIGH
               description: 'A rede elétrica de entrada caiu e o nobreak está alimentando os servidores pelas baterias.'
@@ -212,11 +212,11 @@ zabbix_export:
               value: Power
           triggers:
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5c2
-              expression: 'min(/APC & Universal UPS by NUT (Zabbix Agent)/nut.get[{$UPS_NAME},ups.load],3m) > 85'
+              expression: 'min(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},ups.load],3m) > 85'
               name: 'Nobreak ({$UPS_NAME}): Sobrecarga de Saída (> 85%)'
               priority: WARNING
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5c3
-              expression: 'min(/APC & Universal UPS by NUT (Zabbix Agent)/nut.get[{$UPS_NAME},ups.load],1m) > 95'
+              expression: 'min(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},ups.load],1m) > 95'
               name: 'Nobreak ({$UPS_NAME}): Sobrecarga Crítica de Saída (> 95%)'
               priority: HIGH
         - uuid: c1a1e015a1b24a3c8d5e6f7a8b9c0d1e
@@ -258,7 +258,7 @@ zabbix_export:
               value: Power
           triggers:
             - uuid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5c4
-              expression: 'last(/APC & Universal UPS by NUT (Zabbix Agent)/nut.ups_status_code[{$UPS_NAME}]) = 3'
+              expression: 'last(/APC and Universal UPS by NUT/nut.ups_status_code[{$UPS_NAME}]) = 3'
               name: 'Nobreak ({$UPS_NAME}): Operando em Bateria (onBattery)'
               priority: AVERAGE
               description: 'O nobreak entrou em modo de bateria devido à oscilação ou corte de energia.'
