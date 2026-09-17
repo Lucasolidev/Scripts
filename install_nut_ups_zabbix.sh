@@ -390,6 +390,8 @@ fi
 
 # 5.2 - Script Utilitário de Coleta Otimizada (/etc/zabbix/scripts/nut-ups-status.sh)
 mkdir -p "$ZABBIX_SCRIPTS_DIR"
+chmod 755 /etc/zabbix 2>/dev/null || true
+chmod 755 "$ZABBIX_SCRIPTS_DIR"
 log_info "Criando script de coleta para o Zabbix em ${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh..."
 
 cat <<'EOF' > "${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh"
@@ -489,7 +491,11 @@ case "$METRIC" in
 esac
 EOF
 chmod 755 "${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh"
-chown root:root "${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh"
+if id "zabbix" > /dev/null 2>&1; then
+    chown -R zabbix:zabbix "$ZABBIX_SCRIPTS_DIR"
+else
+    chown -R root:root "$ZABBIX_SCRIPTS_DIR"
+fi
 log_success "Script de métricas criado com sucesso."
 
 # 5.3 - Configuração dos UserParameters do Zabbix Agent
