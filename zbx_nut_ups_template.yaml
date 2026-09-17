@@ -1,311 +1,461 @@
 zabbix_export:
   version: '7.0'
   template_groups:
-    - uuid: c3c5480217de46acb1cd4e924692058b
-      name: 'Templates/Power'
+  - uuid: 7df96b18c230490a9a0a9e2307226338
+    name: Templates
   templates:
-    - uuid: 300f3d87d4ae420fb7f628d4edae790a
-      template: 'APC and Universal UPS by NUT'
-      name: 'APC and Universal UPS by NUT (Zabbix Agent)'
-      description: |
-        Template para monitoramento de nobreaks APC (Smart-UPS SMC2200BI-BR e outros) e qualquer fabricante compatível com o NUT (Network UPS Tools) via Zabbix Agent 7.0.
-        
-        Permite a coleta de todas as 27 métricas elétricas e de status diretamente via cabo USB.
-      groups:
-        - name: 'Templates/Power'
-      items:
-        - uuid: 5c0e5cf575944ebb9c519490bdb2d09a
-          name: 'Device Model Name'
-          key: 'nut.get[{$UPS_NAME},ups.model]'
-          delay: 1h
-          history: 7d
-          trends: '0'
-          value_type: CHAR
-          description: 'Modelo de identificação do nobreak.'
-          tags:
-            - tag: Application
-              value: System
-        - uuid: f0145b02dcd644278654479477f1521e
-          name: 'Device Manufacturer'
-          key: 'nut.get[{$UPS_NAME},ups.mfr]'
-          delay: 1h
-          history: 7d
-          trends: '0'
-          value_type: CHAR
-          description: 'Fabricante do equipamento.'
-          tags:
-            - tag: Application
-              value: System
-        - uuid: 855241deca674642a8f7997d0ad01a67
-          name: 'Device Serial Number'
-          key: 'nut.get[{$UPS_NAME},ups.serial]'
-          delay: 1h
-          history: 7d
-          trends: '0'
-          value_type: CHAR
-          description: 'Número de série do nobreak.'
-          tags:
-            - tag: Application
-              value: System
-        - uuid: 142420646b8f4b69a69dcf583f91bfea
-          name: 'Software version'
-          key: 'nut.get[{$UPS_NAME},ups.firmware]'
-          delay: 1h
-          history: 7d
-          trends: '0'
-          value_type: CHAR
-          description: 'Versão do firmware do equipamento.'
-          tags:
-            - tag: Application
-              value: System
-        - uuid: f8d4ab1e119544e1ac8d131dad1efa76
-          name: 'UPS battery capacity (%)'
-          key: 'nut.get[{$UPS_NAME},battery.charge]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: '%'
-          description: 'Capacidade de carga atual da bateria em porcentagem.'
-          tags:
-            - tag: Application
-              value: Power
-          triggers:
-            - uuid: b47a326264b442709242c94e04f8618f
-              expression: 'last(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},battery.charge]) < 20'
-              name: 'Nobreak ({$UPS_NAME}): Bateria em Nível Crítico (< 20%)'
-              priority: HIGH
-              description: 'A bateria do nobreak está abaixo de 20% de capacidade.'
-            - uuid: 70cd29248c7544b49f821be87136b093
-              expression: 'last(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},battery.charge]) < 10'
-              name: 'Nobreak ({$UPS_NAME}): Bateria Esgotando (< 10%)'
-              priority: DISASTER
-              description: 'A bateria do nobreak está prestes a se esgotar completamente.'
-        - uuid: 11b39bdd94fa4fe9bb47e45085e75718
-          name: 'UPS battery status'
-          key: 'nut.battery_status_code[{$UPS_NAME}]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: UNSIGNED
-          valuemap:
-            name: 'APC Battery Status'
-          description: 'Status operacional do banco de baterias.'
-          tags:
-            - tag: Application
-              value: Power
-          triggers:
-            - uuid: 4c871126ac144e0fa4b659467cfd08c9
-              expression: 'last(/APC and Universal UPS by NUT/nut.battery_status_code[{$UPS_NAME}]) = 3'
-              name: 'Nobreak ({$UPS_NAME}): Alerta de Bateria Baixa'
-              priority: AVERAGE
-            - uuid: d798f86f2e1842cb9a7caf15ea3c76f1
-              expression: 'last(/APC and Universal UPS by NUT/nut.battery_status_code[{$UPS_NAME}]) = 4'
-              name: 'Nobreak ({$UPS_NAME}): Necessária Substituição da Bateria'
-              priority: HIGH
-        - uuid: 3b163413891849a98e5a307fe2a4bfc7
-          name: 'UPS battery temperature'
-          key: 'nut.get[{$UPS_NAME},battery.temperature]'
-          delay: 1m
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: '°C'
-          description: 'Temperatura interna do banco de baterias.'
-          tags:
-            - tag: Application
-              value: Power
-          triggers:
-            - uuid: f3ed58cd669a49ae983a2e6915c5cb1e
-              expression: 'min(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},battery.temperature],5m) > 42'
-              name: 'Nobreak ({$UPS_NAME}): Alta Temperatura na Bateria (> 42°C)'
-              priority: WARNING
-        - uuid: cc854d27daea4290af57443b654a6494
-          name: 'UPS battery time remaining'
-          key: 'nut.get[{$UPS_NAME},battery.runtime]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: UNSIGNED
-          units: 's'
-          description: 'Tempo estimado de autonomia restante em segundos.'
-          tags:
-            - tag: Application
-              value: Power
-        - uuid: 450401dceec744b4a62ae22ce67678f1
-          name: 'UPS battery voltage'
-          key: 'nut.get[{$UPS_NAME},battery.voltage]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: 'V'
-          description: 'Tensão do banco de baterias em Volts.'
-          tags:
-            - tag: Application
-              value: Power
-        - uuid: db576c52e4c14d50857266347dd18efb
-          name: 'UPS current load (Amps)'
-          key: 'nut.load_amps[{$UPS_NAME},{$UPS_NOMINAL_POWER}]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: 'A'
-          description: 'Corrente de saída consumida em Amperes.'
-          tags:
-            - tag: Application
-              value: Power
-        - uuid: 9924d9af113346a298f0722a835af9a7
-          name: 'UPS input frequency'
-          key: 'nut.get[{$UPS_NAME},input.frequency]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: 'Hz'
-          description: 'Frequência da rede elétrica de entrada em Hertz.'
-          tags:
-            - tag: Application
-              value: Power
-        - uuid: e9f174a5dc2d407fa2ff7a4c783876f9
-          name: 'UPS input voltage'
-          key: 'nut.get[{$UPS_NAME},input.voltage]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: 'V'
-          description: 'Tensão da rede elétrica de entrada em Volts.'
-          tags:
-            - tag: Application
-              value: Power
-          triggers:
-            - uuid: 039a3a8030bd4710ae47183cb7ed905c
-              expression: 'last(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},input.voltage]) < 90 and last(/APC and Universal UPS by NUT/nut.ups_status_code[{$UPS_NAME}]) = 3'
-              name: 'Nobreak ({$UPS_NAME}): Falta de Energia da Concessionária (Operando em Bateria)'
-              priority: HIGH
-              description: 'A rede elétrica de entrada caiu e o nobreak está alimentando os servidores pelas baterias.'
-        - uuid: b2d24e05851b4ca9a4c99dfc469da98d
-          name: 'UPS output frequency'
-          key: 'nut.get[{$UPS_NAME},output.frequency]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: 'Hz'
-          description: 'Frequência da rede elétrica de saída.'
-          tags:
-            - tag: Application
-              value: Power
-        - uuid: 189d4012fac849059e1bfbb2aa96b6ba
-          name: 'UPS output load (%)'
-          key: 'nut.get[{$UPS_NAME},ups.load]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: '%'
-          description: 'Porcentagem de carga consumida em relação à capacidade máxima do nobreak.'
-          tags:
-            - tag: Application
-              value: Power
-          triggers:
-            - uuid: 80f8628c9eaf47b2ba0928856751bfb6
-              expression: 'min(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},ups.load],3m) > 85'
-              name: 'Nobreak ({$UPS_NAME}): Sobrecarga de Saída (> 85%)'
-              priority: WARNING
-            - uuid: 733eacf1cb2f4d578746eae9f361aa3d
-              expression: 'min(/APC and Universal UPS by NUT/nut.get[{$UPS_NAME},ups.load],1m) > 95'
-              name: 'Nobreak ({$UPS_NAME}): Sobrecarga Crítica de Saída (> 95%)'
-              priority: HIGH
-        - uuid: c1b1998be3fd4bb3b9b091c108cf6430
-          name: 'UPS output load (W)'
-          key: 'nut.power_watts[{$UPS_NAME},{$UPS_NOMINAL_POWER}]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: 'W'
-          description: 'Potência real consumida pelas cargas conectadas em Watts.'
-          tags:
-            - tag: Application
-              value: Power
-        - uuid: 2903c68e0bcc4441936a599d7ecd11e8
-          name: 'UPS output voltage'
-          key: 'nut.get[{$UPS_NAME},output.voltage]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: FLOAT
-          units: 'V'
-          description: 'Tensão fornecida nas tomadas de saída do nobreak.'
-          tags:
-            - tag: Application
-              value: Power
-        - uuid: 3a8246b6e1964390a0e118983611367d
-          name: 'UPS status'
-          key: 'nut.ups_status_code[{$UPS_NAME}]'
-          delay: 30s
-          history: 30d
-          trends: 365d
-          value_type: UNSIGNED
-          valuemap:
-            name: 'APC UPS Status'
-          description: 'Código de status operacional do nobreak.'
-          tags:
-            - tag: Application
-              value: Power
-          triggers:
-            - uuid: b4ceded6d2374a79adc93e3748373760
-              expression: 'last(/APC and Universal UPS by NUT/nut.ups_status_code[{$UPS_NAME}]) = 3'
-              name: 'Nobreak ({$UPS_NAME}): Operando em Bateria (onBattery)'
-              priority: AVERAGE
-              description: 'O nobreak entrou em modo de bateria devido à oscilação ou corte de energia.'
-        - uuid: 79c094542a2840f49633aeac19c75980
-          name: 'UPS status (raw)'
-          key: 'nut.get[{$UPS_NAME},ups.status]'
-          delay: 30s
-          history: 7d
-          trends: '0'
-          value_type: CHAR
-          description: 'String bruta de status reportada pelo driver (ex: OL, OB, LB, CHRG).'
-          tags:
-            - tag: Application
-              value: Status
-      macros:
-        - macro: '{$UPS_NAME}'
-          value: 'Cliente_Nobreak'
-          description: 'Nome do nobreak configurado no /etc/nut/ups.conf'
-        - macro: '{$UPS_NOMINAL_POWER}'
-          value: '2200'
-          description: 'Potência nominal do nobreak em Watts'
-      valuemaps:
-        - uuid: ef25b478adf84396af34528c59175040
-          name: 'APC Battery Status'
-          mappings:
-            - value: '1'
-              newvalue: 'unknown (1)'
-            - value: '2'
-              newvalue: 'batteryNormal (2)'
-            - value: '3'
-              newvalue: 'batteryLow (3)'
-            - value: '4'
-              newvalue: 'batteryInFault (4)'
-        - uuid: f3be6fed7e324613b37dbd6f4b354f77
-          name: 'APC UPS Status'
-          mappings:
-            - value: '1'
-              newvalue: 'unknown (1)'
-            - value: '2'
-              newvalue: 'onLine (2)'
-            - value: '3'
-              newvalue: 'onBattery (3)'
-            - value: '4'
-              newvalue: 'onBoost (4)'
-            - value: '5'
-              newvalue: 'sleeping (5)'
-            - value: '6'
-              newvalue: 'onBypass (6)'
-            - value: '7'
-              newvalue: 'rebooting (7)'
+  - uuid: bf22fb76b4834395a72846c3dbb57e28
+    template: Template Nobreak APC UPS NUT
+    name: Template Nobreak APC UPS NUT (Zabbix Agent)
+    groups:
+    - name: Templates
+    items:
+    - uuid: 800ca3c5358e451c981135c5ac309465
+      name: Contact
+      key: nut.get[{},ups.mfr]
+      delay: 6h
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      inventory_link: CONTACT
+      tags:
+      - tag: Application
+        value: System
+    - uuid: 7622a2d657d2441cb785e506fd3c459b
+      name: Software version (full)
+      key: nut.get[{},driver.version]
+      delay: 6h
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      inventory_link: OS_FULL
+      tags:
+      - tag: Application
+        value: System
+    - uuid: 4e6d650b18b14487bb9c80b8198403de
+      name: Device Location
+      key: nut.get[{},device.type]
+      delay: 6h
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      inventory_link: LOCATION
+      tags:
+      - tag: Application
+        value: System
+    - uuid: 7adda8d504e244239bb24658045d1abe
+      name: Device Name
+      key: nut.get[{},ups.model]
+      delay: 6h
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      description: 'Bkp
+
+        SNMPv2-MIB::sysName.0
+
+        '
+      inventory_link: NAME
+      tags:
+      - tag: Application
+        value: System
+    - uuid: dc75f27f77c8462f966bc8484ae99ce3
+      name: System Uptime
+      key: system.uptime
+      history: 7d
+      trends: 180d
+      units: uptime
+      description: 'Bkp
+
+        SNMPv2-MIB::sysUpTime.0
+
+        '
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.01'
+      tags:
+      - tag: Application
+        value: Status
+    - uuid: bbd157bcb99d40f49b195d541687e538
+      name: UPS battery capacity (%)
+      key: nut.get[{},battery.charge]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: '%'
+      tags:
+      - tag: Application
+        value: Power
+      triggers:
+      - uuid: f4b80a0d504649cf9899ac7f50668ed5
+        expression: last(/Template Nobreak APC UPS SNMP/upsAdvBatteryCapacity)<90
+        name: Batery Capacity <90%
+        priority: AVERAGE
+    - uuid: 201953ce772342f2906bc28d21446d64
+      name: UPS batery packst
+      key: nut.get[{},battery.packs]
+      delay: 1h
+      history: 7d
+      trends: 180d
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.01'
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: f630a7b3d65b4243859e8a5b48ca03a1
+      name: UPS battery temperature
+      key: nut.get[{},battery.temperature]
+      history: 7d
+      trends: 180d
+      units: °C
+      tags:
+      - tag: Application
+        value: Power
+      triggers:
+      - uuid: 00fe5f37736841168a0cf29c1d9c6c1b
+        expression: last(/Template Nobreak APC UPS SNMP/upsAdvBatteryTemperature)>40
+        name: High battery temperature
+        priority: HIGH
+    - uuid: f41f100278a3423eb7bced8971ec95fa
+      name: UPS battery voltage
+      key: nut.get[{},battery.voltage]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: VAC
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: 69176a26ff174d549bca728fcdcddbc9
+      name: Software version
+      key: nut.get[{},ups.firmware]
+      delay: 6h
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      inventory_link: OS
+      tags:
+      - tag: Application
+        value: System
+    - uuid: 83e959eafa4a47358f49589d737fa7d9
+      name: Device Serial Number
+      key: nut.get[{},device.serial]
+      delay: 6h
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      inventory_link: SERIALNO_A
+      tags:
+      - tag: Application
+        value: System
+    - uuid: 47f628da794b426eb5bc5e7d57b31ff1
+      name: UPS input frequency
+      key: nut.get[{},input.frequency]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: Hz
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: d7c8be281bb34b8ab4463f3a862d0f33
+      name: UPS input voltage
+      key: nut.get[{},input.voltage]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: VAC
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: d55b26504baa4ffe8fbab1f53e4796b0
+      name: UPS current load (Amps)
+      key: nut.load_amps[{},{}]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: amp
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: e5067a69dbc64b47a77ae196d88edf73
+      name: UPS output frequency
+      key: nut.get[{},output.frequency]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: Hz
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: 9186b3ef3b8a495d91619bdf8bdd1b64
+      name: UPS output load (%)
+      key: nut.get[{},ups.load]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: '%'
+      tags:
+      - tag: Application
+        value: Power
+      triggers:
+      - uuid: 467aca2f9bfa42a5929274a4fb0e0764
+        expression: last(/Template Nobreak APC UPS SNMP/upsAdvOutputLoad)>85
+        name: Output Load Critical >85%
+        priority: HIGH
+      - uuid: 3c7495f90f8148e3abb87242cea5f6fd
+        expression: last(/Template Nobreak APC UPS SNMP/upsAdvOutputLoad)>90
+        name: Output load High
+        priority: WARNING
+    - uuid: 6d8c5967f769462c8877d71c6c67b944
+      name: UPS output load (W)
+      key: nut.power_watts[{},{}]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: W
+      params: last(//upsAdvOutputVoltage) * last(//upsAdvOutputCurrent)
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: 89c6fcc4e2864cb68792c7b3e8bb87e2
+      name: UPS output voltage
+      key: nut.get[{},output.voltage]
+      history: 7d
+      value_type: FLOAT
+      trends: 180d
+      units: VAC
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: 8f0df04340cc470f979c5ea366a63d53
+      name: UPS replace battery indicator
+      key: nut.battery_status_code[{}]
+      history: 7d
+      trends: 180d
+      valuemap:
+        name: apcBatteryReplacementStatus
+      tags:
+      - tag: Application
+        value: Power
+      triggers:
+      - uuid: 65d9f190d159406199cf68d8ffa44811
+        expression: last(/Template Nobreak APC UPS SNMP/upsAdvReplaceBatteryIndicator)<>1
+        name: Battery Needs Replaced
+        priority: AVERAGE
+    - uuid: 5f62862bd968450c906089add40336e0
+      name: UPS battery time remaining
+      key: nut.get[{},battery.runtime]
+      history: 7d
+      trends: 180d
+      units: s
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.01'
+      tags:
+      - tag: Application
+        value: Power
+      triggers:
+      - uuid: 582608a242844da78ded1ee817ae2787
+        expression: last(/Template Nobreak APC UPS SNMP/upsAdvRunTimeRemaining)<20
+        name: Batery Time Remaining <20min
+        priority: HIGH
+      - uuid: 048b7e84e5494b3286a7cf934abe4add
+        expression: last(/Template Nobreak APC UPS SNMP/upsAdvRunTimeRemaining)<10
+        name: Run time remaining CRITICAL
+        priority: DISASTER
+    - uuid: f546462c8be04e4f93df7afe846b4e91
+      name: UPS battery status
+      key: nut.battery_status_code[{}]
+      history: 7d
+      trends: 180d
+      valuemap:
+        name: apcBatteryStatus
+      tags:
+      - tag: Application
+        value: Power
+      triggers:
+      - uuid: 68e94591eb0d4b2eae3a2339b1547223
+        expression: last(/Template Nobreak APC UPS SNMP/upsBasicBatteryStatus)=3
+        name: The battery power is too low to support the load
+        priority: AVERAGE
+    - uuid: 8b996eee530a423dab295321d04174f7
+      name: UPS Time on Battery
+      key: nut.get[{},battery.time_on_battery]
+      history: 7d
+      trends: 180d
+      units: s
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.01'
+      tags:
+      - tag: Application
+        value: Power
+    - uuid: 15d96da88b214bb184334aa21d2fef18
+      name: Device Model Name
+      key: nut.get[{},device.model]
+      delay: 6h
+      history: 7d
+      value_type: CHAR
+      trends: '0'
+      inventory_link: TYPE
+      tags:
+      - tag: Application
+        value: System
+    - uuid: 684cd27e2a244d17860fa3cda44430ac
+      name: UPS status
+      key: nut.ups_status_code[{}]
+      history: 7d
+      trends: 180d
+      valuemap:
+        name: apcStatus
+      tags:
+      - tag: Application
+        value: Power
+      triggers:
+      - uuid: 1dd8b23a2dd64364b6b93b7d7bbb381b
+        expression: last(/Template Nobreak APC UPS SNMP/upsBasicOutputStatus)<>2
+        name: Nobreak Status
+        priority: AVERAGE
+    valuemaps:
+    - uuid: 8fcce382d9424f0088a6a61c47e52b61
+      name: apcBatteryReplacementStatus
+      mappings:
+      - value: '1'
+        newvalue: noBatteryNeedsReplacing
+      - value: '2'
+        newvalue: batteryNeedsReplacing
+    - uuid: f7faf728ad084253bfe7b3c67275e29e
+      name: apcBatteryStatus
+      mappings:
+      - value: '1'
+        newvalue: unknown
+      - value: '2'
+        newvalue: batteryNormal
+      - value: '3'
+        newvalue: batteryLow
+    - uuid: f21fd962ae984b6993a8ef1585382a8d
+      name: apcStatus
+      mappings:
+      - value: '1'
+        newvalue: unknown
+      - value: '2'
+        newvalue: onLine
+      - value: '3'
+        newvalue: onBattery
+      - value: '4'
+        newvalue: onSmartBoost
+      - value: '5'
+        newvalue: timedSleeping
+      - value: '6'
+        newvalue: softwareBypass
+      - value: '7'
+        newvalue: 'off'
+      - value: '8'
+        newvalue: rebooting
+      - value: '9'
+        newvalue: switchedBypass
+      - value: '10'
+        newvalue: harwareFailureBypass
+      - value: '11'
+        newvalue: sleepingUnitPowerReturn
+      - value: '12'
+        newvalue: onSmartTrim
+      - value: '13'
+        newvalue: ecoMode
+      - value: '14'
+        newvalue: hotStandby
+      - value: '15'
+        newvalue: onBatteryTest
+    description: Monitoramento universal de nobreaks APC e compativeis com NUT via Zabbix Agent 7.0.
+    macros:
+    - macro: '{}'
+      value: Cliente_Nobreak
+      description: Nome do nobreak configurado no /etc/nut/ups.conf
+    - macro: '{}'
+      value: '2200'
+      description: Potencia nominal do nobreak em Watts
+  triggers:
+  - uuid: 6497cc36fc3245fd97b07d377e000921
+    expression: 'last(/Template Nobreak APC UPS NUT/nut.get[{},battery.time_on_battery])>0
+
+      and
+
+      last(/Template Nobreak APC UPS NUT/nut.get[{},battery.runtime])>=0
+
+      '
+    name: Nobreak on Battery
+    opdata: 'Operando: {ITEM.LASTVALUE1}  |  Restante: {ITEM.LASTVALUE2}'
+    priority: HIGH
+    description: "Operando: {ITEM.LASTVALUE1} \nRestante: {ITEM.LASTVALUE2}\n"
+  graphs:
+  - uuid: dd78f2814cee4649b72fec964872c340
+    name: Battery status
+    ymin_type_1: FIXED
+    graph_items:
+    - drawtype: BOLD_LINE
+      color: C80000
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.battery_status_code[{}]
+    - sortorder: '1'
+      drawtype: BOLD_LINE
+      color: 00C800
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.battery_status_code[{}]
+  - uuid: ebede932c9c441a0bf7dc0e6fd237178
+    name: UPS Capacity
+    ymin_type_1: FIXED
+    graph_items:
+    - sortorder: '1'
+      drawtype: FILLED_REGION
+      color: 4CAF50
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.get[{},battery.charge]
+    - sortorder: '2'
+      drawtype: BOLD_LINE
+      color: CC0000
+      yaxisside: RIGHT
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.get[{},battery.runtime]
+  - uuid: 7d8e0d2a9cba47e19a132b86cc8b83e6
+    name: UPS load
+    graph_items:
+    - color: C80000
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.load_amps[{},{}]
+    - sortorder: '1'
+      color: 0000CC
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.get[{},ups.load]
+  - uuid: 720d2a068138434a9f29ea41413c6c1f
+    name: UPS temperature
+    ymin_type_1: FIXED
+    graph_items:
+    - drawtype: GRADIENT_LINE
+      color: '660000'
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.get[{},battery.temperature]
+  - uuid: d986d1fa0f17462f96fe02bbfb8041e2
+    name: UPS voltage
+    graph_items:
+    - color: 0000CC
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.get[{},output.voltage]
+    - sortorder: '1'
+      color: CC0000
+      item:
+        host: Template Nobreak APC UPS NUT
+        key: nut.get[{},input.voltage]
