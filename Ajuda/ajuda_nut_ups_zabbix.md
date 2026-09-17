@@ -87,10 +87,10 @@ zabbix_agentd -t 'nut.ups_status_code[Cliente_Nobreak]'
 4. Selecione o arquivo [`zbx_nut_ups_template.yaml`](../zbx_nut_ups_template.yaml).
 5. Deixe marcadas as opções padrão e clique em **Import**.
 6. Acesse **Data collection** ➔ **Hosts**, localize o seu Host (`Cliente_Nobreak` ou o servidor onde o nobreak está conectado) e adicione o template:
-   * **Template associado:** `Template Nobreak APC UPS NUT (Zabbix Agent)`.
+   * **Template associado:** `Template Nobreak UPS NUT (Zabbix Agent)`.
 7. Na aba **Macros** do Host, você pode ajustar:
    * `{$UPS_NAME}`: Nome dado ao nobreak no arquivo `/etc/nut/ups.conf` (padrão: `Cliente_Nobreak`).
-   * `{$UPS_NOMINAL_POWER}`: Potência do equipamento em Watts (padrão: `2200`).
+   * `{$UPS_NOMINAL_POWER}`: Potência do equipamento em Watts (opcional).
 
 ---
 

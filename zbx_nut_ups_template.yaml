@@ -5,8 +5,8 @@ zabbix_export:
       name: Templates
   templates:
     - uuid: 10c88dfc48564d5292e5cba005de30b9
-      template: 'Template Nobreak APC UPS NUT'
-      name: 'Template Nobreak APC UPS NUT (Zabbix Agent)'
+      template: 'Template Nobreak UPS NUT'
+      name: 'Template Nobreak UPS NUT (Zabbix Agent)'
       groups:
         - name: Templates
       items:
@@ -105,13 +105,13 @@ zabbix_export:
           history: 7d
           trends: 180d
           valuemap:
-            name: apcStatus
+            name: upsStatus
           tags:
             - tag: Application
               value: Power
           triggers:
             - uuid: 8e9093235d6c4864bb318cccf21e442f
-              expression: 'last(/Template Nobreak APC UPS NUT/nut.ups_status_code[{$UPS_NAME}])<>2'
+              expression: 'last(/Template Nobreak UPS NUT/nut.ups_status_code[{$UPS_NAME}])<>2'
               name: 'Nobreak Status Não Normal'
               priority: AVERAGE
         - uuid: 243b3f5bdab947fcb207e963013e94bf
@@ -129,13 +129,13 @@ zabbix_export:
           history: 7d
           trends: 180d
           valuemap:
-            name: apcBatteryStatus
+            name: upsBatteryStatus
           tags:
             - tag: Application
               value: Power
           triggers:
             - uuid: 8681f38a725545b8842169bd9fad3e53
-              expression: 'last(/Template Nobreak APC UPS NUT/nut.battery_status_code[{$UPS_NAME}])=3'
+              expression: 'last(/Template Nobreak UPS NUT/nut.battery_status_code[{$UPS_NAME}])=3'
               name: 'The battery power is too low to support the load'
               priority: AVERAGE
         - uuid: fcc219d69bf54fd5b21c8d406dea2814
@@ -144,13 +144,13 @@ zabbix_export:
           history: 7d
           trends: 180d
           valuemap:
-            name: apcBatteryReplacementStatus
+            name: upsBatteryReplacementStatus
           tags:
             - tag: Application
               value: Power
           triggers:
             - uuid: a87477b99d014ff0bc2ad9e61426ac2a
-              expression: 'last(/Template Nobreak APC UPS NUT/nut.battery_replacement_code[{$UPS_NAME}])<>1'
+              expression: 'last(/Template Nobreak UPS NUT/nut.battery_replacement_code[{$UPS_NAME}])<>1'
               name: 'Battery Needs Replaced'
               priority: AVERAGE
         - uuid: 965880f9a296497ba1164c6407036f2a
@@ -165,11 +165,11 @@ zabbix_export:
               value: Power
           triggers:
             - uuid: 17f65747368b4ecdbd90dba1d34b9491
-              expression: 'last(/Template Nobreak APC UPS NUT/nut.get[{$UPS_NAME},battery.charge])<90'
+              expression: 'last(/Template Nobreak UPS NUT/nut.get[{$UPS_NAME},battery.charge])<90'
               name: 'Batery Capacity <90%'
               priority: AVERAGE
             - uuid: 22e6ace095bf4b609b50f906943cb16c
-              expression: 'last(/Template Nobreak APC UPS NUT/nut.get[{$UPS_NAME},battery.charge])<20'
+              expression: 'last(/Template Nobreak UPS NUT/nut.get[{$UPS_NAME},battery.charge])<20'
               name: 'Battery Capacity Critical <20%'
               priority: DISASTER
         - uuid: 681833070cd347c38dd10d0f1387d9aa
@@ -246,14 +246,14 @@ zabbix_export:
               value: Power
       valuemaps:
         - uuid: d97770757c794b818800594c15162652
-          name: apcBatteryReplacementStatus
+          name: upsBatteryReplacementStatus
           mappings:
             - value: '1'
               newvalue: noBatteryNeedsReplacing
             - value: '2'
               newvalue: batteryNeedsReplacing
         - uuid: 00aa8b8df74f481e8947d95ab93dbf76
-          name: apcBatteryStatus
+          name: upsBatteryStatus
           mappings:
             - value: '1'
               newvalue: unknown
@@ -262,7 +262,7 @@ zabbix_export:
             - value: '3'
               newvalue: batteryLow
         - uuid: c57440c6f6bd48a5a0f080d304b8c996
-          name: apcStatus
+          name: upsStatus
           mappings:
             - value: '1'
               newvalue: unknown
@@ -300,14 +300,20 @@ zabbix_export:
           description: 'Nome do nobreak configurado no /etc/nut/ups.conf'
         - macro: '{$UPS_NOMINAL_POWER}'
           value: '2200'
-          description: 'Potência nominal do equipamento em Watts'
-      description: 'Monitoramento de nobreak APC Smart-UPS via USB (Network UPS Tools - NUT) pelo Zabbix Agent 7.0 LTS.'
+          description: 'Potencia nominal do equipamento em Watts (opcional)'
+      description: |
+        Template universal para monitoramento de nobreaks (UPS) conectados via USB ou Serial utilizando Network UPS Tools (NUT) e Zabbix Agent 7.0 LTS.
+
+        Compatível com as principais marcas e fabricantes do mercado (APC, SMS / Legrand, Eaton, CyberPower, Ragtech, Tripp-Lite, TS Shara, Riello, NHS, etc.).
+
+        Consulte os modelos homologados e a lista oficial de compatibilidade de hardware (HCL) no site do NUT:
+        https://networkupstools.org/stable-hcl.html
   triggers:
     - uuid: 38a64681ba904f25be3f1397e08dc6e0
       expression: |
-        last(/Template Nobreak APC UPS NUT/nut.ups_status_code[{$UPS_NAME}])=3
+        last(/Template Nobreak UPS NUT/nut.ups_status_code[{$UPS_NAME}])=3
         and
-        last(/Template Nobreak APC UPS NUT/nut.get[{$UPS_NAME},battery.charge])>=0
+        last(/Template Nobreak UPS NUT/nut.get[{$UPS_NAME},battery.charge])>=0
       name: 'Nobreak on Battery'
       opdata: 'Status: {ITEM.LASTVALUE1} | Carga Bateria: {ITEM.LASTVALUE2}%'
       priority: HIGH
@@ -323,19 +329,19 @@ zabbix_export:
         - drawtype: BOLD_LINE
           color: C80000
           item:
-            host: 'Template Nobreak APC UPS NUT'
+            host: 'Template Nobreak UPS NUT'
             key: 'nut.battery_status_code[{$UPS_NAME}]'
         - sortorder: '1'
           drawtype: BOLD_LINE
           color: 00C800
           item:
-            host: 'Template Nobreak APC UPS NUT'
+            host: 'Template Nobreak UPS NUT'
             key: 'nut.battery_replacement_code[{$UPS_NAME}]'
         - sortorder: '2'
           drawtype: BOLD_LINE
           color: 0000CC
           item:
-            host: 'Template Nobreak APC UPS NUT'
+            host: 'Template Nobreak UPS NUT'
             key: 'nut.ups_status_code[{$UPS_NAME}]'
     - uuid: a038bcc748374a0a9aecca854ab94c6d
       name: 'UPS Capacity'
@@ -345,24 +351,24 @@ zabbix_export:
           drawtype: FILLED_REGION
           color: 4CAF50
           item:
-            host: 'Template Nobreak APC UPS NUT'
+            host: 'Template Nobreak UPS NUT'
             key: 'nut.get[{$UPS_NAME},battery.charge]'
         - sortorder: '2'
           drawtype: BOLD_LINE
           color: CC0000
           yaxisside: RIGHT
           item:
-            host: 'Template Nobreak APC UPS NUT'
+            host: 'Template Nobreak UPS NUT'
             key: 'nut.get[{$UPS_NAME},battery.runtime]'
     - uuid: f3b9284795f54a9395c3ddd8a1d64a34
       name: 'UPS Battery Voltage'
       graph_items:
         - color: 0000CC
           item:
-            host: 'Template Nobreak APC UPS NUT'
+            host: 'Template Nobreak UPS NUT'
             key: 'nut.get[{$UPS_NAME},battery.voltage]'
         - sortorder: '1'
           color: CC0000
           item:
-            host: 'Template Nobreak APC UPS NUT'
+            host: 'Template Nobreak UPS NUT'
             key: 'nut.get[{$UPS_NAME},battery.voltage.nominal]'
