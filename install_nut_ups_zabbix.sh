@@ -471,6 +471,24 @@ case "$METRIC" in
             echo "1" # unknown
         fi
         ;;
+    battery_replacement_code)
+        # Mapeia indicador de substituição de bateria: 1=noBatteryNeedsReplacing, 2=batteryNeedsReplacing
+        BSTATUS=$(upsc "$UPS" ups.status 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "")
+        if [[ "$BSTATUS" =~ "RB" ]]; then
+            echo "2" # batteryNeedsReplacing
+        else
+            echo "1" # noBatteryNeedsReplacing
+        fi
+        ;;
+    uptime)
+        # Tempo de atividade do equipamento ou do servidor (em segundos)
+        UP=$(upsc "$UPS" device.uptime 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "")
+        if [ -n "$UP" ] && [[ "$UP" =~ ^[0-9]+$ ]]; then
+            echo "$UP"
+        else
+            cut -d. -f1 /proc/uptime 2>/dev/null || echo "0"
+        fi
+        ;;
     ups_status_code)
         # Mapeia o status do UPS: 1=unknown, 2=onLine, 3=onBattery, 4=onBoost, 5=sleeping, 6=onBypass, 7=rebooting
         STATUS=$(upsc "$UPS" ups.status 2>/dev/null | grep -v -E '(Init SSL|^$)' | head -n 1 | tr -d '\r\n' || echo "")
@@ -513,9 +531,11 @@ USERPARAM_CONTENT="# Configuração de Coleta do NUT UPS para Zabbix Agent 7.0
 UserParameter=nut.discovery,${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '' discovery
 UserParameter=nut.all_json[*],${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '\$1' all_json
 UserParameter=nut.get[*],${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '\$1' '\$2' '\$3'
+UserParameter=nut.uptime[*],${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '\$1' uptime
 UserParameter=nut.power_watts[*],${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '\$1' power_watts '\$2'
 UserParameter=nut.load_amps[*],${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '\$1' load_amps '\$2'
 UserParameter=nut.battery_status_code[*],${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '\$1' battery_status_code
+UserParameter=nut.battery_replacement_code[*],${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '\$1' battery_replacement_code
 UserParameter=nut.ups_status_code[*],${ZABBIX_SCRIPTS_DIR}/nut-ups-status.sh '\$1' ups_status_code
 "
 

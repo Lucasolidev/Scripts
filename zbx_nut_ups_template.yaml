@@ -55,6 +55,20 @@ zabbix_export:
       tags:
       - tag: Application
         value: System
+    - uuid: 6c8cc6c1b683454eadcba439aa7869a6
+      name: System Uptime
+      key: nut.uptime[{$UPS_NAME}]
+      history: 7d
+      trends: 180d
+      units: uptime
+      description: 'Bkp
+
+        SNMPv2-MIB::sysUpTime.0
+
+        '
+      tags:
+      - tag: Application
+        value: Status
     - uuid: 965880f9a296497ba1164c6407036f2a
       name: UPS battery capacity (%)
       key: nut.get[{$UPS_NAME},battery.charge]
@@ -206,6 +220,21 @@ zabbix_export:
       tags:
       - tag: Application
         value: Power
+    - uuid: fcc219d69bf54fd5b21c8d406dea2814
+      name: UPS replace battery indicator
+      key: nut.battery_replacement_code[{$UPS_NAME}]
+      history: 7d
+      trends: 180d
+      valuemap:
+        name: apcBatteryReplacementStatus
+      tags:
+      - tag: Application
+        value: Power
+      triggers:
+      - uuid: a87477b99d014ff0bc2ad9e61426ac2a
+        expression: last(/Template Nobreak APC UPS NUT/nut.battery_replacement_code[{$UPS_NAME}])<>1
+        name: Battery Needs Replaced
+        priority: AVERAGE
     - uuid: 2b738df50faa427689f27ff17877b73e
       name: UPS battery time remaining
       key: nut.get[{$UPS_NAME},battery.runtime]
@@ -242,10 +271,6 @@ zabbix_export:
       - uuid: 8681f38a725545b8842169bd9fad3e53
         expression: last(/Template Nobreak APC UPS NUT/nut.battery_status_code[{$UPS_NAME}])=3
         name: The battery power is too low to support the load
-        priority: AVERAGE
-      - uuid: a87477b99d014ff0bc2ad9e61426ac2a
-        expression: last(/Template Nobreak APC UPS NUT/nut.battery_status_code[{$UPS_NAME}])=4
-        name: Battery Needs Replaced
         priority: AVERAGE
     - uuid: 0ce0ea4922e540cba46c07145276adee
       name: UPS Time on Battery
@@ -286,6 +311,13 @@ zabbix_export:
         name: Nobreak Status
         priority: AVERAGE
     valuemaps:
+    - uuid: d97770757c794b818800594c15162652
+      name: apcBatteryReplacementStatus
+      mappings:
+      - value: '1'
+        newvalue: noBatteryNeedsReplacing
+      - value: '2'
+        newvalue: batteryNeedsReplacing
     - uuid: 00aa8b8df74f481e8947d95ab93dbf76
       name: apcBatteryStatus
       mappings:
@@ -295,8 +327,6 @@ zabbix_export:
         newvalue: batteryNormal
       - value: '3'
         newvalue: batteryLow
-      - value: '4'
-        newvalue: batteryInFault
     - uuid: c57440c6f6bd48a5a0f080d304b8c996
       name: apcStatus
       mappings:
@@ -366,7 +396,7 @@ zabbix_export:
       color: 00C800
       item:
         host: Template Nobreak APC UPS NUT
-        key: nut.battery_status_code[{$UPS_NAME}]
+        key: nut.battery_replacement_code[{$UPS_NAME}]
   - uuid: a038bcc748374a0a9aecca854ab94c6d
     name: UPS Capacity
     ymin_type_1: FIXED
