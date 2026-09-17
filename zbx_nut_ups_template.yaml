@@ -17,7 +17,6 @@ zabbix_export:
       history: 7d
       value_type: CHAR
       trends: '0'
-      inventory_link: CONTACT
       tags:
       - tag: Application
         value: System
@@ -28,7 +27,6 @@ zabbix_export:
       history: 7d
       value_type: CHAR
       trends: '0'
-      inventory_link: OS_FULL
       tags:
       - tag: Application
         value: System
@@ -39,7 +37,6 @@ zabbix_export:
       history: 7d
       value_type: CHAR
       trends: '0'
-      inventory_link: LOCATION
       tags:
       - tag: Application
         value: System
@@ -55,7 +52,6 @@ zabbix_export:
         SNMPv2-MIB::sysName.0
 
         '
-      inventory_link: NAME
       tags:
       - tag: Application
         value: System
@@ -118,7 +114,6 @@ zabbix_export:
       history: 7d
       value_type: CHAR
       trends: '0'
-      inventory_link: OS
       tags:
       - tag: Application
         value: System
@@ -129,7 +124,6 @@ zabbix_export:
       history: 7d
       value_type: CHAR
       trends: '0'
-      inventory_link: SERIALNO_A
       tags:
       - tag: Application
         value: System
@@ -273,7 +267,6 @@ zabbix_export:
       history: 7d
       value_type: CHAR
       trends: '0'
-      inventory_link: TYPE
       tags:
       - tag: Application
         value: System
