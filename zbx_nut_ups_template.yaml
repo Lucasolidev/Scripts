@@ -11,7 +11,7 @@ zabbix_export:
         - name: Templates
       items:
         - uuid: 2cc8b43cfeb7429788f6fe3894c8d7bd
-          name: Contact
+          name: 'Contact'
           key: 'nut.get[{$UPS_NAME},device.mfr]'
           delay: 6h
           history: 7d
@@ -115,11 +115,44 @@ zabbix_export:
               name: 'Nobreak Status Não Normal'
               priority: AVERAGE
         - uuid: 243b3f5bdab947fcb207e963013e94bf
-          name: 'UPS status (raw string)'
+          name: 'Fonte de Alimentação / Status NUT (OL=Rede | OB=Bateria)'
           key: 'nut.get[{$UPS_NAME},ups.status]'
           history: 7d
           value_type: CHAR
           trends: '0'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var map = {
+                      'OL': 'Operando na Rede Elétrica (Online)',
+                      'OB': 'Operando na Bateria (Falta de Energia)',
+                      'LB': 'Bateria em Nível Baixo (Crítico)',
+                      'RB': 'Bateria Requer Substituição',
+                      'CHRG': 'Carregando Bateria',
+                      'DISCHRG': 'Descarregando Bateria',
+                      'BYPASS': 'Modo Bypass Ativo',
+                      'CAL': 'Em Calibração de Bateria',
+                      'OFF': 'Nobreak Desligado',
+                      'OVER': 'Sobrecarga Detectada',
+                      'TRIM': 'Atenuando Tensão Alta (Trim)',
+                      'BOOST': 'Elevando Tensão Baixa (Boost)'
+                  };
+                  var clean = value.trim();
+                  var parts = clean.split(/\s+/);
+                  var res = [];
+                  for (var i = 0; i < parts.length; i++) {
+                      res.push(map[parts[i]] || parts[i]);
+                  }
+                  return res.join(' + ') + ' [' + clean + ']';
+          description: |
+            Significado dos códigos de status do NUT:
+            - OL (On Line): Operando alimentado pela rede elétrica da concessionária.
+            - OB (On Battery): Falta de energia. Operando a partir das baterias.
+            - LB (Low Battery): Bateria em nível crítico (próximo do esgotamento).
+            - RB (Replace Battery): Bateria desgastada / precisa ser trocada.
+            - CHRG (Charging): Baterias sendo recarregadas.
+            - BOOST / TRIM: Compensação de flutuação de tensão da rede.
           tags:
             - tag: Application
               value: Status
@@ -249,51 +282,51 @@ zabbix_export:
           name: upsBatteryReplacementStatus
           mappings:
             - value: '1'
-              newvalue: noBatteryNeedsReplacing
+              newvalue: 'Normal / OK (noBatteryNeedsReplacing)'
             - value: '2'
-              newvalue: batteryNeedsReplacing
+              newvalue: 'Troca Necessária (batteryNeedsReplacing)'
         - uuid: 00aa8b8df74f481e8947d95ab93dbf76
           name: upsBatteryStatus
           mappings:
             - value: '1'
-              newvalue: unknown
+              newvalue: 'Desconhecido (unknown)'
             - value: '2'
-              newvalue: batteryNormal
+              newvalue: 'Bateria Normal (batteryNormal)'
             - value: '3'
-              newvalue: batteryLow
+              newvalue: 'Bateria Baixa (batteryLow)'
         - uuid: c57440c6f6bd48a5a0f080d304b8c996
           name: upsStatus
           mappings:
             - value: '1'
-              newvalue: unknown
+              newvalue: 'Desconhecido (unknown)'
             - value: '2'
-              newvalue: onLine
+              newvalue: 'Operando na Rede Elétrica (onLine)'
             - value: '3'
-              newvalue: onBattery
+              newvalue: 'Operando na Bateria (onBattery)'
             - value: '4'
-              newvalue: onSmartBoost
+              newvalue: 'Elevando Tensão Baixa (onSmartBoost)'
             - value: '5'
-              newvalue: timedSleeping
+              newvalue: 'Espera Programada (timedSleeping)'
             - value: '6'
-              newvalue: softwareBypass
+              newvalue: 'Bypass por Software (softwareBypass)'
             - value: '7'
-              newvalue: 'off'
+              newvalue: 'Desligado (off)'
             - value: '8'
-              newvalue: rebooting
+              newvalue: 'Reiniciando (rebooting)'
             - value: '9'
-              newvalue: switchedBypass
+              newvalue: 'Bypass Chaveado (switchedBypass)'
             - value: '10'
-              newvalue: harwareFailureBypass
+              newvalue: 'Falha de Hardware em Bypass (hardwareFailureBypass)'
             - value: '11'
-              newvalue: sleepingUnitPowerReturn
+              newvalue: 'Retorno de Energia (sleepingUnitPowerReturn)'
             - value: '12'
-              newvalue: onSmartTrim
+              newvalue: 'Reduzindo Tensão Alta (onSmartTrim)'
             - value: '13'
-              newvalue: ecoMode
+              newvalue: 'Modo Econômico (ecoMode)'
             - value: '14'
-              newvalue: hotStandby
+              newvalue: 'Espera Ativa (hotStandby)'
             - value: '15'
-              newvalue: onBatteryTest
+              newvalue: 'Teste de Bateria (onBatteryTest)'
       macros:
         - macro: '{$UPS_NAME}'
           value: Cliente_Nobreak
