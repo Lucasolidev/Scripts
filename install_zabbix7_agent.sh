@@ -264,6 +264,9 @@ Timeout=30
 
 # Endereco IP WAN
 UserParameter=net.ipaddress,curl -s -L -k http://www.geset.com.br/suporte/ip.php
+
+### Diretorio de Inclusao de Parametros Customizados ###
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
 EOF
     log_success "Configurações aplicadas em ${ZABBIX_CONF_FILE}."
 else

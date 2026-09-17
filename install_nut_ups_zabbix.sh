@@ -508,12 +508,28 @@ if [ -d "$ZABBIX_AGENT_CONF_DIR" ]; then
     echo "$USERPARAM_CONTENT" > "${ZABBIX_AGENT_CONF_DIR}/userparameter_nut.conf"
     chmod 644 "${ZABBIX_AGENT_CONF_DIR}/userparameter_nut.conf"
     log_success "UserParameters injetados em: ${ZABBIX_AGENT_CONF_DIR}/userparameter_nut.conf"
+
+    # Garante a diretiva Include no zabbix_agentd.conf principal
+    if [ -f /etc/zabbix/zabbix_agentd.conf ]; then
+        if ! grep -q "^Include=.*/zabbix_agentd\.d" /etc/zabbix/zabbix_agentd.conf; then
+            echo "Include=/etc/zabbix/zabbix_agentd.d/*.conf" >> /etc/zabbix/zabbix_agentd.conf
+            log_success "Diretiva Include configurada em /etc/zabbix/zabbix_agentd.conf."
+        fi
+    fi
 fi
 
 if [ -d "$ZABBIX_AGENT2_CONF_DIR" ]; then
     echo "$USERPARAM_CONTENT" > "${ZABBIX_AGENT2_CONF_DIR}/userparameter_nut.conf"
     chmod 644 "${ZABBIX_AGENT2_CONF_DIR}/userparameter_nut.conf"
     log_success "UserParameters injetados em: ${ZABBIX_AGENT2_CONF_DIR}/userparameter_nut.conf"
+
+    # Garante a diretiva Include no zabbix_agent2.conf principal
+    if [ -f /etc/zabbix/zabbix_agent2.conf ]; then
+        if ! grep -q "^Include=.*/zabbix_agent2\.d" /etc/zabbix/zabbix_agent2.conf; then
+            echo "Include=/etc/zabbix/zabbix_agent2.d/*.conf" >> /etc/zabbix/zabbix_agent2.conf
+            log_success "Diretiva Include configurada em /etc/zabbix/zabbix_agent2.conf."
+        fi
+    fi
 fi
 
 # ==============================================================================
