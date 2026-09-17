@@ -11,7 +11,7 @@ zabbix_export:
         - name: Templates
       items:
         - uuid: 2cc8b43cfeb7429788f6fe3894c8d7bd
-          name: 'Contact'
+          name: 'UPS Fabricante'
           key: 'nut.get[{$UPS_NAME},device.mfr]'
           delay: 6h
           history: 7d
@@ -21,7 +21,7 @@ zabbix_export:
             - tag: Application
               value: System
         - uuid: bb4167a492a64090aae98ecb72d1b7f4
-          name: 'Driver Version'
+          name: 'UPS Driver Versão'
           key: 'nut.get[{$UPS_NAME},driver.version]'
           delay: 6h
           history: 7d
@@ -31,7 +31,7 @@ zabbix_export:
             - tag: Application
               value: System
         - uuid: 68f6c06648424374b489224a144dc175
-          name: 'Device Type'
+          name: 'UPS Tipo de Dispositivo'
           key: 'nut.get[{$UPS_NAME},device.type]'
           delay: 6h
           history: 7d
@@ -41,7 +41,7 @@ zabbix_export:
             - tag: Application
               value: System
         - uuid: c7b22775bc7e4db2a0cc62d0235c4a14
-          name: 'Device Model'
+          name: 'UPS Modelo'
           key: 'nut.get[{$UPS_NAME},device.model]'
           delay: 6h
           history: 7d
@@ -51,7 +51,7 @@ zabbix_export:
             - tag: Application
               value: System
         - uuid: 9bb0079b79f448c6900e570f37e7a429
-          name: 'Device Serial Number'
+          name: 'UPS Número de Série'
           key: 'nut.get[{$UPS_NAME},device.serial]'
           delay: 6h
           history: 7d
@@ -61,7 +61,7 @@ zabbix_export:
             - tag: Application
               value: System
         - uuid: 69e95e8d71bf44cbb188c077b6da59fe
-          name: 'Firmware Version'
+          name: 'UPS Firmware Versão'
           key: 'nut.get[{$UPS_NAME},ups.firmware]'
           delay: 6h
           history: 7d
@@ -71,7 +71,7 @@ zabbix_export:
             - tag: Application
               value: System
         - uuid: 0ea4bd016bc84d42b17b85022d4d1310
-          name: 'Manufacture Date'
+          name: 'UPS Data de Fabricação'
           key: 'nut.get[{$UPS_NAME},ups.mfr.date]'
           delay: 6h
           history: 7d
@@ -81,7 +81,7 @@ zabbix_export:
             - tag: Application
               value: System
         - uuid: c0cdc21cfa1048dab815fa5b61222b8f
-          name: 'Beeper Status'
+          name: 'UPS Alarme Sonoro (Beeper)'
           key: 'nut.get[{$UPS_NAME},ups.beeper.status]'
           delay: 1h
           history: 7d
@@ -91,7 +91,7 @@ zabbix_export:
             - tag: Application
               value: System
         - uuid: 6c8cc6c1b683454eadcba439aa7869a6
-          name: 'System Uptime'
+          name: 'UPS Tempo de Atividade (Uptime)'
           key: 'nut.uptime[{$UPS_NAME}]'
           history: 7d
           trends: 180d
@@ -100,7 +100,7 @@ zabbix_export:
             - tag: Application
               value: Status
         - uuid: 6298635faaf946959721e34a6ad25d0b
-          name: 'UPS status'
+          name: 'UPS Status Operacional'
           key: 'nut.ups_status_code[{$UPS_NAME}]'
           history: 7d
           trends: 180d
@@ -112,10 +112,10 @@ zabbix_export:
           triggers:
             - uuid: 8e9093235d6c4864bb318cccf21e442f
               expression: 'last(/Template Nobreak UPS NUT/nut.ups_status_code[{$UPS_NAME}])<>2'
-              name: 'Nobreak Status Não Normal'
+              name: 'UPS Status Operacional Anormal'
               priority: AVERAGE
         - uuid: 243b3f5bdab947fcb207e963013e94bf
-          name: 'Fonte de Alimentação / Status NUT (OL=Rede | OB=Bateria)'
+          name: 'UPS Modo de Operação (Rede / Bateria)'
           key: 'nut.get[{$UPS_NAME},ups.status]'
           history: 7d
           value_type: CHAR
@@ -157,7 +157,7 @@ zabbix_export:
             - tag: Application
               value: Status
         - uuid: fa3cbe58a0884b0f946d549c0d863373
-          name: 'UPS battery status'
+          name: 'UPS Status da Bateria'
           key: 'nut.battery_status_code[{$UPS_NAME}]'
           history: 7d
           trends: 180d
@@ -169,10 +169,10 @@ zabbix_export:
           triggers:
             - uuid: 8681f38a725545b8842169bd9fad3e53
               expression: 'last(/Template Nobreak UPS NUT/nut.battery_status_code[{$UPS_NAME}])=3'
-              name: 'The battery power is too low to support the load'
+              name: 'UPS Bateria Muito Baixa para Suportar a Carga'
               priority: AVERAGE
         - uuid: fcc219d69bf54fd5b21c8d406dea2814
-          name: 'UPS replace battery indicator'
+          name: 'UPS Indicador de Substituição da Bateria'
           key: 'nut.battery_replacement_code[{$UPS_NAME}]'
           history: 7d
           trends: 180d
@@ -184,10 +184,10 @@ zabbix_export:
           triggers:
             - uuid: a87477b99d014ff0bc2ad9e61426ac2a
               expression: 'last(/Template Nobreak UPS NUT/nut.battery_replacement_code[{$UPS_NAME}])<>1'
-              name: 'Battery Needs Replaced'
+              name: 'UPS Bateria Requer Substituição'
               priority: AVERAGE
         - uuid: 965880f9a296497ba1164c6407036f2a
-          name: 'UPS battery capacity (%)'
+          name: 'UPS Capacidade da Bateria (%)'
           key: 'nut.get[{$UPS_NAME},battery.charge]'
           history: 7d
           value_type: FLOAT
@@ -199,14 +199,14 @@ zabbix_export:
           triggers:
             - uuid: 17f65747368b4ecdbd90dba1d34b9491
               expression: 'last(/Template Nobreak UPS NUT/nut.get[{$UPS_NAME},battery.charge])<90'
-              name: 'Batery Capacity <90%'
+              name: 'UPS Capacidade da Bateria Baixa (<90%)'
               priority: AVERAGE
             - uuid: 22e6ace095bf4b609b50f906943cb16c
               expression: 'last(/Template Nobreak UPS NUT/nut.get[{$UPS_NAME},battery.charge])<20'
-              name: 'Battery Capacity Critical <20%'
+              name: 'UPS Capacidade da Bateria Crítica (<20%)'
               priority: DISASTER
         - uuid: 681833070cd347c38dd10d0f1387d9aa
-          name: 'UPS battery capacity low threshold (%)'
+          name: 'UPS Limite Crítico de Bateria (%)'
           key: 'nut.get[{$UPS_NAME},battery.charge.low]'
           delay: 6h
           history: 7d
@@ -217,7 +217,7 @@ zabbix_export:
             - tag: Application
               value: Power
         - uuid: b82d4048047b43fb90d1c9a2a876664c
-          name: 'UPS battery capacity warning threshold (%)'
+          name: 'UPS Limite de Alerta de Bateria (%)'
           key: 'nut.get[{$UPS_NAME},battery.charge.warning]'
           delay: 6h
           history: 7d
@@ -228,7 +228,7 @@ zabbix_export:
             - tag: Application
               value: Power
         - uuid: 2b738df50faa427689f27ff17877b73e
-          name: 'UPS battery time remaining'
+          name: 'UPS Autonomia Restante da Bateria'
           key: 'nut.get[{$UPS_NAME},battery.runtime]'
           history: 7d
           trends: 180d
@@ -237,7 +237,7 @@ zabbix_export:
             - tag: Application
               value: Power
         - uuid: 4288b422170d4fac83b68dc686215e50
-          name: 'UPS battery runtime low threshold'
+          name: 'UPS Limite Crítico de Autonomia'
           key: 'nut.get[{$UPS_NAME},battery.runtime.low]'
           delay: 6h
           history: 7d
@@ -247,7 +247,7 @@ zabbix_export:
             - tag: Application
               value: Power
         - uuid: 804549f6ae33483e931893629e62137c
-          name: 'UPS battery voltage'
+          name: 'UPS Tensão da Bateria'
           key: 'nut.get[{$UPS_NAME},battery.voltage]'
           history: 7d
           value_type: FLOAT
@@ -257,7 +257,7 @@ zabbix_export:
             - tag: Application
               value: Power
         - uuid: a3fedc26d1434551951a6c3c294f39cf
-          name: 'UPS battery voltage nominal'
+          name: 'UPS Tensão Nominal da Bateria'
           key: 'nut.get[{$UPS_NAME},battery.voltage.nominal]'
           delay: 6h
           history: 7d
@@ -268,7 +268,7 @@ zabbix_export:
             - tag: Application
               value: Power
         - uuid: 43a0cb0e4ae44a32a64716ece827dc4d
-          name: 'UPS battery type'
+          name: 'UPS Tipo de Bateria'
           key: 'nut.get[{$UPS_NAME},battery.type]'
           delay: 6h
           history: 7d
@@ -347,7 +347,7 @@ zabbix_export:
         last(/Template Nobreak UPS NUT/nut.ups_status_code[{$UPS_NAME}])=3
         and
         last(/Template Nobreak UPS NUT/nut.get[{$UPS_NAME},battery.charge])>=0
-      name: 'Nobreak on Battery'
+      name: 'UPS em Modo Bateria (Falta de Energia)'
       opdata: 'Status: {ITEM.LASTVALUE1} | Carga Bateria: {ITEM.LASTVALUE2}%'
       priority: HIGH
       description: |
@@ -356,7 +356,7 @@ zabbix_export:
         Nível de Carga da Bateria: {ITEM.LASTVALUE2}%
   graphs:
     - uuid: 5db6eb22e3d44264a26d49b0b1c69cfb
-      name: 'Battery status'
+      name: 'UPS - Status Operacional e Bateria'
       ymin_type_1: FIXED
       graph_items:
         - drawtype: BOLD_LINE
@@ -377,7 +377,7 @@ zabbix_export:
             host: 'Template Nobreak UPS NUT'
             key: 'nut.ups_status_code[{$UPS_NAME}]'
     - uuid: a038bcc748374a0a9aecca854ab94c6d
-      name: 'UPS Capacity'
+      name: 'UPS - Capacidade e Autonomia da Bateria'
       ymin_type_1: FIXED
       graph_items:
         - sortorder: '1'
@@ -394,7 +394,7 @@ zabbix_export:
             host: 'Template Nobreak UPS NUT'
             key: 'nut.get[{$UPS_NAME},battery.runtime]'
     - uuid: f3b9284795f54a9395c3ddd8a1d64a34
-      name: 'UPS Battery Voltage'
+      name: 'UPS - Tensão da Bateria'
       graph_items:
         - color: 0000CC
           item:
