@@ -330,6 +330,13 @@ zabbix_export:
         newvalue: hotStandby
       - value: '15'
         newvalue: onBatteryTest
+    macros:
+    - macro: '{$UPS_NAME}'
+      value: Cliente_Nobreak
+      description: 'Nome do nobreak configurado no /etc/nut/ups.conf'
+    - macro: '{$UPS_NOMINAL_POWER}'
+      value: '2200'
+      description: 'Potência nominal do equipamento em Watts para cálculo de carga e corrente'
     description: Monitoramento universal de nobreaks APC e compativeis com NUT via Zabbix Agent 7.0.
   triggers:
   - uuid: 38a64681ba904f25be3f1397e08dc6e0
