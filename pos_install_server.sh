@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.1
+# Version: 2.2
 # ------------------------------------------------
-VERSION="2.1"
+VERSION="2.2"
 # ==============================================================================
 # SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
 # ==============================================================================
@@ -20,7 +20,7 @@ VERSION="2.1"
 # 11. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
 # 12. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH (22/tcp) e Zabbix Agent (10050/tcp).
 # 13. Configura e personaliza o editor Vim com tema Sonokai, Airline e plugins com suporte multi-usuário (/root, /etc/skel, /home).
-# 14. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, IP, Uptime, RAM e Disco.
+# 14. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, Uptime, RAM, Discos, IPs e Status do Firewall UFW.
 # 15. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 # Execução recomendada (copiar e colar comando único):
@@ -711,6 +711,18 @@ if [ -n "$PS1" ]; then
     IP_FALLBACK=$(hostname -I 2>/dev/null | awk '{print $1}')
     printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "IP Local:" "${IP_FALLBACK:-N/A}"
   fi
+
+  # Status do Firewall UFW
+  if command -v ufw >/dev/null 2>&1; then
+    if ufw status 2>/dev/null | grep -qi "^Status:[[:space:]]*active"; then
+      UFW_STATUS_TXT="\033[1;32mAtivo\033[0m"
+    else
+      UFW_STATUS_TXT="\033[1;33mInativo\033[0m"
+    fi
+  else
+    UFW_STATUS_TXT="\033[1;33mNão Instalado\033[0m"
+  fi
+  printf "     \033[1m%-18s\033[0m %b\n" "Firewall UFW:" "${UFW_STATUS_TXT}"
 
   echo -e "\033[1;36m================================================================\033[0m\n"
 fi
