@@ -713,12 +713,10 @@ if [ -n "$PS1" ]; then
   fi
 
   # Status do Firewall UFW
-  if command -v ufw >/dev/null 2>&1; then
-    if ufw status 2>/dev/null | grep -qi "^Status:[[:space:]]*active"; then
-      UFW_STATUS_TXT="\033[1;32mAtivo\033[0m"
-    else
-      UFW_STATUS_TXT="\033[1;33mInativo\033[0m"
-    fi
+  if (grep -qs -i "^ENABLED=yes" /etc/ufw/ufw.conf 2>/dev/null && systemctl is-active --quiet ufw 2>/dev/null) || (ufw status 2>/dev/null | grep -qi "^Status:[[:space:]]*active"); then
+    UFW_STATUS_TXT="\033[1;32mAtivo\033[0m"
+  elif command -v ufw >/dev/null 2>&1; then
+    UFW_STATUS_TXT="\033[1;33mInativo\033[0m"
   else
     UFW_STATUS_TXT="\033[1;33mNão Instalado\033[0m"
   fi
