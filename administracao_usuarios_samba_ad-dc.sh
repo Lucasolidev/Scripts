@@ -1,15 +1,16 @@
 #!/bin/bash
-# ------------------------------------------------
-# Version: 1.0
-# ------------------------------------------------
-VERSION="1.0"
 # ==============================================================================
-# Administracao de Usuarios Samba AD
+# Script: administracao_usuarios_samba_ad-dc.sh
+# Descrição: Interface interativa para administração de usuários e computadores no Samba 4 AD DC
+# Autor: Lucas Oliveira
+# Repositório: https://github.com/Lucasolidev/Scripts
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/administracao_usuarios_samba_ad-dc.sh -O administracao_usuarios_samba_ad-dc.sh && sudo chmod +x administracao_usuarios_samba_ad-dc.sh && sudo ./administracao_usuarios_samba_ad-dc.sh
 # ==============================================================================
 # RESUMO DO SCRIPT:
 # Este script fornece uma interface interativa via terminal para facilitar a 
 # administração de um domínio Active Directory provido pelo Samba 4 (AD DC). 
-# Ele automatiza tarefas complexas com ldbmodify e samba-tool, incluindo:
+# Ele automatiza tarefas com ldbmodify e samba-tool, incluindo:
 # - Criação de usuários completos com atributos POSIX (UID, GID, loginShell).
 # - Criação e aplicação de permissões (chown/chmod) no diretório home do usuário.
 # - Correção de usuários antigos para injetar os atributos POSIX faltantes.
@@ -21,9 +22,13 @@ VERSION="1.0"
 # Domain Controller (AD DC). Se o seu servidor for apenas um servidor de arquivos 
 # comum (Standalone Server), o script não vai funcionar porque os comandos 
 # 'samba-tool user' não existem nesse modo.
-# Execução recomendada (copiar e colar comando único):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/administracao_usuarios_samba_ad-dc.sh -O administracao_usuarios_samba_ad-dc.sh && chmod +x administracao_usuarios_samba_ad-dc.sh && sudo ./administracao_usuarios_samba_ad-dc.sh
 # ==============================================================================
+
+set -Eeuo pipefail
+umask 077
+
+VERSION="1.0"
+export VERSION
 
 # --- Configurações ESPECÍFICAS (ALTERAR ANTES DE USAR) ---
 # ATENÇÃO: Revise estas variáveis para adequar à infraestrutura do seu servidor.
@@ -45,7 +50,6 @@ FG_CYAN="\033[36m"
 FG_YELLOW="\033[33m"
 FG_GREEN="\033[32m"
 FG_RED="\033[31m"
-FG_WHITE="\033[37m"
 ARROW="❯"
 
 # --- Funções Auxiliares de Visual ---
@@ -68,16 +72,17 @@ print_alert_box() {
 }
 
 # --- Obter informações do domínio dinamicamente ---
-DOMAIN_DN=$(sudo ldbsearch -H "$SAM_LDB" -b "" -s base defaultNamingContext 2>/dev/null | grep defaultNamingContext | awk '{print $2}')
+DOMAIN_DN=$(sudo ldbsearch -H "$SAM_LDB" -b "" -s base defaultNamingContext 2>/dev/null | awk -F': ' '/^defaultNamingContext: / {print $2}' | xargs || true)
 if [ -z "$DOMAIN_DN" ]; then
     log_error "Não foi possível determinar o DN do domínio a partir de $SAM_LDB."
     exit 1
 fi
+
 # ATENÇÃO: Altere a estrutura de OUs abaixo para corresponder à árvore do seu AD.
 # Por exemplo, se seus usuários ficam na OU TI, dentro da OU Colaboradores, use:
 # TARGET_OU="OU=TI,OU=Colaboradores,$DOMAIN_DN"
 TARGET_OU="OU=Users,$DOMAIN_DN" 
-WORKGROUP=$(sudo samba-tool testparm --suppress-prompt 2>/dev/null | grep 'workgroup =' | awk '{print $3}')
+WORKGROUP=$(sudo samba-tool testparm --suppress-prompt 2>/dev/null | awk -F'=' '/workgroup/ {print $2}' | xargs || true)
 if [ -z "$WORKGROUP" ]; then
     log_error "Não foi possível determinar o nome do Workgroup (NetBIOS) do smb.conf."
     exit 1
@@ -87,7 +92,7 @@ fi
 func_get_user_dn() {
     local username_to_check="$1"
     local user_dn
-    user_dn=$(sudo ldbsearch -H "$SAM_LDB" "sAMAccountName=$username_to_check" dn 2>/dev/null | awk -F': ' '/^dn: / {print $2}' | xargs)
+    user_dn=$(sudo ldbsearch -H "$SAM_LDB" "sAMAccountName=$username_to_check" dn 2>/dev/null | awk -F': ' '/^dn: / {print $2}' | xargs || true)
     echo "$user_dn"
 }
 
@@ -113,15 +118,15 @@ while true; do
     draw_separator
     echo -e "  10. Sair"
     draw_separator
-    read -p "  ${FG_YELLOW}${ARROW} Escolha uma opção [1-10]: ${NC}" choice
+    read -r -p "  ${FG_YELLOW}${ARROW} Escolha uma opção [1-10]: ${NC}" choice || true
 
     case "$choice" in
         1 | 2)
             echo -e "\n  ${FG_CYAN}${BOLD}=== COLETA DE PARÂMETROS ===${NC}"
-            read -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário (ex: joao.silva): ${NC}" USERNAME
+            read -r -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário (ex: joao.silva): ${NC}" USERNAME || true
             if [ -z "$USERNAME" ]; then
                 log_error "Nome de login não pode ser vazio."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
 
@@ -129,22 +134,22 @@ while true; do
             if [ -n "$USER_DN_CHECK" ]; then
                 log_error "O usuário '$USERNAME' já existe no domínio (DN: $USER_DN_CHECK)."
                 log_warning "Ação cancelada. Use a Opção 6 para corrigir usuários existentes."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
             
             log_info "Usuário '$USERNAME' não encontrado. Prosseguindo com a coleta..."
-            read -p "  ${FG_YELLOW}${ARROW} Digite o nome completo do usuário (ex: João da Silva): ${NC}" FULLNAME
+            read -r -p "  ${FG_YELLOW}${ARROW} Digite o nome completo do usuário (ex: João da Silva): ${NC}" FULLNAME || true
             if [ -z "$FULLNAME" ]; then
                 log_error "Nome completo não pode ser vazio."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
 
             while true; do
-                read -sp "  ${FG_YELLOW}${ARROW} Digite a senha para o usuário '$USERNAME': ${NC}" PASSWORD
+                read -r -sp "  ${FG_YELLOW}${ARROW} Digite a senha para o usuário '$USERNAME': ${NC}" PASSWORD || true
                 echo
-                read -sp "  ${FG_YELLOW}${ARROW} Confirme a senha: ${NC}" PASSWORD_CONFIRM
+                read -r -sp "  ${FG_YELLOW}${ARROW} Confirme a senha: ${NC}" PASSWORD_CONFIRM || true
                 echo
                 [ "$PASSWORD" = "$PASSWORD_CONFIRM" ] && [ -n "$PASSWORD" ] && break
                 log_warning "Senhas não conferem ou estão vazias. Tente novamente."
@@ -154,7 +159,7 @@ while true; do
             log_info "Criando usuário '$USERNAME' no container padrão..."
             if ! sudo samba-tool user create "$USERNAME" "$PASSWORD" > /dev/null 2>&1; then
                 log_error "Falha ao criar o usuário '$USERNAME' no AD."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
             log_success "Usuário criado no container padrão."
@@ -163,8 +168,8 @@ while true; do
             if ! sudo samba-tool user move "$USERNAME" "$TARGET_OU" > /dev/null 2>&1; then
                 log_error "Falha ao mover o usuário '$USERNAME'."
                 log_warning "Tentando remover o usuário '$USERNAME' para limpeza..."
-                sudo samba-tool user delete "$USERNAME" > /dev/null 2>&1
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                sudo samba-tool user delete "$USERNAME" > /dev/null 2>&1 || true
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
             log_success "Usuário movido para a OU alvo."
@@ -172,21 +177,21 @@ while true; do
 
             log_info "Renomeando CN do usuário para '$FULLNAME'..."
             LDIF_RENAME_FILE="/tmp/rename_cn_${USERNAME}.ldif"
-            cat << EOF > $LDIF_RENAME_FILE
+            cat << EOF > "$LDIF_RENAME_FILE"
 dn: $USER_DN_BEFORE_RENAME
 changetype: modrdn
 newrdn: CN=$FULLNAME
 deleteoldrdn: 1
 EOF
-            LDIF_OUTPUT=$(sudo ldbmodify -H "$SAM_LDB" $LDIF_RENAME_FILE 2>&1)
-            if [ $? -ne 0 ] || [[ "$LDIF_OUTPUT" == *"Error:"* ]] || [[ "$LDIF_OUTPUT" == *"ERR:"* ]] || [[ "$LDIF_OUTPUT" == *"failed"* ]]; then
+            LDIF_OUTPUT=$(sudo ldbmodify -H "$SAM_LDB" "$LDIF_RENAME_FILE" 2>&1 || true)
+            if [[ "$LDIF_OUTPUT" == *"Error:"* || "$LDIF_OUTPUT" == *"ERR:"* || "$LDIF_OUTPUT" == *"failed"* ]]; then
                 log_error "Falha ao renomear o CN do usuário para '$FULLNAME'."
                 log_error "Saída do LDB: $LDIF_OUTPUT"
-                rm -f $LDIF_RENAME_FILE
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                rm -f "$LDIF_RENAME_FILE"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
-            rm -f $LDIF_RENAME_FILE
+            rm -f "$LDIF_RENAME_FILE"
             USER_DN_FINAL="CN=$FULLNAME,$TARGET_OU"
             log_success "CN renomeado. DN final: $USER_DN_FINAL"
 
@@ -194,7 +199,7 @@ EOF
             GIVEN_NAME=$(echo "$FULLNAME" | awk '{print $1}')
             SURNAME=$(echo "$FULLNAME" | cut -d' ' -f2-)
             LDIF_NAME_FILE="/tmp/set_name_${USERNAME}.ldif"
-            cat << EOF > $LDIF_NAME_FILE
+            cat << EOF > "$LDIF_NAME_FILE"
 dn: $USER_DN_FINAL 
 changetype: modify
 replace: displayName
@@ -206,21 +211,21 @@ givenName: $GIVEN_NAME
 replace: sn
 sn: $SURNAME
 EOF
-            LDIF_OUTPUT=$(sudo ldbmodify -H "$SAM_LDB" $LDIF_NAME_FILE 2>&1)
-            if [ $? -ne 0 ] || [[ "$LDIF_OUTPUT" == *"Error:"* ]] || [[ "$LDIF_OUTPUT" == *"ERR:"* ]] || [[ "$LDIF_OUTPUT" == *"failed"* ]]; then
+            LDIF_OUTPUT=$(sudo ldbmodify -H "$SAM_LDB" "$LDIF_NAME_FILE" 2>&1 || true)
+            if [[ "$LDIF_OUTPUT" == *"Error:"* || "$LDIF_OUTPUT" == *"ERR:"* || "$LDIF_OUTPUT" == *"failed"* ]]; then
                 log_error "Falha ao definir atributos de nome para '$USERNAME'."
                 log_error "Saída do LDB: $LDIF_OUTPUT"
                 log_warning "Tentando remover o usuário '$USERNAME' para limpeza..."
-                sudo samba-tool user delete "$USERNAME" > /dev/null 2>&1
-                rm -f $LDIF_NAME_FILE
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                sudo samba-tool user delete "$USERNAME" > /dev/null 2>&1 || true
+                rm -f "$LDIF_NAME_FILE"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
-            rm -f $LDIF_NAME_FILE
+            rm -f "$LDIF_NAME_FILE"
             log_success "Atributos de nome definidos."
             
             log_info "Determinando o próximo UID disponível (a partir de $BASE_UID)..."
-            LAST_UID=$(sudo ldbsearch -H "$SAM_LDB" '(uidNumber=*)' uidNumber --sorted 2>/dev/null | grep uidNumber | awk '{print $2}' | sort -n | tail -n 1)
+            LAST_UID=$(sudo ldbsearch -H "$SAM_LDB" '(uidNumber=*)' uidNumber --sorted 2>/dev/null | grep uidNumber | awk '{print $2}' | sort -n | tail -n 1 || true)
             if [ -z "$LAST_UID" ] || [ "$LAST_UID" -lt "$BASE_UID" ]; then
                 NEXT_UID=$BASE_UID
             else
@@ -235,7 +240,7 @@ EOF
 
             log_info "Atribuindo atributos POSIX para '$USERNAME'..."
             LDIF_POSIX_FILE="/tmp/set_posix_${USERNAME}.ldif"
-            cat << EOF > $LDIF_POSIX_FILE
+            cat << EOF > "$LDIF_POSIX_FILE"
 dn: $USER_DN_FINAL 
 changetype: modify
 replace: uidNumber
@@ -250,48 +255,47 @@ loginShell: $DEFAULT_SHELL
 replace: unixHomeDirectory
 unixHomeDirectory: $HOME_DIR_TEMPLATE
 EOF
-            LDIF_OUTPUT=$(sudo ldbmodify -H "$SAM_LDB" $LDIF_POSIX_FILE 2>&1)
-            if [ $? -ne 0 ] || [[ "$LDIF_OUTPUT" == *"Error:"* ]] || [[ "$LDIF_OUTPUT" == *"ERR:"* ]] || [[ "$LDIF_OUTPUT" == *"failed"* ]]; then
+            LDIF_OUTPUT=$(sudo ldbmodify -H "$SAM_LDB" "$LDIF_POSIX_FILE" 2>&1 || true)
+            if [[ "$LDIF_OUTPUT" == *"Error:"* || "$LDIF_OUTPUT" == *"ERR:"* || "$LDIF_OUTPUT" == *"failed"* ]]; then
                 log_error "Falha ao aplicar atributos POSIX para '$USERNAME'."
                 log_error "Saída do LDB: $LDIF_OUTPUT"
                 log_warning "Tentando remover o usuário '$USERNAME' para limpeza..."
-                sudo samba-tool user delete "$USERNAME" > /dev/null 2>&1
-                rm -f $LDIF_POSIX_FILE
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                sudo samba-tool user delete "$USERNAME" > /dev/null 2>&1 || true
+                rm -f "$LDIF_POSIX_FILE"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
-            rm -f $LDIF_POSIX_FILE
+            rm -f "$LDIF_POSIX_FILE"
             log_success "Atributos POSIX definidos com sucesso."
 
             if [ "$choice" = "1" ]; then
                 USER_HOME_PATH="$HOME_BASE/$USERNAME"
                 log_info "Verificando/Criando diretório home físico em $USER_HOME_PATH..."
                 if [ ! -d "$USER_HOME_PATH" ]; then
-                    sudo mkdir -p "$USER_HOME_PATH"
-                    if [ $? -ne 0 ]; then
+                    if ! sudo mkdir -p "$USER_HOME_PATH"; then
                         log_error "Falha ao criar o diretório $USER_HOME_PATH."
                         log_warning "O usuário '$USERNAME' foi criado, mas a pasta home falhou."
-                        read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                        read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                         continue
                     fi
                 fi
                 
                 QUALIFIED_USERNAME="${WORKGROUP}\\${USERNAME}"
                 log_info "Definindo proprietário ($USER_UID:$PRIMARY_LINUX_GROUP) e permissões (2770) para $USER_HOME_PATH..."
-                sudo net cache flush 2>/dev/null
+                sudo net cache flush 2>/dev/null || true
                 sleep 1 
                 
                 if ! sudo chown "$QUALIFIED_USERNAME":"${WORKGROUP}\\Domain Users" "$USER_HOME_PATH" 2>/dev/null || ! sudo chmod 700 "$USER_HOME_PATH" 2>/dev/null; then
                     log_warning "Falha ao usar '$QUALIFIED_USERNAME' para chown. Tentando com UID numérico '$USER_UID'..."
                     if ! sudo chown "$USER_UID:$PRIMARY_LINUX_GROUP" "$USER_HOME_PATH" 2>/dev/null; then
                       log_error "Falha ao definir o proprietário/grupo para $USER_HOME_PATH."
-                      read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                      read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                       continue
                     fi
                 fi
                 if ! sudo chmod 2770 "$USER_HOME_PATH" 2>/dev/null; then
                      log_error "Falha ao definir permissões para $USER_HOME_PATH."
-                     read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                     read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                      continue
                 fi
                 log_success "Permissões do diretório home definidas."
@@ -329,7 +333,7 @@ EOF
             
         5)
             echo -e "\n  ${FG_CYAN}${BOLD}=== COLETA DE PARÂMETROS ===${NC}"
-            read -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário a consultar: ${NC}" USERNAME
+            read -r -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário a consultar: ${NC}" USERNAME || true
             if [ -z "$USERNAME" ]; then
                 log_error "Nome de login não pode ser vazio."
             else
@@ -344,10 +348,10 @@ EOF
 
         6)
             echo -e "\n  ${FG_CYAN}${BOLD}=== COLETA DE PARÂMETROS ===${NC}"
-            read -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário a CORRIGIR: ${NC}" USERNAME
+            read -r -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário a CORRIGIR: ${NC}" USERNAME || true
             if [ -z "$USERNAME" ]; then
                 log_error "Nome de login não pode ser vazio."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
             
@@ -356,7 +360,7 @@ EOF
             if [ -z "$USER_DN_FINAL" ]; then
                 log_error "O usuário '$USERNAME' não foi encontrado no domínio."
                 log_warning "Ação cancelada. Use a Opção 1 para criar."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
             
@@ -366,7 +370,7 @@ EOF
               sudo samba-tool group addmembers usuarios "$USERNAME" >/dev/null 2>&1 || true
             fi
             
-            USER_UID=$(sudo ldbsearch -H "$SAM_LDB" -b "$USER_DN_FINAL" '(objectClass=user)' uidNumber 2>/dev/null | grep uidNumber | awk '{print $2}')
+            USER_UID=$(sudo ldbsearch -H "$SAM_LDB" -b "$USER_DN_FINAL" '(objectClass=user)' uidNumber 2>/dev/null | grep uidNumber | awk '{print $2}' || true)
             
             if [ -n "$USER_UID" ]; then
                 log_warning "Usuário '$USERNAME' já possui uidNumber ($USER_UID). Pulando adição de POSIX."
@@ -374,7 +378,7 @@ EOF
                 log_info "Atributos POSIX não encontrados. Adicionando..."
                 
                 log_info "Determinando o próximo UID disponível (a partir de $BASE_UID)..."
-                LAST_UID=$(sudo ldbsearch -H "$SAM_LDB" '(uidNumber=*)' uidNumber --sorted 2>/dev/null | grep uidNumber | awk '{print $2}' | sort -n | tail -n 1)
+                LAST_UID=$(sudo ldbsearch -H "$SAM_LDB" '(uidNumber=*)' uidNumber --sorted 2>/dev/null | grep uidNumber | awk '{print $2}' | sort -n | tail -n 1 || true)
                 if [ -z "$LAST_UID" ] || [ "$LAST_UID" -lt "$BASE_UID" ]; then
                     NEXT_UID=$BASE_UID
                 else
@@ -388,7 +392,7 @@ EOF
                 USER_UID=$NEXT_UID 
                 
                 LDIF_POSIX_FILE="/tmp/set_posix_${USERNAME}.ldif"
-                cat << EOF > $LDIF_POSIX_FILE
+                cat << EOF > "$LDIF_POSIX_FILE"
 dn: $USER_DN_FINAL 
 changetype: modify
 replace: uidNumber
@@ -403,25 +407,24 @@ loginShell: $DEFAULT_SHELL
 replace: unixHomeDirectory
 unixHomeDirectory: $HOME_DIR_TEMPLATE
 EOF
-                LDIF_OUTPUT=$(sudo ldbmodify -H "$SAM_LDB" $LDIF_POSIX_FILE 2>&1)
-                if [ $? -ne 0 ] || [[ "$LDIF_OUTPUT" == *"Error:"* ]] || [[ "$LDIF_OUTPUT" == *"ERR:"* ]] || [[ "$LDIF_OUTPUT" == *"failed"* ]]; then
+                LDIF_OUTPUT=$(sudo ldbmodify -H "$SAM_LDB" "$LDIF_POSIX_FILE" 2>&1 || true)
+                if [[ "$LDIF_OUTPUT" == *"Error:"* || "$LDIF_OUTPUT" == *"ERR:"* || "$LDIF_OUTPUT" == *"failed"* ]]; then
                     log_error "Falha ao aplicar atributos POSIX para '$USERNAME'."
                     log_error "Saída do LDB: $LDIF_OUTPUT"
-                    rm -f $LDIF_POSIX_FILE
-                    read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                    rm -f "$LDIF_POSIX_FILE"
+                    read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                     continue
                 fi
-                rm -f $LDIF_POSIX_FILE
+                rm -f "$LDIF_POSIX_FILE"
                 log_success "Atributos POSIX definidos com sucesso."
             fi
             
             USER_HOME_PATH="$HOME_BASE/$USERNAME"
             log_info "Verificando/Criando diretório home físico em $USER_HOME_PATH..."
             if [ ! -d "$USER_HOME_PATH" ]; then
-                sudo mkdir -p "$USER_HOME_PATH"
-                if [ $? -ne 0 ]; then
+                if ! sudo mkdir -p "$USER_HOME_PATH"; then
                     log_error "Falha ao criar o diretório $USER_HOME_PATH."
-                    read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                    read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                     continue
                 fi
             else
@@ -430,26 +433,26 @@ EOF
             
             QUALIFIED_USERNAME="${WORKGROUP}\\${USERNAME}"
             log_info "Definindo proprietário ($USER_UID:$PRIMARY_LINUX_GROUP) e permissões (2770) para $USER_HOME_PATH..."
-            sudo net cache flush 2>/dev/null
+            sudo net cache flush 2>/dev/null || true
             sleep 1 
             
             if ! sudo chown "$QUALIFIED_USERNAME":"${WORKGROUP}\\Domain Users" "$USER_HOME_PATH" 2>/dev/null || ! sudo chmod 700 "$USER_HOME_PATH" 2>/dev/null; then
                 log_warning "Falha ao usar '$QUALIFIED_USERNAME'. Tentando com UID numérico '$USER_UID'..."
                 if [ -z "$USER_UID" ]; then
                      log_error "Não foi possível determinar o UID para o chown."
-                     read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                     read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                      continue
                 fi
                 if ! sudo chown "$USER_UID:$PRIMARY_LINUX_GROUP" "$USER_HOME_PATH" 2>/dev/null; then
                   log_error "Falha ao definir o proprietário/grupo para $USER_HOME_PATH."
-                  read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                  read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                   continue
                 fi
             fi
             
             if ! sudo chmod 2770 "$USER_HOME_PATH" 2>/dev/null; then
                  log_error "Falha ao definir permissões para $USER_HOME_PATH."
-                 read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                 read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                  continue
             fi
             
@@ -462,10 +465,10 @@ EOF
 
         7)
             echo -e "\n  ${FG_CYAN}${BOLD}=== COLETA DE PARÂMETROS ===${NC}"
-            read -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário a EXCLUIR: ${NC}" USERNAME
+            read -r -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário a EXCLUIR: ${NC}" USERNAME || true
             if [ -z "$USERNAME" ]; then
                 log_error "Nome de login não pode ser vazio."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
 
@@ -473,16 +476,16 @@ EOF
             if [ -z "$USER_DN_CHECK" ]; then
                 log_error "O usuário '$USERNAME' não foi encontrado no domínio."
                 log_warning "Ação cancelada."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
 
             print_alert_box "TEM CERTEZA que deseja excluir permanentemente o usuário '$USERNAME' (DN: $USER_DN_CHECK)?\nA pasta home será MANTIDA."
-            read -p "  ${FG_YELLOW}${ARROW} Confirmar [s/N]: ${NC}" confirm
+            read -r -p "  ${FG_YELLOW}${ARROW} Confirmar [s/N]: ${NC}" confirm || true
             
             if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
                 log_warning "Exclusão cancelada."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
             
@@ -502,10 +505,10 @@ EOF
             
         8)
             echo -e "\n  ${FG_CYAN}${BOLD}=== COLETA DE PARÂMETROS ===${NC}"
-            read -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário a EXCLUIR: ${NC}" USERNAME
+            read -r -p "  ${FG_YELLOW}${ARROW} Digite o nome de login do usuário a EXCLUIR: ${NC}" USERNAME || true
             if [ -z "$USERNAME" ]; then
                 log_error "Nome de login não pode ser vazio."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
 
@@ -513,16 +516,16 @@ EOF
             if [ -z "$USER_DN_CHECK" ]; then
                 log_error "O usuário '$USERNAME' não foi encontrado no domínio."
                 log_warning "Ação cancelada."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
 
             print_alert_box "TEM CERTEZA que deseja excluir permanentemente o usuário '$USERNAME' (DN: $USER_DN_CHECK)?"
-            read -p "  ${FG_YELLOW}${ARROW} Confirmar [s/N]: ${NC}" confirm
+            read -r -p "  ${FG_YELLOW}${ARROW} Confirmar [s/N]: ${NC}" confirm || true
             
             if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
                 log_warning "Exclusão cancelada."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
             
@@ -539,7 +542,7 @@ EOF
                 log_info "Pasta home encontrada em $USER_HOME_PATH."
                 
                 print_alert_box "Deseja excluir permanentemente a pasta home $USER_HOME_PATH?"
-                read -p "  ${FG_YELLOW}${ARROW} Confirmar [s/N]: ${NC}" confirm_home
+                read -r -p "  ${FG_YELLOW}${ARROW} Confirmar [s/N]: ${NC}" confirm_home || true
                 
                 if [[ "$confirm_home" == "s" || "$confirm_home" == "S" ]]; then
                     log_info "Excluindo pasta home $USER_HOME_PATH..."
@@ -562,10 +565,10 @@ EOF
 
         9)
             echo -e "\n  ${FG_CYAN}${BOLD}=== COLETA DE PARÂMETROS ===${NC}"
-            read -p "  ${FG_YELLOW}${ARROW} Digite o nome do computador a EXCLUIR (ex: ESTACAO-01): ${NC}" COMP_NAME
+            read -r -p "  ${FG_YELLOW}${ARROW} Digite o nome do computador a EXCLUIR (ex: ESTACAO-01): ${NC}" COMP_NAME || true
             if [ -z "$COMP_NAME" ]; then
                 log_error "Nome do computador não pode ser vazio."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
             
@@ -575,11 +578,11 @@ EOF
             fi
 
             print_alert_box "TEM CERTEZA que deseja excluir permanentemente o computador '$COMP_NAME' do domínio?"
-            read -p "  ${FG_YELLOW}${ARROW} Confirmar [s/N]: ${NC}" confirm
+            read -r -p "  ${FG_YELLOW}${ARROW} Confirmar [s/N]: ${NC}" confirm || true
             
             if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
                 log_warning "Exclusão cancelada."
-                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}"
+                read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para continuar... ${NC}" _
                 continue
             fi
 
@@ -608,7 +611,7 @@ EOF
 
     if [ "$choice" != "10" ]; then
         echo ""
-        read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para voltar ao menu... ${NC}"
+        read -r -p "  ${FG_YELLOW}${ARROW} Pressione [Enter] para voltar ao menu... ${NC}" _
     fi
 done
 

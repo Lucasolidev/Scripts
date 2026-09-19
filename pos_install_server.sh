@@ -1,10 +1,11 @@
 #!/bin/bash
-# ------------------------------------------------
-# Version: 2.2
-# ------------------------------------------------
-VERSION="2.2"
 # ==============================================================================
-# SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU SERVER
+# Script: pos_install_server.sh
+# Descrição: Pós-instalação, hardening e segurança automatizada para Ubuntu Server
+# Autor: Lucas Oliveira
+# Repositório: https://github.com/Lucasolidev/Scripts
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/pos_install_server.sh -O pos_install_server.sh && sudo chmod +x pos_install_server.sh && sudo ./pos_install_server.sh
 # ==============================================================================
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (exige Root/Sudo) e captura logs de auditoria em /root e na Home.
@@ -23,10 +24,12 @@ VERSION="2.2"
 # 14. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, Uptime, RAM, Discos, IPs e Status do Firewall UFW.
 # 15. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
-# Execução recomendada (copiar e colar comando único):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh -O pos_install_server.sh && chmod +x pos_install_server.sh && sudo ./pos_install_server.sh
-# ==============================================================================
 
+set -Eeuo pipefail
+umask 077
+
+VERSION="2.2"
+export VERSION
 export DEBIAN_FRONTEND=noninteractive
 
 # ==========================================
@@ -35,17 +38,12 @@ export DEBIAN_FRONTEND=noninteractive
 NC='\033[0m'              # Reset (Sem Cor)
 BOLD='\033[1m'
 DIM='\033[2m'
-UNDERLINE='\033[4m'
 
 # Cores de Fonte (Foreground)
-FG_BLACK='\033[30m'
 FG_RED='\033[31m'
 FG_GREEN='\033[32m'
 FG_YELLOW='\033[33m'
-FG_BLUE='\033[34m'
-FG_MAGENTA='\033[35m'
 FG_CYAN='\033[36m'
-FG_WHITE='\033[37m'
 
 # Símbolos Customizados
 ARROW="❯"
@@ -144,30 +142,31 @@ echo -e "${FG_CYAN}${BOLD}======================================================
 LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
 LOG_FILENAME="relatorio_pos_install_server_${LOG_TIMESTAMP}.log"
 LOG_LATEST="relatorio_pos_install_server_latest.log"
-LOG_TMP="/tmp/${LOG_FILENAME}"
+LOG_DIR=$(mktemp -d -p /tmp pos_install_server.XXXXXX)
+LOG_FILE="${LOG_DIR}/${LOG_FILENAME}"
 
 # Redireciona a saída do script para o terminal e grava no log simultaneamente
-exec > >(tee -a "$LOG_TMP") 2>&1
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 print_header "COLETA DE PARÂMETROS"
 
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/N): ${NC}")" PERMITIR_ROOT_SSH
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja habilitar o Firewall UFW? (S/n): ${NC}")" HABILITAR_UFW
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja atualizar o sistema (apt update e upgrade)? (s/N): ${NC}")" EXEC_UPDATE || true
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja permitir o login de ROOT via SSH? (s/N): ${NC}")" PERMITIR_ROOT_SSH || true
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja habilitar o Firewall UFW? (S/n): ${NC}")" HABILITAR_UFW || true
 HABILITAR_UFW=${HABILITAR_UFW:-S}
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset' (sudo)? (s/N): ${NC}")" CRIAR_GESET
-read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN || true
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset' (sudo)? (s/N): ${NC}")" CRIAR_GESET || true
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO || true
 
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
-  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do GRUPO que deseja criar (ex: TI, DEV, SUPORTE): ${NC}")" NOME_GRUPO
-  while [ -z "$NOME_GRUPO" ]; do
-    read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do grupo não pode ser vazio. Digite novamente: ${NC}")" NOME_GRUPO
+  read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do GRUPO que deseja criar (ex: TI, DEV, SUPORTE): ${NC}")" NOME_GRUPO || true
+  while [ -z "${NOME_GRUPO:-}" ]; do
+    read -r -p "$(echo -e "  ${FG_RED}${ARROW} O nome do grupo não pode ser vazio. Digite novamente: ${NC}")" NOME_GRUPO || true
   done
 
-  read -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do novo usuário para o grupo ${BOLD}$NOME_GRUPO${NC}${FG_YELLOW}: ${NC}")" NOVO_USER
-  while [ -z "$NOVO_USER" ]; do
-    read -p "$(echo -e "  ${FG_RED}${ARROW} O nome do usuário não pode ser vazio. Digite novamente: ${NC}")" NOVO_USER
+  read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do novo usuário para o grupo ${BOLD}$NOME_GRUPO${NC}${FG_YELLOW}: ${NC}")" NOVO_USER || true
+  while [ -z "${NOVO_USER:-}" ]; do
+    read -r -p "$(echo -e "  ${FG_RED}${ARROW} O nome do usuário não pode ser vazio. Digite novamente: ${NC}")" NOVO_USER || true
   done
 fi
 
@@ -818,23 +817,23 @@ echo -e "  ${DIM}─────────────────────
 print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 
 # Salva cópias no diretório /root
-cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
-cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
+cp "$LOG_FILE" "/root/${LOG_FILENAME}" 2>/dev/null || true
+cp "$LOG_FILE" "/root/${LOG_LATEST}" 2>/dev/null || true
 log_success "Log salvo em: /root/${LOG_FILENAME}"
 log_success "Atalho do último log: /root/${LOG_LATEST}"
 
 # Se executado via sudo, salva também na pasta home do usuário real
-if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
   REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
   if [ -d "$REAL_USER_HOME" ]; then
-    cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
-    cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
+    cp "$LOG_FILE" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
+    cp "$LOG_FILE" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
     chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
     log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
   fi
 fi
 
-rm -f "$LOG_TMP" 2>/dev/null || true
+rm -rf "$LOG_DIR" 2>/dev/null || true
 
 draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"

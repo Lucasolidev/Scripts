@@ -20,10 +20,8 @@
 .EXAMPLE
     .\Implantacao_WSL.ps1 -Modo CriarTestes
 
-.VERSION
-    1.0
-
 .NOTES
+    Versao: 1.0
     Requer privilegios de Administrador.
     A senha e solicitada como SecureString e nao fica fixa no codigo-fonte.
 #>
@@ -32,6 +30,10 @@
 #Requires -RunAsAdministrator
 
 [CmdletBinding()]
+[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Script interativo de console com interface visual para o operador')]
+[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'SemConfirmacao', Justification = 'Utilizado pelo operador para ignorar confirmacoes')]
+[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification = 'Funcoes internas que operam sobre multiplas distribuicoes')]
+[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Funcoes internas orquestradas pelo bloco principal')]
 param(
     [ValidateSet('PrepararBases', 'CriarTestes')]
     [string]$Modo = 'PrepararBases',

@@ -15,9 +15,8 @@ VERSION="2.4"
 #
 # COMPATIBILIDADE: Ubuntu 22.04 (PHP 8.3 via PPA), 24.04 (PHP 8.3 nativo)
 # e 26.04 (PHP 8.5 nativo). Requer root/sudo e usuario de deploy existente.
-#
-# EXECUCAO REMOTA (revise a origem antes de executar):
-# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/install_lemp_ubuntu.sh -O install_lemp_ubuntu.sh && chmod +x install_lemp_ubuntu.sh && sudo ./install_lemp_ubuntu.sh
+# Execução recomendada (copiar e colar comando único):
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/install_lemp_ubuntu.sh -O install_lemp_ubuntu.sh && sudo chmod +x install_lemp_ubuntu.sh && sudo ./install_lemp_ubuntu.sh
 # ==============================================================================
 set -Eeuo pipefail
 umask 077

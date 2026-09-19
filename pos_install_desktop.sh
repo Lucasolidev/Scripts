@@ -1,15 +1,18 @@
 #!/bin/bash
-# ------------------------------------------------
-# Version: 1.2
-# ------------------------------------------------
-VERSION="1.2"
 # ==============================================================================
-# SCRIPT DE PÓS-INSTALAÇÃO AUTOMÁTICO E SEGURO - UBUNTU DESKTOP 26.04
-# ==============================================================================
+# Script: pos_install_desktop.sh
+# Descrição: Pós-instalação, otimização e produtividade automatizada para Ubuntu Desktop
+# Autor: Lucas Oliveira
+# Repositório: https://github.com/Lucasolidev/Scripts
 # Execução recomendada (copiar e colar comando único):
-# wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_desktop.sh -O pos_install_desktop.sh && chmod +x pos_install_desktop.sh && sudo ./pos_install_desktop.sh
+# wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/pos_install_desktop.sh -O pos_install_desktop.sh && sudo chmod +x pos_install_desktop.sh && sudo ./pos_install_desktop.sh
 # ==============================================================================
 
+set -Eeuo pipefail
+umask 077
+
+VERSION="1.2"
+export VERSION
 export DEBIAN_FRONTEND=noninteractive
 
 # ==========================================
@@ -18,20 +21,12 @@ export DEBIAN_FRONTEND=noninteractive
 NC='\033[0m'              # Reset (Sem Cor)
 BOLD='\033[1m'
 DIM='\033[2m'
-UNDERLINE='\033[4m'
 
 # Cores de Fonte (Foreground)
-FG_BLACK='\033[30m'
 FG_RED='\033[31m'
 FG_GREEN='\033[32m'
 FG_YELLOW='\033[33m'
-FG_BLUE='\033[34m'
-FG_MAGENTA='\033[35m'
 FG_CYAN='\033[36m'
-FG_WHITE='\033[37m'
-
-# Símbolos Customizados
-ARROW="❯"
 
 # ==========================================
 # FUNÇÕES DE HIGHLIGHT E LOGGING
@@ -73,10 +68,6 @@ log_error() {
     echo -e "  ${FG_RED}[x]${NC}  ${FG_RED}${BOLD}ERRO:${NC}      $1"
 }
 
-log_skipped() {
-    echo -e "  ${FG_RED}[-]${NC}  ${FG_RED}${BOLD}PULADO:${NC}    $1"
-}
-
 print_alert_box() {
     local msg="$1"
     echo -e ""
@@ -90,6 +81,15 @@ print_alert_box() {
 
 clear
 
+# Valida privilégios administrativos
+if [ "$(id -u)" -ne 0 ]; then
+    log_error "Por favor, execute como root (sudo)."
+    exit 1
+fi
+
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+
 echo -e "\n${FG_CYAN}${BOLD}================================================================${NC}"
 echo -e "${FG_CYAN}${BOLD}           PÓS-INSTALAÇÃO DO UBUNTU DESKTOP                     ${NC}"
 echo -e "${FG_CYAN}${BOLD}================================================================${NC}"
@@ -97,25 +97,21 @@ echo -e "${FG_CYAN}${BOLD}======================================================
 LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
 LOG_FILENAME="relatorio_pos_install_desktop_${LOG_TIMESTAMP}.log"
 LOG_LATEST="relatorio_pos_install_desktop_latest.log"
-LOG_TMP="/tmp/${LOG_FILENAME}"
+LOG_DIR=$(mktemp -d -p /tmp pos_install_desktop.XXXXXX)
+LOG_FILE="${LOG_DIR}/${LOG_FILENAME}"
 
 # Redireciona a saída do script para o terminal e grava no log simultaneamente
-exec > >(tee -a "$LOG_TMP") 2>&1
-
-# Valida o sudo logo no início da execução para evitar travas
-log_warning "Solicitando credenciais de administrador..."
-sudo -v
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 # ==============================================================================
 # 1. ATUALIZAÇÃO DO SISTEMA E DEPENDÊNCIAS BASE
 # ==============================================================================
-print_header "ATUALIZAÇÃO DO SISTEMA E GERENCIADOR NALA"
+print_header "ATUALIZAÇÃO DO SISTEMA E PACOTES BASE"
 
 log_info "Atualizando repositórios e instalando dependências base..."
-sudo apt-get update > /dev/null 2>&1
-sudo apt-get install -y nala curl git unzip ncdu locales btop build-essential jq tldr ufw > /dev/null 2>&1
-sudo nala upgrade -y > /dev/null 2>&1
+apt-get update -y > /dev/null 2>&1
+apt-get install -y curl git unzip ncdu locales btop build-essential jq tldr ufw > /dev/null 2>&1
+apt-get upgrade -y > /dev/null 2>&1
 log_success "Repositórios atualizados e pacotes dev/base instalados (btop, build-essential, jq, tldr)."
 
 # ==============================================================================
@@ -124,18 +120,18 @@ log_success "Repositórios atualizados e pacotes dev/base instalados (btop, buil
 print_header "CONFIGURAÇÃO DE LOCALES (UTF-8), TECLADO E FUSO HORÁRIO"
 
 log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
-sudo sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
-sudo sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-sudo locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
-sudo update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
+sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
+sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
+update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
 log_success "Locales UTF-8 gerados com sucesso."
 
 log_info "Ajustando fuso horário (America/Sao_Paulo)..."
-sudo timedatectl set-timezone America/Sao_Paulo > /dev/null 2>&1 || true
+timedatectl set-timezone America/Sao_Paulo > /dev/null 2>&1 || true
 log_success "Fuso horário ajustado para America/Sao_Paulo."
 
 log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
-sudo cat <<EOF | sudo tee /etc/default/keyboard > /dev/null
+cat <<EOF > /etc/default/keyboard
 XKBMODEL="pc105"
 XKBLAYOUT="us,br"
 XKBVARIANT="intl,"
@@ -143,7 +139,7 @@ XKBOPTIONS="grp:alt_shift_toggle"
 BACKSPACE="guess"
 EOF
 
-sudo setupcon --force > /dev/null 2>&1 || true
+setupcon --force > /dev/null 2>&1 || true
 
 if command -v gsettings >/dev/null 2>&1; then
     gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us+intl'), ('xkb', 'br')]" 2>/dev/null || true
@@ -159,28 +155,28 @@ log_info "Configurando aliases de produtividade e segurança no Shell (ll, rm, c
 for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
   if [ -f "$bashrc" ]; then
     if grep -q "alias ll=" "$bashrc"; then
-      sudo sed -i "s/alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
+      sed -i "s/alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
     elif grep -q "#alias ll=" "$bashrc"; then
-      sudo sed -i "s/#alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
+      sed -i "s/#alias ll=.*/alias ll='ls -alFh'/" "$bashrc"
     else
-      echo "alias ll='ls -alFh'" | sudo tee -a "$bashrc" > /dev/null
+      echo "alias ll='ls -alFh'" >> "$bashrc"
     fi
     if grep -q "alias rm=" "$bashrc"; then
-      sudo sed -i "s/alias rm=.*/alias rm='rm -I'/" "$bashrc"
+      sed -i "s/alias rm=.*/alias rm='rm -I'/" "$bashrc"
     else
-      echo "alias rm='rm -I'" | sudo tee -a "$bashrc" > /dev/null
+      echo "alias rm='rm -I'" >> "$bashrc"
     fi
-    grep -q "alias cp=" "$bashrc" || echo "alias cp='cp -i'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias mv=" "$bashrc" || echo "alias mv='mv -i'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias df=" "$bashrc" || echo "alias df='df -h'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias free=" "$bashrc" || echo "alias free='free -h'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias ports=" "$bashrc" || echo "alias ports='sudo ss -tulanp'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias myip=" "$bashrc" || echo "alias myip='curl -s ifconfig.me; echo'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias \.\.=" "$bashrc" || echo "alias ..='cd ..'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias \.\.\.=" "$bashrc" || echo "alias ...='cd ../..'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt-get update && sudo apt-get upgrade -y'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt-get autoremove -y && sudo apt-get autoclean'" | sudo tee -a "$bashrc" > /dev/null
-    grep -q "alias reload=" "$bashrc" || echo "alias reload='source ~/.bashrc'" | sudo tee -a "$bashrc" > /dev/null
+    grep -q "alias cp=" "$bashrc" || echo "alias cp='cp -i'" >> "$bashrc"
+    grep -q "alias mv=" "$bashrc" || echo "alias mv='mv -i'" >> "$bashrc"
+    grep -q "alias df=" "$bashrc" || echo "alias df='df -h'" >> "$bashrc"
+    grep -q "alias free=" "$bashrc" || echo "alias free='free -h'" >> "$bashrc"
+    grep -q "alias ports=" "$bashrc" || echo "alias ports='sudo ss -tulanp'" >> "$bashrc"
+    grep -q "alias myip=" "$bashrc" || echo "alias myip='curl -s ifconfig.me; echo'" >> "$bashrc"
+    grep -q "alias \.\.=" "$bashrc" || echo "alias ..='cd ..'" >> "$bashrc"
+    grep -q "alias \.\.\.=" "$bashrc" || echo "alias ...='cd ../..'" >> "$bashrc"
+    grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt-get update && sudo apt-get upgrade -y'" >> "$bashrc"
+    grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt-get autoremove -y && sudo apt-get autoclean'" >> "$bashrc"
+    grep -q "alias reload=" "$bashrc" || echo "alias reload='source ~/.bashrc'" >> "$bashrc"
   fi
 done
 log_success "Aliases de produtividade e segurança configurados em todos os perfis .bashrc."
@@ -191,9 +187,9 @@ log_success "Aliases de produtividade e segurança configurados em todos os perf
 print_header "FIREWALL DE PROTEÇÃO (UFW)"
 
 log_info "Ativando Firewall UFW (Bloqueio de conexões de entrada)..."
-sudo ufw default deny incoming > /dev/null 2>&1
-sudo ufw default allow outgoing > /dev/null 2>&1
-sudo ufw enable > /dev/null 2>&1
+ufw default deny incoming > /dev/null 2>&1 || true
+ufw default allow outgoing > /dev/null 2>&1 || true
+ufw --force enable > /dev/null 2>&1 || true
 log_success "Firewall UFW ativado (Proteção de rede local/Wi-Fi ativa)."
 
 # ==============================================================================
@@ -202,8 +198,8 @@ log_success "Firewall UFW ativado (Proteção de rede local/Wi-Fi ativa)."
 print_header "SERVIÇOS E MONITORAMENTO (SSH E HTOP)"
 
 log_info "Instalando OpenSSH Server e HTOP..."
-sudo nala install -y openssh-server htop > /dev/null 2>&1
-sudo systemctl enable --now ssh > /dev/null 2>&1
+apt-get install -y openssh-server htop > /dev/null 2>&1
+systemctl enable --now ssh > /dev/null 2>&1 || true
 log_success "OpenSSH Server e HTOP instalados e ativos."
 
 # ==============================================================================
@@ -212,19 +208,19 @@ log_success "OpenSSH Server e HTOP instalados e ativos."
 print_header "INFORMAÇÕES DO SISTEMA (FASTFETCH)"
 
 log_info "Instalando Fastfetch..."
-if sudo nala install -y fastfetch > /dev/null 2>&1 || sudo apt-get install -y fastfetch > /dev/null 2>&1; then
+if apt-get install -y fastfetch > /dev/null 2>&1; then
   log_success "Fastfetch instalado com sucesso."
 else
   log_info "Fastfetch não encontrado nos repositórios padrão. Tentando via PPA/GitHub..."
-  sudo apt-get install -y software-properties-common > /dev/null 2>&1
-  sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch > /dev/null 2>&1
-  sudo apt-get update -y > /dev/null 2>&1
-  if sudo apt-get install -y fastfetch > /dev/null 2>&1; then
+  apt-get install -y software-properties-common > /dev/null 2>&1
+  add-apt-repository -y ppa:zhangsongcui3371/fastfetch > /dev/null 2>&1 || true
+  apt-get update -y > /dev/null 2>&1
+  if apt-get install -y fastfetch > /dev/null 2>&1; then
     log_success "Fastfetch instalado via PPA com sucesso."
   else
-    FASTFETCH_DEB_URL=$(curl -s https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | grep -o 'https://[^"]*linux-amd64.deb' | head -n1)
+    FASTFETCH_DEB_URL=$(curl -s https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest | grep -o 'https://[^"]*linux-amd64.deb' | head -n1 || true)
     if [ -n "$FASTFETCH_DEB_URL" ] && curl -sL "$FASTFETCH_DEB_URL" -o /tmp/fastfetch.deb; then
-      sudo dpkg -i /tmp/fastfetch.deb > /dev/null 2>&1 || sudo apt-get install -f -y > /dev/null 2>&1
+      dpkg -i /tmp/fastfetch.deb > /dev/null 2>&1 || apt-get install -f -y > /dev/null 2>&1
       rm -f /tmp/fastfetch.deb
       if command -v fastfetch >/dev/null 2>&1; then
         log_success "Fastfetch instalado via .deb do GitHub com sucesso."
@@ -243,11 +239,11 @@ fi
 print_header "ECOSSISTEMA FLATPAK E GOOGLE CHROME"
 
 log_info "Configurando Flatpak e repositório Flathub..."
-sudo nala install -y flatpak gnome-software-plugin-flatpak > /dev/null 2>&1
-sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo > /dev/null 2>&1
+apt-get install -y flatpak gnome-software-plugin-flatpak > /dev/null 2>&1
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo > /dev/null 2>&1 || true
 
 log_info "Instalando Google Chrome via Flatpak..."
-sudo flatpak install -y flathub com.google.Chrome > /dev/null 2>&1
+flatpak install -y flathub com.google.Chrome > /dev/null 2>&1 || true
 log_success "Flatpak e Google Chrome configurados com sucesso."
 
 # ==============================================================================
@@ -256,10 +252,12 @@ log_success "Flatpak e Google Chrome configurados com sucesso."
 print_header "INSTALAÇÃO DE FONTE NERD FONT"
 
 log_info "Baixando e instalando Hack Nerd Font..."
-mkdir -p ~/.local/share/fonts
-curl -fLo ~/.local/share/fonts/HackNerdFont-Regular.ttf \
-    https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf > /dev/null 2>&1
-fc-cache -fv > /dev/null 2>&1
+FONT_DIR="${TARGET_HOME}/.local/share/fonts"
+mkdir -p "$FONT_DIR"
+curl -fLo "${FONT_DIR}/HackNerdFont-Regular.ttf" \
+    https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/Hack/Regular/HackNerdFont-Regular.ttf > /dev/null 2>&1 || true
+chown -R "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.local" 2>/dev/null || true
+fc-cache -fv > /dev/null 2>&1 || true
 log_success "Hack Nerd Font instalada com sucesso."
 
 # ==============================================================================
@@ -268,17 +266,17 @@ log_success "Hack Nerd Font instalada com sucesso."
 print_header "CONFIGURAÇÃO DO EDITOR VIM (PLUGINS & TEMA SONOKAI)"
 
 log_info "Instalando Vim, Python3-pip e configurando plugins..."
-sudo nala install -y vim python3-pip > /dev/null 2>&1 || sudo apt-get install -y vim python3-pip > /dev/null 2>&1
+apt-get install -y vim python3-pip > /dev/null 2>&1
 
-sudo mkdir -p /root/.vim/autoload /root/.vim/plugged /etc/skel/.vim/autoload /etc/skel/.vim/plugged
+mkdir -p /root/.vim/autoload /root/.vim/plugged /etc/skel/.vim/autoload /etc/skel/.vim/plugged
 
 if [ ! -f /root/.vim/autoload/plug.vim ]; then
   log_info "Baixando o gerenciador de plugins 'vim-plug'..."
-  sudo curl -fLo /root/.vim/autoload/plug.vim --create-dirs \
+  curl -fLo /root/.vim/autoload/plug.vim --create-dirs \
       https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim > /dev/null 2>&1 || true
 fi
 
-sudo cat << 'EOF' | sudo tee /root/.vimrc > /dev/null
+cat << 'EOF' > /root/.vimrc
 " Seção de Plugins (vim-plug) """""""""""""""""""""""""""""""""""""""""""""""""
 call plug#begin('~/.vim/plugged')
 
@@ -346,19 +344,19 @@ EOF
 
 if command -v vim >/dev/null 2>&1 && [ -f /root/.vim/autoload/plug.vim ]; then
   log_info "Instalando plugins do Vim via vim-plug..."
-  sudo vim -u NONE -N -e -s -c "source /root/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1 || true
+  vim -u NONE -N -e -s -c "source /root/.vimrc" -c "PlugInstall" -c "qa!" > /dev/null 2>&1 || true
 fi
 
 # Replica a configuração do Vim para o /etc/skel e para todos os usuários em /home
-sudo cp /root/.vimrc /etc/skel/.vimrc 2>/dev/null || true
-sudo cp -r /root/.vim /etc/skel/ 2>/dev/null || true
+cp /root/.vimrc /etc/skel/.vimrc 2>/dev/null || true
+cp -r /root/.vim /etc/skel/ 2>/dev/null || true
 
 for user_home in /home/*; do
   if [ -d "$user_home" ]; then
     user_name=$(basename "$user_home")
-    sudo cp /root/.vimrc "$user_home/.vimrc" 2>/dev/null || true
-    sudo cp -r /root/.vim "$user_home/" 2>/dev/null || true
-    sudo chown -R "$user_name:$user_name" "$user_home/.vimrc" "$user_home/.vim" 2>/dev/null || true
+    cp /root/.vimrc "$user_home/.vimrc" 2>/dev/null || true
+    cp -r /root/.vim "$user_home/" 2>/dev/null || true
+    chown -R "$user_name:$user_name" "$user_home/.vimrc" "$user_home/.vim" 2>/dev/null || true
   fi
 done
 
@@ -370,26 +368,36 @@ log_success "Editor Vim configurado com plugins (Sonokai/Airline) em /root, /etc
 print_header "CONFIGURAÇÃO DO SHELL ZSH E OH MY ZSH"
 
 log_info "Instalando Zsh e fontes Powerline..."
-sudo nala install -y zsh fonts-powerline > /dev/null 2>&1
+apt-get install -y zsh fonts-powerline > /dev/null 2>&1
 
 if [ "$SHELL" != "/bin/zsh" ]; then
-    sudo chsh -s /bin/zsh $USER > /dev/null 2>&1
+    chsh -s /bin/zsh "$TARGET_USER" > /dev/null 2>&1 || true
 fi
 
-if [ ! -d "$HOME/.oh-my-zsh" ]; then
-    log_info "Instalando Oh My Zsh..."
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended > /dev/null 2>&1
+if [ ! -d "$TARGET_HOME/.oh-my-zsh" ]; then
+    log_info "Instalando Oh My Zsh via clone do repositório Git..."
+    git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "$TARGET_HOME/.oh-my-zsh" > /dev/null 2>&1 || true
 fi
 
-ZSH_CUSTOM="$HOME/.oh-my-zsh/custom"
-mkdir -p "$ZSH_CUSTOM/plugins"
-[ ! -d "$ZSH_CUSTOM/themes/powerlevel10k" ] && git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$ZSH_CUSTOM/themes/powerlevel10k" > /dev/null 2>&1
-[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" > /dev/null 2>&1
-[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" > /dev/null 2>&1
-[ ! -d "$ZSH_CUSTOM/plugins/zsh-completions" ] && git clone https://github.com/zsh-users/zsh-completions "$ZSH_CUSTOM/plugins/zsh-completions" > /dev/null 2>&1
-[ ! -d "$ZSH_CUSTOM/plugins/history-search-multi-word" ] && git clone https://github.com/zdharma-continuum/history-search-multi-word.git "$ZSH_CUSTOM/plugins/history-search-multi-word" > /dev/null 2>&1
+ZSH_CUSTOM="$TARGET_HOME/.oh-my-zsh/custom"
+mkdir -p "$ZSH_CUSTOM/plugins" "$ZSH_CUSTOM/themes"
+if [ ! -d "$ZSH_CUSTOM/themes/powerlevel10k" ]; then
+    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$ZSH_CUSTOM/themes/powerlevel10k" > /dev/null 2>&1 || true
+fi
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
+    git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" > /dev/null 2>&1 || true
+fi
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" > /dev/null 2>&1 || true
+fi
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-completions" ]; then
+    git clone https://github.com/zsh-users/zsh-completions "$ZSH_CUSTOM/plugins/zsh-completions" > /dev/null 2>&1 || true
+fi
+if [ ! -d "$ZSH_CUSTOM/plugins/history-search-multi-word" ]; then
+    git clone https://github.com/zdharma-continuum/history-search-multi-word.git "$ZSH_CUSTOM/plugins/history-search-multi-word" > /dev/null 2>&1 || true
+fi
 
-cat << 'EOF' > ~/.zshrc
+cat << 'EOF' > "$TARGET_HOME/.zshrc"
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="agnoster"
 
@@ -408,6 +416,7 @@ plugins=(
 source $ZSH/oh-my-zsh.sh
 fpath+=${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions/src
 EOF
+chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.oh-my-zsh" "$TARGET_HOME/.zshrc" 2>/dev/null || true
 log_success "Zsh e Oh My Zsh (Tema Agnoster) configurados com sucesso."
 
 # ==============================================================================
@@ -425,25 +434,27 @@ load-script() {
         echo \"Uso: load-script nome_do_script.sh\"
         return 1
     fi
-    curl -fsSL \"https://raw.githubusercontent.com/lucasolidev/scripts/main/\$1\" | bash
+    curl -fsSL \"https://raw.githubusercontent.com/Lucasolidev/Scripts/main/\$1\" | bash
 }
 alias lucasolidev=\"load-script\"
 # === FIM DO BLOCO DO SCRIPT ===
 "
 
-sed -i '/# === BLOCO DE CUSTOMIZACAO DO SCRIPT ===/,/# === FIM DO BLOCO DO SCRIPT ===/d' ~/.bashrc
-echo "$BLOCO_CUSTOMIZACAO" >> ~/.bashrc
+sed -i '/# === BLOCO DE CUSTOMIZACAO DO SCRIPT ===/,/# === FIM DO BLOCO DO SCRIPT ===/d' "$TARGET_HOME/.bashrc" 2>/dev/null || true
+echo "$BLOCO_CUSTOMIZACAO" >> "$TARGET_HOME/.bashrc"
+chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.bashrc" 2>/dev/null || true
 
-if [ -f "$HOME/.zshrc" ]; then
-    sed -i '/# === BLOCO DE CUSTOMIZACAO DO SCRIPT ===/,/# === FIM DO BLOCO DO SCRIPT ===/d' ~/.zshrc
-    echo "$BLOCO_CUSTOMIZACAO" >> ~/.zshrc
+if [ -f "$TARGET_HOME/.zshrc" ]; then
+    sed -i '/# === BLOCO DE CUSTOMIZACAO DO SCRIPT ===/,/# === FIM DO BLOCO DO SCRIPT ===/d' "$TARGET_HOME/.zshrc" 2>/dev/null || true
+    echo "$BLOCO_CUSTOMIZACAO" >> "$TARGET_HOME/.zshrc"
+    chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.zshrc" 2>/dev/null || true
 fi
 log_success "Aliases e função lucasolidev injetados no .bashrc e .zshrc."
 
 # Limpeza final de pacotes e cache temporário
 log_info "Executando limpeza de pacotes desnecessários e cache do APT..."
-sudo apt-get autoremove -y > /dev/null 2>&1
-sudo apt-get autoclean -y > /dev/null 2>&1
+apt-get autoremove -y > /dev/null 2>&1
+apt-get autoclean -y > /dev/null 2>&1
 log_success "Limpeza do sistema concluída."
 
 # ==============================================================================
@@ -464,12 +475,12 @@ fi
 echo -e "  ${FG_GREEN}${BOLD}✔ PÓS-INSTALAÇÃO DO UBUNTU DESKTOP FINALIZADA COM SUCESSO!${NC}\n"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
 echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional e Otimizado${NC}"
-echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}nala, curl, git, unzip, ncdu, locales, btop, build-essential, jq, tldr, openssh-server, htop, fastfetch, flatpak, Google Chrome, Vim, Zsh, Hack Nerd Font${NC}"
+echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}curl, git, unzip, ncdu, locales, btop, build-essential, jq, tldr, openssh-server, htop, fastfetch, flatpak, Google Chrome, Vim, Zsh, Hack Nerd Font${NC}"
 echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
 echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
 echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo${NC}"
-echo -e "  ${BOLD}Firewall UFW:${NC}          $(sudo ufw status 2>/dev/null | grep -q "^Status:[[:space:]]*active" && echo -e "${FG_GREEN}Ativo (Bloqueio de Entrada)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
+echo -e "  ${BOLD}Firewall UFW:${NC}          $(ufw status 2>/dev/null | grep -q "^Status:[[:space:]]*active" && echo -e "${FG_GREEN}Ativo (Bloqueio de Entrada)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
 echo -e "  ${BOLD}OpenSSH Server:${NC}        $(get_service_status ssh)"
 echo -e "  ${BOLD}Shell Padrão:${NC}          ${FG_CYAN}Zsh + Oh My Zsh (Tema Agnoster)${NC}"
 echo -e "  ${BOLD}Flatpak / Flathub:${NC}     ${FG_GREEN}Ativo e Integrado${NC}"
@@ -485,19 +496,24 @@ echo -e "  ${DIM}─────────────────────
 print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
 
 # Salva cópias no diretório /root
-sudo cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
-sudo cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
+cp "$LOG_FILE" "/root/${LOG_FILENAME}" 2>/dev/null || true
+cp "$LOG_FILE" "/root/${LOG_LATEST}" 2>/dev/null || true
 log_success "Log salvo em: /root/${LOG_FILENAME}"
 log_success "Atalho do último log: /root/${LOG_LATEST}"
 
-# Salva também na pasta HOME do usuário
-cp "$LOG_TMP" "$HOME/${LOG_FILENAME}" 2>/dev/null || true
-cp "$LOG_TMP" "$HOME/${LOG_LATEST}" 2>/dev/null || true
-log_success "Log salvo na sua Home ($HOME): $HOME/${LOG_FILENAME}"
+# Salva também na pasta HOME do usuário real
+if [ -d "$TARGET_HOME" ]; then
+  cp "$LOG_FILE" "$TARGET_HOME/${LOG_FILENAME}" 2>/dev/null || true
+  cp "$LOG_FILE" "$TARGET_HOME/${LOG_LATEST}" 2>/dev/null || true
+  chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/${LOG_FILENAME}" "$TARGET_HOME/${LOG_LATEST}" 2>/dev/null || true
+  log_success "Log salvo na Home ($TARGET_USER): $TARGET_HOME/${LOG_FILENAME}"
+fi
 
-rm -f "$LOG_TMP" 2>/dev/null || true
+rm -rf "$LOG_DIR" 2>/dev/null || true
 
 print_alert_box "IMPORTANTE: Feche este terminal e abra um novo para carregar todo o seu ecossistema sem travas."
 
 draw_separator
 echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
+
+exit 0

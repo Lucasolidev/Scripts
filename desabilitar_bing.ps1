@@ -1,41 +1,88 @@
 <#
 .SYNOPSIS
-    Desabilita o Bing na barra de pesquisa do Windows 10/11.
+    Desabilita o Bing na barra de pesquisa do Windows 10 e 11.
 .DESCRIPTION
     Script PowerShell compativel com versoes antigas e recentes.
-    Altera o registro 'BingSearchEnabled' para 0 e reinicia o explorer.exe para aplicar imediatamente.
+    Altera o valor de registro 'BingSearchEnabled' para 0 em HKCU e reinicia o explorer.exe
+    para que as alteracoes entrem em vigor imediatamente.
 .EXAMPLE
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/lucasolidev/scripts/main/desabilitar_bing.ps1 | iex
-.VERSION
-    1.1
+    .\desabilitar_bing.ps1
+.EXAMPLE
+    .\desabilitar_bing.ps1 -WhatIf
 .NOTES
-    Pode requerer privilegios de Administrador dependendo do ambiente.
+    Versao: 1.1
+    Requisitos: Windows PowerShell 5.1 ou PowerShell 7.
+    Ajusta configuracao de usuario corrente (HKCU).
+    Saida: 0 = sucesso ou simulacao; 1 = falha; 2 = cancelamento.
 #>
+
+#Requires -Version 5.1
+
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
+[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Script interativo de console com interface visual para o operador')]
+param()
+
+$ErrorActionPreference = 'Stop'
+$codigoSaida = 1
+$status = 'Falha'
+$corStatus = 'Red'
+$etapa = 'Validacao inicial'
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " Script para Desabilitar o Bing Search v1.1" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 try {
-    # Altera o registro para desativar o Bing na barra de pesquisa
-    $Path = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search"
-    $Name = "BingSearchEnabled"
+    $path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
+    $name = 'BingSearchEnabled'
+    $value = 0
 
-    Write-Host " Configurando o Registro do Windows..." -ForegroundColor Yellow
+    if ($PSCmdlet.ShouldProcess($path, "Definir $name = $value e reiniciar o processo explorer")) {
+        $etapa = 'Configuracao do Registro'
 
-    if (!(Test-Path $Path)) {
-        New-Item -Path $Path -Force | Out-Null
+        Write-Host "`nConfigurando o Registro do Windows..." -ForegroundColor Yellow
+
+        if (-not (Test-Path -LiteralPath $path)) {
+            New-Item -Path $path -Force | Out-Null
+        }
+
+        New-ItemProperty -LiteralPath $path -Name $name -Value $value -PropertyType DWord -Force | Out-Null
+
+        $etapa = 'Reinicio do Explorer'
+        Write-Host "Reiniciando o Explorador de Arquivos para aplicar as alteracoes..." -ForegroundColor Yellow
+        Stop-Process -Name 'explorer' -Force | Out-Null
+
+        Write-Host "`nOperacao concluida com exito! O Bing Search foi desativado." -ForegroundColor Green
+        $status = 'Concluido e verificado'
+        $corStatus = 'Green'
+        $codigoSaida = 0
     }
-
-    New-ItemProperty -Path $Path -Name $Name -Value 0 -PropertyType DWORD -Force | Out-Null
-
-    Write-Host " Reiniciando o Explorador de Arquivos para aplicar as alteracoes..." -ForegroundColor Yellow
-
-    # Reinicia o explorer para aplicar a alteracao imediatamente
-    Stop-Process -Name explorer -Force | Out-Null
-
-    Write-Host "`nOperacao concluida com exito! O Bing Search foi desativado." -ForegroundColor Green
-} catch {
-    Write-Host "`nOcorreu um erro durante a alteracao do registro." -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Red
+    elseif ($WhatIfPreference) {
+        $status = 'Simulacao concluida; nenhuma alteracao aplicada'
+        $corStatus = 'Yellow'
+        $codigoSaida = 0
+    }
+    else {
+        $status = 'Cancelado pelo operador; nenhuma alteracao aplicada'
+        $corStatus = 'Yellow'
+        $codigoSaida = 2
+    }
 }
+catch {
+    Write-Error -Message "Falha na etapa: $etapa. Nao foi possivel concluir a desativacao do Bing." -ErrorAction Continue
+    $status = 'Falha durante a execucao'
+    $corStatus = 'Red'
+    $codigoSaida = 1
+}
+
+Write-Host "`n==========================================================" -ForegroundColor Cyan
+Write-Host "  RESUMO DA EXECUCAO" -ForegroundColor Cyan
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "  - Status:          $status" -ForegroundColor $corStatus
+Write-Host "  - Chave Alvo:      HKCU\...\Search" -ForegroundColor White
+Write-Host "  - Valor Definido:  BingSearchEnabled = 0" -ForegroundColor White
+Write-Host "  - Processo:        explorer.exe reiniciado" -ForegroundColor White
+Write-Host "  - Codigo de saida: $codigoSaida" -ForegroundColor White
+Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+
+exit $codigoSaida
