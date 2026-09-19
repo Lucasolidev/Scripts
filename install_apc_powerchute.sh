@@ -393,7 +393,7 @@ print_header "INSTALAÇÃO DE DEPENDÊNCIAS DO SISTEMA"
 log_info "Atualizando índices de pacotes do Ubuntu Server..."
 apt-get update -qq >/dev/null 2>&1
 
-DEPENDENCIAS_SISTEMA=(rpm unzip curl ca-certificates udev snmp)
+DEPENDENCIAS_SISTEMA=(rpm rpm2cpio cpio unzip curl ca-certificates udev snmp)
 
 for pkg in "${DEPENDENCIAS_SISTEMA[@]}"; do
     if dpkg -s "$pkg" >/dev/null 2>&1; then
@@ -477,12 +477,33 @@ print_header "AJUSTES DE COMPATIBILIDADE UBUNTU SERVER"
 if [[ ! -x "${INSTALL_BASE_DIR}/jre/bin/java" ]]; then
     log_info "Configurando o ambiente JRE dedicado do PowerChute..."
     mkdir -p "${INSTALL_BASE_DIR}/jre"
-    if [[ -f "${AGENT_DIR}/jrelnx.zip" ]]; then
+    
+    # 1. Tenta descompactar a partir de jrelnx.zip já presente no diretório
+    if [[ -f "${AGENT_DIR}/jrelnx.zip" && -s "${AGENT_DIR}/jrelnx.zip" ]]; then
         unzip -q -o "${AGENT_DIR}/jrelnx.zip" -d "${INSTALL_BASE_DIR}/jre" 2>/dev/null || true
+    fi
+
+    # 2. Se o JRE ainda não estiver presente, extrai o payload diretamente do RPM com rpm2cpio
+    if [[ ! -x "${INSTALL_BASE_DIR}/jre/bin/java" && -f "$RPM_FILE" ]]; then
+        log_info "Extraindo payload do pacote JRE diretamente do arquivo RPM..."
+        RPM_TMP_EXTRACT="${RUNTIME_DIR}/rpm_jre_extract"
+        mkdir -p "$RPM_TMP_EXTRACT"
+        (cd "$RPM_TMP_EXTRACT" && rpm2cpio "$RPM_FILE" | cpio -idmv "*jrelnx.zip*" >/dev/null 2>&1) || true
+        
+        FOUND_ZIP=$(find "$RPM_TMP_EXTRACT" -name "jrelnx.zip" | head -n 1)
+        if [[ -n "$FOUND_ZIP" && -f "$FOUND_ZIP" ]]; then
+            unzip -q -o "$FOUND_ZIP" -d "${INSTALL_BASE_DIR}/jre" 2>/dev/null || true
+        fi
+        rm -rf "$RPM_TMP_EXTRACT"
+    fi
+
+    # 3. Ajusta permissões executáveis no binário java da APC
+    if [[ -x "${INSTALL_BASE_DIR}/jre/bin/java" ]]; then
         chmod +x "${INSTALL_BASE_DIR}/jre/bin/"* 2>/dev/null || true
         log_success "Ambiente JRE embutido configurado com sucesso."
-    elif [[ -f "${AGENT_DIR}/InstallJava.sh" ]]; then
-        (cd "$AGENT_DIR" && bash ./InstallJava.sh "$AGENT_DIR" >/dev/null 2>&1) || true
+    else
+        log_error "Não foi possível configurar a Máquina Virtual Java (JRE) da APC."
+        exit 1
     fi
 fi
 
