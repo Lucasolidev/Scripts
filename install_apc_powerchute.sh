@@ -106,7 +106,6 @@ APC_PASS=""
 APC_SIGNAL="usb"
 APC_PORT="/dev/ttyS0"
 CONFIG_UFW_VAL="S"
-CONFIG_SNMP_UFW_VAL="S"
 OS_DISTRO=""
 OS_VERSION=""
 OS_CODENAME=""
@@ -377,35 +376,13 @@ else
     log_info "Configuração inicial de credenciais pulada a pedido do operador."
 fi
 
-# 2.3 - Liberação de Portas no Firewall UFW (HTTPS 6547/tcp e SNMP 161/udp)
+# 2.3 - Detecção de Firewall UFW (Liberação Automática se Ativo)
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
-    echo -e "\n  ${BOLD}Firewall UFW Ativo Detectado:${NC}"
-    echo -e "  A interface Web HTTPS utiliza a porta TCP ${WEB_PORT}."
-    echo -ne "  ${FG_YELLOW}${ARROW} Deseja liberar a porta ${WEB_PORT}/tcp no firewall UFW? (S/n): ${NC}"
-    read -r RESP_UFW
-    RESP_UFW="${RESP_UFW:-S}"
-    if [[ "$RESP_UFW" =~ ^[sSyY]$ ]]; then
-        CONFIG_UFW_VAL="S"
-        log_info "Liberação no Firewall UFW: ${FG_GREEN}Sim (Porta ${WEB_PORT}/tcp)${NC}"
-    else
-        CONFIG_UFW_VAL="N"
-        log_info "Liberação no Firewall UFW: ${FG_YELLOW}Não${NC}"
-    fi
-
-    echo -e "\n  O monitoramento via Zabbix / SNMP utiliza a porta UDP ${SNMP_PORT}."
-    echo -ne "  ${FG_YELLOW}${ARROW} Deseja liberar a porta ${SNMP_PORT}/udp (SNMP) no firewall UFW? (S/n): ${NC}"
-    read -r RESP_SNMP_UFW
-    RESP_SNMP_UFW="${RESP_SNMP_UFW:-S}"
-    if [[ "$RESP_SNMP_UFW" =~ ^[sSyY]$ ]]; then
-        CONFIG_SNMP_UFW_VAL="S"
-        log_info "Liberação no Firewall UFW: ${FG_GREEN}Sim (Porta ${SNMP_PORT}/udp - SNMP)${NC}"
-    else
-        CONFIG_SNMP_UFW_VAL="N"
-        log_info "Liberação no Firewall UFW: ${FG_YELLOW}Não${NC}"
-    fi
+    CONFIG_UFW_VAL="S"
+    log_info "Firewall UFW ativo detectado: Portas ${FG_CYAN}${WEB_PORT}/tcp${NC} (HTTPS) e ${FG_CYAN}${SNMP_PORT}/udp${NC} (SNMP) serão liberadas automaticamente."
 else
     CONFIG_UFW_VAL="N"
-    CONFIG_SNMP_UFW_VAL="N"
+    log_info "Firewall UFW inativo ou não instalado. Liberação automática ignorada."
 fi
 
 # ==============================================================================
@@ -629,12 +606,7 @@ if [[ "$CONFIG_UFW_VAL" == "S" ]]; then
     else
         log_warning "Não foi possível aplicar a regra TCP ${WEB_PORT} no UFW."
     fi
-else
-    log_skipped "Liberação da porta ${WEB_PORT}/tcp no UFW não solicitada ou firewall inativo."
-    echo -e "  ${DIM}Para liberar manualmente execute:${NC} ${BOLD}sudo ufw allow ${WEB_PORT}/tcp comment 'APC PowerChute Web UI'${NC}"
-fi
 
-if [[ "$CONFIG_SNMP_UFW_VAL" == "S" ]]; then
     log_info "Liberando porta ${SNMP_PORT}/udp (SNMP) no Firewall UFW..."
     if ufw allow "${SNMP_PORT}/udp" comment 'SNMP Daemon / APC PowerChute' >/dev/null 2>&1; then
         log_success "Porta ${SNMP_PORT}/udp liberada com sucesso no UFW."
@@ -642,8 +614,10 @@ if [[ "$CONFIG_SNMP_UFW_VAL" == "S" ]]; then
         log_warning "Não foi possível aplicar a regra UDP ${SNMP_PORT} no UFW."
     fi
 else
-    log_skipped "Liberação da porta ${SNMP_PORT}/udp (SNMP) no UFW não solicitada ou firewall inativo."
-    echo -e "  ${DIM}Para liberar manualmente execute:${NC} ${BOLD}sudo ufw allow ${SNMP_PORT}/udp comment 'SNMP Daemon / APC PowerChute'${NC}"
+    log_skipped "Firewall UFW inativo ou não instalado. Regras de firewall puladas."
+    echo -e "  ${DIM}Para liberar manualmente execute:${NC}"
+    echo -e "      ${BOLD}sudo ufw allow ${WEB_PORT}/tcp comment 'APC PowerChute Web UI'${NC}"
+    echo -e "      ${BOLD}sudo ufw allow ${SNMP_PORT}/udp comment 'SNMP Daemon / APC PowerChute'${NC}"
 fi
 
 # ==============================================================================
