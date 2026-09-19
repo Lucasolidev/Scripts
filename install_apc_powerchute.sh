@@ -106,6 +106,9 @@ APC_PASS=""
 APC_SIGNAL="usb"
 APC_PORT="/dev/ttyS0"
 CONFIG_UFW_VAL="S"
+CONFIG_SNMP_AUTO="S"
+SNMP_COMMUNITY="amo_snmp"
+SNMP_NMS_IP=""
 OS_DISTRO=""
 OS_VERSION=""
 OS_CODENAME=""
@@ -371,8 +374,38 @@ if [[ "$RESP_ASSISTENTE" =~ ^[sSyY]$ ]]; then
         APC_PORT="none"
         log_info "Conexão definida: ${FG_GREEN}USB (Detecção Automática)${NC}"
     fi
+
+    # 2.3 - Configuração do Agente SNMP para Monitoramento Zabbix
+    echo -e "\n  ${BOLD}Configuração do Agente SNMP para Zabbix (Porta ${SNMP_PORT}/udp):${NC}"
+    echo -e "  Permite que o Zabbix capture dados do nobreak via SNMPv1."
+    echo -ne "  ${FG_YELLOW}${ARROW} Deseja pré-configurar o SNMPv1 para o Zabbix agora? (S/n): ${NC}"
+    read -r RESP_SNMP_CONF
+    RESP_SNMP_CONF="${RESP_SNMP_CONF:-S}"
+
+    if [[ "$RESP_SNMP_CONF" =~ ^[sSyY]$ ]]; then
+        CONFIG_SNMP_AUTO="S"
+        echo -ne "  ${FG_YELLOW}${ARROW} Digite a Comunidade SNMP [amo_snmp]: ${NC}"
+        read -r INPUT_COMMUNITY
+        SNMP_COMMUNITY="${INPUT_COMMUNITY:-amo_snmp}"
+        log_info "Comunidade SNMP definida: ${FG_GREEN}${SNMP_COMMUNITY}${NC}"
+
+        echo -e "  ${DIM}Informe o IP do seu Zabbix Server/Proxy que irá coletar os dados do nobreak.${NC}"
+        echo -ne "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (ex: 192.168.0.50): ${NC}"
+        read -r INPUT_NMS_IP
+        SNMP_NMS_IP="${INPUT_NMS_IP:-}"
+        if [[ -n "$SNMP_NMS_IP" ]]; then
+            log_info "Servidor Zabbix (NMS IP) autorizado: ${FG_GREEN}${SNMP_NMS_IP}${NC}"
+        else
+            log_warning "IP do Zabbix não informado. O SNMP será ativado com perfil '0.0.0.0' (necessitará ajuste posterior no painel)."
+            SNMP_NMS_IP="0.0.0.0"
+        fi
+    else
+        CONFIG_SNMP_AUTO="N"
+        log_info "Pré-configuração automática do SNMP pulada a pedido do operador."
+    fi
 else
     CONFIG_ASSISTENTE_VAL="N"
+    CONFIG_SNMP_AUTO="N"
     log_info "Configuração inicial de credenciais pulada a pedido do operador."
 fi
 
@@ -590,6 +623,32 @@ if [[ "$CONFIG_ASSISTENTE_VAL" == "S" && -n "$APC_USER" && -n "$APC_PASS" ]]; th
     else
         bash ./config.sh "user=${APC_USER}" "pass=${APC_PASS}" "signal=USB_NO_KERNEL_CHECK" "port=none" || true
     fi
+
+    # Aplicação da configuração de SNMP para Zabbix caso solicitada
+    if [[ "$CONFIG_SNMP_AUTO" == "S" && -n "$SNMP_COMMUNITY" ]]; then
+        log_info "Configurando serviço SNMP interno para o Zabbix..."
+        local_target_ip="${SNMP_NMS_IP:-0.0.0.0}"
+        
+        # Garante a existência da seção [PCBESNMPAgent] no pcssconfig.ini
+        for ini_file in "${AGENT_DIR}/pcssconfig.ini" "${AGENT_DIR}/pcssconfig_backup.ini"; do
+            if [[ -f "$ini_file" ]]; then
+                # Remove entradas anteriores de SNMP se existirem
+                sed -i '/^\[PCBESNMPAgent\]/,/^\[/ { /^\[PCBESNMPAgent\]/d; /^\[/!d }' "$ini_file" 2>/dev/null || true
+            fi
+            cat >> "$ini_file" << EOF
+
+[PCBESNMPAgent]
+SNMPv1_Enabled = true
+SNMP_DiscoveryPort = 161
+SNMPv1_Name_Profile_1 = ${SNMP_COMMUNITY}
+SNMPv1_NMS_Profile_1 = ${local_target_ip}
+SNMPv1_AccessType_Profile_1 = READONLY
+EOF
+            chmod 0640 "$ini_file" 2>/dev/null || true
+        done
+        log_success "Agente SNMP configurado: Comunidade '${SNMP_COMMUNITY}' | NMS IP '${local_target_ip}'."
+    fi
+
     draw_separator
     log_success "Credenciais e parâmetros aplicados com sucesso no PowerChute."
 else
@@ -700,7 +759,11 @@ echo -e "  ${BOLD}Comandos Úteis de Gerenciamento:${NC}"
 echo -e "  • Verificar Status:   ${BOLD}sudo systemctl status ${SERVICE_NAME}${NC}"
 echo -e "  • Reiniciar Serviço:  ${BOLD}sudo systemctl restart ${SERVICE_NAME}${NC}"
 echo -e "  • Parar Serviço:      ${BOLD}sudo systemctl stop ${SERVICE_NAME}${NC}"
-echo -e "  • Testar SNMP Local:  ${BOLD}snmpwalk -v1 -c <sua_comunidade> 127.0.0.1 1.3.6.1.4.1.318${NC}"
+if [[ "$CONFIG_SNMP_AUTO" == "S" ]]; then
+    echo -e "  • Testar SNMP Local:  ${BOLD}snmpwalk -v1 -c ${SNMP_COMMUNITY} 127.0.0.1 1.3.6.1.4.1.318${NC}"
+else
+    echo -e "  • Testar SNMP Local:  ${BOLD}snmpwalk -v1 -c <sua_comunidade> 127.0.0.1 1.3.6.1.4.1.318${NC}"
+fi
 echo -e "  • Reconfigurar APC:   ${BOLD}cd ${AGENT_DIR} && sudo bash config.sh${NC}"
 echo -e "  • Portal do Produto:  ${DIM}${PCSS_PORTAL_URL}${NC}"
 echo -e ""
