@@ -100,6 +100,10 @@ PACOTES_INSTALADOS=()
 ORIGEM_PACOTE_VAL=""
 TAR_PATH_VAL=""
 CONFIG_ASSISTENTE_VAL="S"
+APC_USER=""
+APC_PASS=""
+APC_SIGNAL="usb"
+APC_PORT="/dev/ttyS0"
 CONFIG_UFW_VAL="S"
 OS_DISTRO=""
 OS_VERSION=""
@@ -266,18 +270,109 @@ case "$OPT_ORIGEM" in
         ;;
 esac
 
-# 2.2 - Execução do Assistente Interativo Oficial da Schneider
-echo -e "\n  ${BOLD}Assistente de Configuração do Nobreak:${NC}"
-echo -e "  O assistente oficial da APC define o usuário, senha e tipo de conexão (USB ou Serial)."
-echo -ne "  ${FG_YELLOW}${ARROW} Deseja executar o assistente interativo ao término da instalação? (S/n): ${NC}"
+# 2.2 - Configuração de Credenciais do PowerChute
+echo -e "\n  ${BOLD}Configuração de Acesso ao Painel Web APC:${NC}"
+echo -e "  Defina o usuário e a senha de administração para gerenciar o nobreak via HTTPS (${WEB_PORT})."
+echo -ne "  ${FG_YELLOW}${ARROW} Deseja configurar as credenciais do nobreak agora? (S/n): ${NC}"
 read -r RESP_ASSISTENTE
 RESP_ASSISTENTE="${RESP_ASSISTENTE:-S}"
+
 if [[ "$RESP_ASSISTENTE" =~ ^[sSyY]$ ]]; then
     CONFIG_ASSISTENTE_VAL="S"
-    log_info "Assistente interativo: ${FG_GREEN}Habilitado (Será iniciado após instalação)${NC}"
+    echo -e "\n  ${FG_YELLOW}${BOLD}REGRAS OBRIGATÓRIAS PARA CREDENCIAIS APC:${NC}"
+    echo -e "  • ${BOLD}Usuário:${NC} Mínimo de 6 a 128 caracteres (ex: ${FG_CYAN}administrador${NC})"
+    echo -e "  • ${BOLD}Senha:${NC}   Mínimo de 8 a 128 caracteres, contendo ao menos:"
+    echo -e "             - 1 letra maiúscula e 1 letra minúscula"
+    echo -e "             - 1 número ou caractere especial (#?!@$%^&*-)"
+    echo -e "  • O nome de usuário não pode fazer parte da senha."
+    echo -e ""
+
+    # Coleta e Validação do Usuário
+    while true; do
+        echo -ne "  ${FG_YELLOW}${ARROW} Digite o Usuário de Administração [administrador]: ${NC}"
+        read -r INPUT_USER
+        INPUT_USER="${INPUT_USER:-administrador}"
+
+        if [[ ${#INPUT_USER} -ge 6 && ${#INPUT_USER} -le 128 && "$INPUT_USER" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+            APC_USER="$INPUT_USER"
+            log_info "Usuário definido: ${FG_GREEN}${APC_USER}${NC}"
+            break
+        else
+            log_warning "Usuário inválido! Deve ter entre 6 e 128 caracteres alfanuméricos sem espaços."
+        fi
+    done
+
+    # Coleta e Validação da Senha
+    while true; do
+        echo -ne "  ${FG_YELLOW}${ARROW} Digite a Nova Senha: ${NC}"
+        read -r -s INPUT_PASS
+        echo ""
+
+        if [[ ${#INPUT_PASS} -lt 8 || ${#INPUT_PASS} -gt 128 ]]; then
+            log_warning "A senha deve ter entre 8 e 128 caracteres."
+            continue
+        fi
+
+        if [[ ! "$INPUT_PASS" =~ [A-Z] ]]; then
+            log_warning "A senha deve conter ao menos 1 letra MAIÚSCULA."
+            continue
+        fi
+
+        if [[ ! "$INPUT_PASS" =~ [a-z] ]]; then
+            log_warning "A senha deve conter ao menos 1 letra MINÚSCULA."
+            continue
+        fi
+
+        SPECIAL_PATTERN='[#?!@$%^&*-]'
+        if [[ ! "$INPUT_PASS" =~ [0-9] && ! "$INPUT_PASS" =~ $SPECIAL_PATTERN ]]; then
+            log_warning "A senha deve conter ao menos 1 NÚMERO ou CARACTERE ESPECIAL (#?!@$%^&*-)."
+            continue
+        fi
+
+        # Validação: usuário não pode estar contido na senha
+        USER_LOWER=$(echo "$APC_USER" | tr '[:upper:]' '[:lower:]')
+        PASS_LOWER=$(echo "$INPUT_PASS" | tr '[:upper:]' '[:lower:]')
+        if [[ "$PASS_LOWER" == *"$USER_LOWER"* ]]; then
+            log_warning "O nome de usuário não pode fazer parte da senha."
+            continue
+        fi
+
+        echo -ne "  ${FG_YELLOW}${ARROW} Confirme a Nova Senha: ${NC}"
+        read -r -s INPUT_PASS_CONFIRM
+        echo ""
+
+        if [[ "$INPUT_PASS" != "$INPUT_PASS_CONFIRM" ]]; then
+            log_warning "As senhas não coincidem. Tente novamente."
+            continue
+        fi
+
+        APC_PASS="$INPUT_PASS"
+        log_success "Senha validada com sucesso."
+        break
+    done
+
+    # Tipo de Comunicação com o Nobreak (USB ou Serial)
+    echo -e "\n  ${BOLD}Tipo de Conexão com o Nobreak APC:${NC}"
+    echo -e "  ${FG_GREEN}1)${NC} ${BOLD}USB${NC} (Recomendado para Smart-UPS e Easy UPS conectados via cabo USB)"
+    echo -e "  ${FG_GREEN}2)${NC} ${BOLD}Serial (COM / ttyS0 / ttyUSB0)${NC}"
+    echo -ne "  ${FG_YELLOW}${ARROW} Escolha o tipo de conexão [1]: ${NC}"
+    read -r OPT_CONN
+    OPT_CONN="${OPT_CONN:-1}"
+
+    if [[ "$OPT_CONN" == "2" ]]; then
+        APC_SIGNAL="serial"
+        echo -ne "  ${FG_YELLOW}${ARROW} Digite a porta serial [/dev/ttyS0]: ${NC}"
+        read -r INPUT_PORT
+        APC_PORT="${INPUT_PORT:-/dev/ttyS0}"
+        log_info "Conexão definida: ${FG_GREEN}Serial (${APC_PORT})${NC}"
+    else
+        APC_SIGNAL="usb"
+        APC_PORT="none"
+        log_info "Conexão definida: ${FG_GREEN}USB (Detecção Automática)${NC}"
+    fi
 else
     CONFIG_ASSISTENTE_VAL="N"
-    log_info "Assistente interativo: ${FG_YELLOW}Desabilitado (Configuração manual posterior)${NC}"
+    log_info "Configuração inicial de credenciais pulada a pedido do operador."
 fi
 
 # 2.3 - Liberação de Porta no Firewall UFW
@@ -386,12 +481,14 @@ fi
 # ==============================================================================
 print_header "AJUSTES DE COMPATIBILIDADE UBUNTU SERVER"
 
-# 6.1 - Correção do Shebang no script de configuração (/bin/sh -> /bin/bash)
-# Necessário porque no Ubuntu /bin/sh aponta para o dash, que falha em testes [[ ... ]]
+# 6.1 - Correção e Ajustes de Compatibilidade no script config.sh
+# Necessário porque no Ubuntu /bin/sh aponta para dash e o script invoca 'systemctl start PBEAgent'
 if [[ -f "${AGENT_DIR}/config.sh" ]]; then
     sed -i '1s|^#!/bin/sh|#!/bin/bash|' "${AGENT_DIR}/config.sh"
+    # Correção do nome do serviço systemctl no script da APC (PBEAgent -> PBEAgent.service)
+    sed -i 's|systemctl start PBEAgent|systemctl start PBEAgent.service|g' "${AGENT_DIR}/config.sh"
     chmod 0750 "${AGENT_DIR}/config.sh"
-    log_success "Script config.sh ajustado com cabeçalho nativo Bash."
+    log_success "Script config.sh ajustado com cabeçalho nativo Bash e compatibilidade systemd."
 fi
 
 # 6.2 - Correção do Shebang no executável do daemon
@@ -427,24 +524,22 @@ log_success "Serviço ${SERVICE_NAME}.service habilitado no boot."
 # ==============================================================================
 print_header "CONFIGURAÇÃO DO AGENTE NOBREAK"
 
-if [[ "$CONFIG_ASSISTENTE_VAL" == "S" ]]; then
-    echo -e "  ${FG_YELLOW}${BOLD}REGRAS OBRIGATÓRIAS PARA CREDENCIAIS APC:${NC}"
-    echo -e "  • ${BOLD}Usuário:${NC} Mínimo de 6 caracteres (ex: ${FG_CYAN}apcadmin${NC})"
-    echo -e "  • ${BOLD}Senha:${NC}   Mínimo de 8 caracteres, contendo ao menos:"
-    echo -e "             - 1 letra maiúscula e 1 letra minúscula"
-    echo -e "             - 1 número ou caractere especial (#?!@$%^&*-)"
-    echo -e "  • O nome de usuário não pode fazer parte da senha."
-    echo -e ""
-    log_info "Iniciando o assistente de configuração oficial da APC..."
+if [[ "$CONFIG_ASSISTENTE_VAL" == "S" && -n "$APC_USER" && -n "$APC_PASS" ]]; then
+    log_info "Aplicando credenciais administrativas no agente PowerChute..."
+    log_info "Usuário: ${FG_CYAN}${APC_USER}${NC} | Conexão: ${FG_CYAN}${APC_SIGNAL}${NC}"
     draw_separator
     
     cd "$AGENT_DIR"
-    bash ./config.sh || {
-        log_warning "O assistente de configuração encerrou ou foi suspenso pelo operador."
-    }
+    # Chamada com parâmetros oficiais do utilitário da APC
+    if [[ "$APC_SIGNAL" == "serial" ]]; then
+        bash ./config.sh "user=${APC_USER}" "pass=${APC_PASS}" "signal=${APC_SIGNAL}" "port=${APC_PORT}" || true
+    else
+        bash ./config.sh "user=${APC_USER}" "pass=${APC_PASS}" "signal=${APC_SIGNAL}" || true
+    fi
     draw_separator
+    log_success "Credenciais e parâmetros aplicados com sucesso no PowerChute."
 else
-    log_info "Assistente pulado a pedido do operador."
+    log_info "Configuração inicial pulada a pedido do operador."
     log_info "Para realizar a configuração posterior, execute:"
     echo -e "      ${BOLD}cd ${AGENT_DIR} && sudo bash config.sh${NC}"
 fi
