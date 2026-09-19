@@ -6,7 +6,7 @@
 VERSION="1.0"
 # ==============================================================================
 # SCRIPT DE INSTALAÇÃO DO SCHNEIDER POWERCHUTE SERIAL SHUTDOWN (PCSS)
-# AMBIENTE: UBUNTU SERVER 24.04 LTS / 26.04 (PRODUÇÃO)
+# AMBIENTE: UBUNTU SERVER 22.04 LTS / 24.04 LTS / 26.04 (PRODUÇÃO)
 # MONITORAMENTO E GERENCIAMENTO DE NOBREAKS APC SMART-UPS VIA USB OU SERIAL
 # ==============================================================================
 # METADADOS DO PACOTE OFICIAL (SCHNEIDER ELECTRIC):
@@ -15,7 +15,7 @@ VERSION="1.0"
 # • Data de Lançamento do Pacote: 29/07/2026
 # • Formato: GZ (.tar.gz) | Tamanho: 92.6 MB | Idioma: Inglês (English only)
 # • Sistemas Operacionais Homologados pelo Fabricante: Red Hat Enterprise Linux, SUSE Enterprise Linux
-# • Homologação e Adaptação deste Script: Ubuntu Server 24.04 LTS e 26.04 (x86_64)
+# • Homologação e Adaptação deste Script: Ubuntu Server 22.04 LTS, 24.04 LTS e 26.04 (x86_64)
 # • Página Oficial do Produto:
 #   https://www.se.com/br/pt/product/SFPCSS/powerchute-serial-shutdown-desligamento-aut%C3%B4nomo-e-controlado-monitoramento-e-configura%C3%A7%C3%A3o-de-nobreak-gerenciamento-de-energia/
 # • Link Direto de Download:
@@ -125,7 +125,7 @@ if [[ "$ARCH" != "x86_64" ]]; then
     exit 1
 fi
 
-# Detecção e Validação do Sistema Operacional (Ubuntu Server 24.04 ou 26.04)
+# Detecção e Validação do Sistema Operacional (Ubuntu Server 22.04, 24.04 ou 26.04)
 if [[ -f /etc/os-release ]]; then
     OS_DISTRO=$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
     OS_VERSION=$(grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
@@ -141,11 +141,11 @@ if [[ "$OS_DISTRO" != "ubuntu" ]]; then
 fi
 
 case "$OS_VERSION" in
-    "24.04"|"26.04")
+    "22.04"|"24.04"|"26.04")
         log_info "Sistema homologado detectado: Ubuntu Server ${OS_VERSION} (${OS_CODENAME})."
         ;;
     *)
-        log_error "Versão do Ubuntu não suportada: '${OS_VERSION}' (${OS_CODENAME}). Versões homologadas: Ubuntu Server 24.04 LTS ou 26.04."
+        log_error "Versão do Ubuntu não suportada: '${OS_VERSION}' (${OS_CODENAME}). Versões homologadas: Ubuntu Server 22.04 LTS, 24.04 LTS ou 26.04."
         exit 1
         ;;
 esac
