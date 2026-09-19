@@ -670,6 +670,11 @@ echo -e "  ${BOLD}URL de Acesso:${NC}              ${FG_CYAN}https://${SERVER_IP
 echo -e "  ${BOLD}Log de Instalação:${NC}          ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
+echo -e "  ${FG_YELLOW}${BOLD}⚠ OBSERVAÇÃO IMPORTANTE PARA MONITORAMENTO ZABBIX (SNMPv1):${NC}"
+echo -e "  • Ao vincular o host/template no Zabbix utilizando ${BOLD}SNMPv1${NC}:"
+echo -e "    ${FG_RED}${BOLD}DESATIVE${NC} obrigatoriamente a opção: ${BOLD}[ ] Use combined requests${NC}"
+echo -e "    ${DIM}(Se mantida ativa, o Zabbix retornará 'authorizationError' ou falha de coleta nos itens).${NC}\n"
+
 echo -e "  ${BOLD}Comandos Úteis de Gerenciamento:${NC}"
 echo -e "  • Verificar Status:   ${BOLD}sudo systemctl status ${SERVICE_NAME}${NC}"
 echo -e "  • Reiniciar Serviço:  ${BOLD}sudo systemctl restart ${SERVICE_NAME}${NC}"
