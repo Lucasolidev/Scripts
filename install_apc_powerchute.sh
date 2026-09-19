@@ -481,7 +481,20 @@ fi
 # ==============================================================================
 print_header "AJUSTES DE COMPATIBILIDADE UBUNTU SERVER"
 
-# 6.1 - Correção e Ajustes de Compatibilidade no script config.sh
+# 6.1 - Garantia da Extração da Máquina Virtual Java (JRE embutida da APC)
+if [[ ! -x "${INSTALL_BASE_DIR}/jre/bin/java" ]]; then
+    log_info "Configurando o ambiente JRE dedicado do PowerChute..."
+    mkdir -p "${INSTALL_BASE_DIR}/jre"
+    if [[ -f "${AGENT_DIR}/jrelnx.zip" ]]; then
+        unzip -q -o "${AGENT_DIR}/jrelnx.zip" -d "${INSTALL_BASE_DIR}/jre" 2>/dev/null || true
+        chmod +x "${INSTALL_BASE_DIR}/jre/bin/"* 2>/dev/null || true
+        log_success "Ambiente JRE embutido configurado com sucesso."
+    elif [[ -f "${AGENT_DIR}/InstallJava.sh" ]]; then
+        (cd "$AGENT_DIR" && bash ./InstallJava.sh "$AGENT_DIR" >/dev/null 2>&1) || true
+    fi
+fi
+
+# 6.2 - Correção e Ajustes de Compatibilidade no script config.sh
 # Necessário porque no Ubuntu /bin/sh aponta para dash e o script invoca 'systemctl start PBEAgent'
 if [[ -f "${AGENT_DIR}/config.sh" ]]; then
     sed -i '1s|^#!/bin/sh|#!/bin/bash|' "${AGENT_DIR}/config.sh"
@@ -491,21 +504,25 @@ if [[ -f "${AGENT_DIR}/config.sh" ]]; then
     log_success "Script config.sh ajustado com cabeçalho nativo Bash e compatibilidade systemd."
 fi
 
-# 6.2 - Correção do Shebang no executável do daemon
+# 6.3 - Instalação e Correção do Shebang no executável do daemon (/usr/bin/PBEAgent)
+if [[ ! -f "/usr/bin/PBEAgent" && -f "${AGENT_DIR}/bin/startup" ]]; then
+    cp "${AGENT_DIR}/bin/startup" "/usr/bin/PBEAgent"
+fi
+
 if [[ -f "/usr/bin/PBEAgent" ]]; then
     sed -i '1s|^#!/bin/sh|#!/bin/bash|' "/usr/bin/PBEAgent"
     chmod 0755 "/usr/bin/PBEAgent"
     log_success "Executável /usr/bin/PBEAgent ajustado com cabeçalho nativo Bash."
 fi
 
-# 6.3 - Criação de Diretórios de Trabalho e Bloqueio
+# 6.4 - Criação de Diretórios de Trabalho e Bloqueio
 mkdir -p "${AGENT_DIR}/temp"
 chmod 0770 "${AGENT_DIR}/temp"
 mkdir -p /var/lock/subsys
 chmod 0755 /var/lock/subsys
 log_success "Diretórios temporários e de subsistema criados."
 
-# 6.4 - Atualização e Recarga das Regras udev (Reconhecimento de portas USB de nobreaks)
+# 6.5 - Atualização e Recarga das Regras udev (Reconhecimento de portas USB de nobreaks)
 if command -v udevadm >/dev/null 2>&1; then
     log_info "Recarregando regras do udev para nobreaks USB..."
     udevadm control --reload-rules 2>/dev/null || true
@@ -513,8 +530,30 @@ if command -v udevadm >/dev/null 2>&1; then
     log_success "Regras udev recarregadas com sucesso."
 fi
 
-# 6.5 - Registro e Habilitação do Serviço Systemd
+# 6.6 - Registro e Habilitação do Serviço Systemd
 log_info "Configurando o serviço ${SERVICE_NAME} no systemd..."
+if [[ ! -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
+    if [[ -f "${AGENT_DIR}/${SERVICE_NAME}.service" ]]; then
+        cp "${AGENT_DIR}/${SERVICE_NAME}.service" "/etc/systemd/system/${SERVICE_NAME}.service"
+    else
+        cat > "/etc/systemd/system/${SERVICE_NAME}.service" << 'EOF'
+[Unit]
+Description=PowerChute Serial Shutdown Agent
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/PBEAgent start
+ExecStop=/usr/bin/PBEAgent stop
+ExecReload=/usr/bin/PBEAgent restart
+
+[Install]
+WantedBy=default.target
+EOF
+    fi
+    chmod 0644 "/etc/systemd/system/${SERVICE_NAME}.service"
+fi
+
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}.service" >/dev/null 2>&1 || true
 log_success "Serviço ${SERVICE_NAME}.service habilitado no boot."
@@ -530,11 +569,13 @@ if [[ "$CONFIG_ASSISTENTE_VAL" == "S" && -n "$APC_USER" && -n "$APC_PASS" ]]; th
     draw_separator
     
     cd "$AGENT_DIR"
-    # Chamada com parâmetros oficiais do utilitário da APC
+    # Chamada com parâmetros do utilitário da APC (PCBEConfig)
+    # Nota técnica: args[0]=user=<usr>, args[1]=pass=<pwd>, args[2]=signal=<sig>, args[3]=port=<porta>
+    # Para USB em kernels modernos (Linux 6.x+), signal=USB_NO_KERNEL_CHECK e port=none são obrigatórios.
     if [[ "$APC_SIGNAL" == "serial" ]]; then
-        bash ./config.sh "user=${APC_USER}" "pass=${APC_PASS}" "signal=${APC_SIGNAL}" "port=${APC_PORT}" || true
+        bash ./config.sh "user=${APC_USER}" "pass=${APC_PASS}" "signal=serial" "port=${APC_PORT}" || true
     else
-        bash ./config.sh "user=${APC_USER}" "pass=${APC_PASS}" "signal=${APC_SIGNAL}" || true
+        bash ./config.sh "user=${APC_USER}" "pass=${APC_PASS}" "signal=USB_NO_KERNEL_CHECK" "port=none" || true
     fi
     draw_separator
     log_success "Credenciais e parâmetros aplicados com sucesso no PowerChute."
