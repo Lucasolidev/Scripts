@@ -94,6 +94,7 @@ readonly INSTALL_BASE_DIR="/opt/APC/PowerChuteSerialShutdown"
 readonly AGENT_DIR="${INSTALL_BASE_DIR}/Agent"
 readonly SERVICE_NAME="PBEAgent"
 readonly WEB_PORT="6547"
+readonly SNMP_PORT="161"
 
 # Variáveis de Estado e Parâmetros
 PACOTES_INSTALADOS=()
@@ -105,6 +106,7 @@ APC_PASS=""
 APC_SIGNAL="usb"
 APC_PORT="/dev/ttyS0"
 CONFIG_UFW_VAL="S"
+CONFIG_SNMP_UFW_VAL="S"
 OS_DISTRO=""
 OS_VERSION=""
 OS_CODENAME=""
@@ -375,10 +377,10 @@ else
     log_info "Configuração inicial de credenciais pulada a pedido do operador."
 fi
 
-# 2.3 - Liberação de Porta no Firewall UFW
+# 2.3 - Liberação de Portas no Firewall UFW (HTTPS 6547/tcp e SNMP 161/udp)
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
     echo -e "\n  ${BOLD}Firewall UFW Ativo Detectado:${NC}"
-    echo -e "  A interface de gerenciamento Web HTTPS utiliza a porta TCP ${WEB_PORT}."
+    echo -e "  A interface Web HTTPS utiliza a porta TCP ${WEB_PORT}."
     echo -ne "  ${FG_YELLOW}${ARROW} Deseja liberar a porta ${WEB_PORT}/tcp no firewall UFW? (S/n): ${NC}"
     read -r RESP_UFW
     RESP_UFW="${RESP_UFW:-S}"
@@ -389,8 +391,21 @@ if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
         CONFIG_UFW_VAL="N"
         log_info "Liberação no Firewall UFW: ${FG_YELLOW}Não${NC}"
     fi
+
+    echo -e "\n  O monitoramento via Zabbix / SNMP utiliza a porta UDP ${SNMP_PORT}."
+    echo -ne "  ${FG_YELLOW}${ARROW} Deseja liberar a porta ${SNMP_PORT}/udp (SNMP) no firewall UFW? (S/n): ${NC}"
+    read -r RESP_SNMP_UFW
+    RESP_SNMP_UFW="${RESP_SNMP_UFW:-S}"
+    if [[ "$RESP_SNMP_UFW" =~ ^[sSyY]$ ]]; then
+        CONFIG_SNMP_UFW_VAL="S"
+        log_info "Liberação no Firewall UFW: ${FG_GREEN}Sim (Porta ${SNMP_PORT}/udp - SNMP)${NC}"
+    else
+        CONFIG_SNMP_UFW_VAL="N"
+        log_info "Liberação no Firewall UFW: ${FG_YELLOW}Não${NC}"
+    fi
 else
     CONFIG_UFW_VAL="N"
+    CONFIG_SNMP_UFW_VAL="N"
 fi
 
 # ==============================================================================
@@ -401,7 +416,7 @@ print_header "INSTALAÇÃO DE DEPENDÊNCIAS DO SISTEMA"
 log_info "Atualizando índices de pacotes do Ubuntu Server..."
 apt-get update -qq >/dev/null 2>&1
 
-DEPENDENCIAS_SISTEMA=(rpm unzip curl ca-certificates udev)
+DEPENDENCIAS_SISTEMA=(rpm unzip curl ca-certificates udev snmp)
 
 for pkg in "${DEPENDENCIAS_SISTEMA[@]}"; do
     if dpkg -s "$pkg" >/dev/null 2>&1; then
@@ -612,11 +627,23 @@ if [[ "$CONFIG_UFW_VAL" == "S" ]]; then
     if ufw allow "${WEB_PORT}/tcp" comment 'APC PowerChute Serial Shutdown Web UI' >/dev/null 2>&1; then
         log_success "Porta ${WEB_PORT}/tcp liberada com sucesso no UFW."
     else
-        log_warning "Não foi possível aplicar a regra no UFW."
+        log_warning "Não foi possível aplicar a regra TCP ${WEB_PORT} no UFW."
     fi
 else
-    log_skipped "Configuração do UFW não solicitada ou firewall inativo."
-    echo -e "  ${DIM}Para liberar manualmente execute:${NC} ${BOLD}sudo ufw allow ${WEB_PORT}/tcp comment 'APC PowerChute'${NC}"
+    log_skipped "Liberação da porta ${WEB_PORT}/tcp no UFW não solicitada ou firewall inativo."
+    echo -e "  ${DIM}Para liberar manualmente execute:${NC} ${BOLD}sudo ufw allow ${WEB_PORT}/tcp comment 'APC PowerChute Web UI'${NC}"
+fi
+
+if [[ "$CONFIG_SNMP_UFW_VAL" == "S" ]]; then
+    log_info "Liberando porta ${SNMP_PORT}/udp (SNMP) no Firewall UFW..."
+    if ufw allow "${SNMP_PORT}/udp" comment 'SNMP Daemon / APC PowerChute' >/dev/null 2>&1; then
+        log_success "Porta ${SNMP_PORT}/udp liberada com sucesso no UFW."
+    else
+        log_warning "Não foi possível aplicar a regra UDP ${SNMP_PORT} no UFW."
+    fi
+else
+    log_skipped "Liberação da porta ${SNMP_PORT}/udp (SNMP) no UFW não solicitada ou firewall inativo."
+    echo -e "  ${DIM}Para liberar manualmente execute:${NC} ${BOLD}sudo ufw allow ${SNMP_PORT}/udp comment 'SNMP Daemon / APC PowerChute'${NC}"
 fi
 
 # ==============================================================================
@@ -664,6 +691,7 @@ echo -e "  ${BOLD}Data de Lançamento:${NC}         ${FG_WHITE}${PCSS_RELEASE_DA
 echo -e "  ${BOLD}Serviço do Sistema:${NC}         ${STATUS_SERVICE}"
 echo -e "  ${BOLD}Diretório de Instalação:${NC}    ${FG_CYAN}${AGENT_DIR}${NC}"
 echo -e "  ${BOLD}Porta Web de Gerência:${NC}      ${FG_WHITE}${WEB_PORT} (TCP / HTTPS)${NC}"
+echo -e "  ${BOLD}Porta Agente SNMP:${NC}          ${FG_WHITE}${SNMP_PORT} (UDP / SNMPv1 e SNMPv3)${NC}"
 echo -e "  ${BOLD}URL de Acesso:${NC}              ${FG_CYAN}https://${SERVER_IP}:${WEB_PORT}${NC}"
 echo -e "  ${BOLD}Log de Instalação:${NC}          ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
@@ -672,6 +700,7 @@ echo -e "  ${BOLD}Comandos Úteis de Gerenciamento:${NC}"
 echo -e "  • Verificar Status:   ${BOLD}sudo systemctl status ${SERVICE_NAME}${NC}"
 echo -e "  • Reiniciar Serviço:  ${BOLD}sudo systemctl restart ${SERVICE_NAME}${NC}"
 echo -e "  • Parar Serviço:      ${BOLD}sudo systemctl stop ${SERVICE_NAME}${NC}"
+echo -e "  • Testar SNMP Local:  ${BOLD}snmpwalk -v1 -c <sua_comunidade> 127.0.0.1 1.3.6.1.4.1.318${NC}"
 echo -e "  • Reconfigurar APC:   ${BOLD}cd ${AGENT_DIR} && sudo bash config.sh${NC}"
 echo -e "  • Portal do Produto:  ${DIM}${PCSS_PORTAL_URL}${NC}"
 echo -e ""
