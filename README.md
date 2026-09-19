@@ -81,6 +81,13 @@ Script não-invasivo de diagnóstico e varredura completa pré-migração. Mapei
 wget https://raw.githubusercontent.com/lucasolidev/scripts/main/auditoria_servidor_inventario.sh -O auditoria_servidor_inventario.sh && chmod +x auditoria_servidor_inventario.sh && sudo ./auditoria_servidor_inventario.sh
 ```
 
+### 7. Instalador Schneider APC PowerChute Serial Shutdown (`install_apc_powerchute.sh`)
+Instala e configura o agente de gerenciamento para nobreaks APC (**PowerChute Serial Shutdown v1.6.0-301**) em servidores **Ubuntu Server (24.04 / 26.04 LTS)** com suporte a comunicação USB e Serial. Prepara o runtime Java OpenJDK 17 headless, cria o usuário de serviço dedicado `pcssagent`, configura o serviço systemd com inicialização automática e ajusta regras no firewall UFW para as portas web segura (HTTPS 6547) e SNMP:
+```bash
+wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/install_apc_powerchute.sh -O install_apc_powerchute.sh && chmod +x install_apc_powerchute.sh && sudo ./install_apc_powerchute.sh
+```
+
+
 
 ---
 
