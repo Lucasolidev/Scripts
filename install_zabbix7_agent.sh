@@ -74,10 +74,11 @@ print_alert_box() {
     echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
 }
 
-# Variáveis de Execução
+## Variáveis de Execução
 HOSTNAME_VAL=""
 SERVER_VAL=""
 CONFIRMAR=""
+ENABLE_ACTIVE_CHECKS=""
 PACOTES_INSTALADOS=()
 OS_DISTRO=""
 OS_VERSION=""
@@ -85,7 +86,7 @@ OS_CODENAME=""
 ZABBIX_REPO_URL=""
 
 # ==============================================================================
-# 1.2 - VALIDAÇÃO DE PRIVILÉGIOS E INICIALIZAÇÃO DE LOGS PADRONIZADOS
+# VALIDAÇÃO DE PRIVILÉGIOS E INICIALIZAÇÃO DE LOGS PADRONIZADOS
 # ==============================================================================
 if [[ "$(id -u)" -ne 0 ]]; then
     log_error "Este script requer privilégios de superusuário. Execute como root (sudo)."
@@ -154,6 +155,10 @@ log_info "Hostname definido: ${FG_GREEN}${HOSTNAME_VAL}${NC}"
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o IP do Servidor Zabbix (Padrão: ${DEFAULT_SERVER}): ${NC}")" input_server
 SERVER_VAL="${input_server:-$DEFAULT_SERVER}"
 log_info "Servidor Zabbix definido: ${FG_GREEN}${SERVER_VAL}${NC}"
+
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Habilitar Checagens Ativas (ServerActive porta 10051)? (s/N): ${NC}")" input_active
+ENABLE_ACTIVE_CHECKS="${input_active:-N}"
+log_info "Checagens ativas: ${FG_GREEN}${ENABLE_ACTIVE_CHECKS}${NC}"
 
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja aplicar estas configurações ao arquivo final? [S/n]: ${NC}")" input_confirm
 CONFIRMAR="${input_confirm:-S}"
@@ -247,13 +252,27 @@ if [[ "$CONFIRMAR" =~ ^[Ss]$ ]]; then
         log_info "Backup da configuração anterior salvo em: ${BACKUP_FILE}"
     fi
 
+    local_server_active=""
+    if [[ "$ENABLE_ACTIVE_CHECKS" =~ ^[Ss]$ ]]; then
+        local_server_active="ServerActive=${SERVER_VAL}"
+        log_info "Configurando checagens ativas (ServerActive=${SERVER_VAL})."
+    else
+        local_server_active="# ServerActive= (desabilitado - ambiente passivo)"
+        log_info "Checagens ativas desabilitadas (modo puramente passivo)."
+    fi
+
     log_info "Gerando arquivo de configuração customizado..."
     cat <<EOF > "$ZABBIX_CONF_FILE"
 ### Agente Zabbix ###
 
+# Nome do Host
 Hostname=${HOSTNAME_VAL}
+
+# Servidor/Proxy Zabbix (Modo Passivo)
 Server=${SERVER_VAL}
-ServerActive=${SERVER_VAL}
+
+# Servidor/Proxy Zabbix (Modo Ativo)
+${local_server_active}
 
 ListenPort=10050
 PidFile=${ZABBIX_PID_FILE}
@@ -261,6 +280,10 @@ LogFile=${ZABBIX_LOG_FILE}
 LogFileSize=2
 DebugLevel=3
 Timeout=30
+
+### Execucao e Log de Comandos Remotos (Sintaxe Zabbix 7.0 LTS) ###
+AllowKey=system.run[*]
+LogRemoteCommands=1
 
 # Endereco IP WAN
 UserParameter=net.ipaddress,curl -s -L -k http://www.geset.com.br/suporte/ip.php
@@ -317,6 +340,11 @@ echo -e "  ${DIM}─────────────────────
 echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional${NC}"
 echo -e "  ${BOLD}Sistema Operacional:${NC}   ${FG_CYAN}Ubuntu ${OS_VERSION} (${OS_CODENAME})${NC}"
 echo -e "  ${BOLD}Versão do Script:${NC}      ${FG_WHITE}v${VERSION}${NC}"
+if [[ "$ENABLE_ACTIVE_CHECKS" =~ ^[Ss]$ ]]; then
+    echo -e "  ${BOLD}Modo de Operação:${NC}      ${FG_GREEN}Híbrido (Passivo + Ativo)${NC}"
+else
+    echo -e "  ${BOLD}Modo de Operação:${NC}      ${FG_CYAN}Passivo (Server porta 10050)${NC}"
+fi
 
 LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
 echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-Nenhum}${NC}"
