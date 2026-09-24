@@ -661,50 +661,123 @@ sudo setfacl -R -d -m u:www-data:rwx,g:www-data:rwx,u:zelio_dev:rwx,g:zelio_dev:
 
 ---
 
-## 💾 7. Aumento de Armazenamento - Partição Simples (EXT4)
+## 💾 7. Gerenciamento e Aumento de Armazenamento - Partição Simples (EXT4)
 
-### 1. Verificar montagens atuais
+> 💡 **Novo Disco vs. Expansão de Armazenamento:**
+> * **Adicionar novo disco do zero:** Se você adicionou um novo disco rígido ou virtual (ex: `/dev/sdb` de 80G cru) e precisa criar partição, formatar em EXT4 e mapear em `/arquivos`, siga o **[Cenário A](#-cenário-a-adicionar-novo-disco-e-montar-ex-devsdb-em-arquivos)** abaixo (ou consulte a **[Seção 6](#-6-inicialização-particionamento-e-montagem-de-novo-disco-ext4--fstab)** para configurações detalhadas de POSIX ACLs).
+> * **Aumentar partição existente:** Se o disco já está montado e foi expandido no hipervisor/cloud (ex: Proxmox, VMware, AWS), siga o **[Cenário B](#-cenário-b-aumentar--expandir-capacidade-de-partição-existente-ext4)** para expandir online sem reiniciar o servidor.
+
+---
+
+### 🟢 Cenário A: Adicionar Novo Disco e Montar (Ex: /dev/sdb em /arquivos)
+
+Utilize este fluxo quando um novo disco rígido ou virtual (vDisk) foi adicionado à máquina e ainda não possui partições formatadas (`lsblk` exibe apenas o disco cru, ex: `sdb`).
+
+#### 1. Identificar o novo disco e status atual
+```bash
+lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINTS,TYPE
+```
+
+#### 2. Criar a Tabela de Partições (GPT) e Partição Primária (`parted`)
+A tabela GPT suporta discos superiores a 2TB e possui maior tolerância a falhas que a MBR:
+```bash
+sudo parted /dev/sdb --script mklabel gpt mkpart primary ext4 0% 100%
+```
+
+```bash
+# Atualizar a tabela de partições no Kernel imediatamente
+sudo partprobe /dev/sdb
+```
+
+#### 3. Formatar a Partição em EXT4 (`mkfs.ext4`)
+```bash
+# Otimização (-m 1): reduz o espaço reservado do root de 5% para 1%, liberando mais gigabytes para uso
+sudo mkfs.ext4 -m 1 -F /dev/sdb1
+```
+
+#### 4. Criar o Diretório Ponto de Montagem
+```bash
+sudo mkdir -p /arquivos
+```
+
+#### 5. Configurar Montagem Persistente no `/etc/fstab` (via UUID com proteção nofail)
+> ⚠️ **Atenção:** Sempre utilize o **UUID** em vez do caminho `/dev/sdb1` (as letras `sdb`, `sdc` podem mudar após reinicializações). O parâmetro `nofail` impede que o servidor entre em modo de emergência caso o disco secundário esteja ausente no boot.
+
+```bash
+# Capturar o UUID e anexar a linha ao /etc/fstab automaticamente:
+UUID_SDB=$(sudo blkid -s UUID -o value /dev/sdb1)
+echo "UUID=${UUID_SDB}  /arquivos  ext4  defaults,nofail  0  2" | sudo tee -a /etc/fstab
+```
+
+#### 6. Testar a Montagem sem Reiniciar e Validar
+```bash
+# Monta todas as entradas configuradas no fstab
+sudo mount -a
+```
+
+```bash
+# Valida se montou corretamente e confere o tamanho
+df -h /arquivos
+```
+
+#### 7. Ajustar Proprietário e Permissões Iniciais
+```bash
+# Ajusta o proprietário para o usuário da aplicação ou operador:
+sudo chown -R administrador:administrador /arquivos
+```
+
+```bash
+# Define permissão de leitura, escrita e execução para dono e grupo:
+sudo chmod 775 /arquivos
+```
+
+---
+
+### 🔵 Cenário B: Aumentar / Expandir Capacidade de Partição Existente (EXT4)
+
+Utilize este fluxo quando o disco (ex: `sda`, `sdb` ou `sdc`) já estava montado e teve seu tamanho aumentado no hipervisor (Proxmox, VMware, VirtualBox) ou provedor de nuvem (AWS, GCP, Azure).
+
+#### 1. Verificar montagens e tamanho atual
 ```bash
 df -hT
 ```
 
-### 2. Forçar o Kernel a reconhecer o novo tamanho do disco (ex: sda ou sdc)
+#### 2. Forçar o Kernel a reconhecer o novo tamanho do disco (Rescan SCSI sem reboot)
 > ⚠️ **Atenção:** Nunca use `sudo echo 1 > ...`, pois o shell do usuário comum avalia o `>` antes de chamar o `sudo`, gerando o erro `-bash: ...: Permissão negada`. Utilize o utilitário `tee`:
 
 ```bash
-# Método correto com tee (recomendado):
-echo 1 | sudo tee /sys/class/block/sdc/device/rescan
+# Rescan em um disco específico (ex: sdb):
+echo 1 | sudo tee /sys/class/block/sdb/device/rescan
+```
 
-# Ou via subshell com sudo:
-sudo sh -c 'echo 1 > /sys/class/block/sdc/device/rescan'
-
-# Dica: Forçar o rescan de TODOS os discos e controladoras SCSI de uma vez só:
+```bash
+# Dica: Forçar o rescan de TODOS os discos e controladoras SCSI de uma só vez:
 echo "- - -" | sudo tee /sys/class/scsi_host/host*/scan
 ```
 
-### 3. Confirmar se o disco principal cresceu no lsblk
+#### 3. Confirmar se o disco principal cresceu no `lsblk`
 ```bash
 lsblk
 ```
 
-### 4. Instalar ferramenta de expansão de partição
+#### 4. Instalar ferramenta de expansão de partição (se ainda não tiver)
 ```bash
-apt update && apt install -y cloud-guest-utils
+sudo apt update && sudo apt install -y cloud-guest-utils
 ```
 
-### 5. Expandir a partição 1 do disco target (Substitua sdX pelo seu disco)
+#### 5. Expandir a partição no disco target (Substitua sdX pelo seu disco)
 ```bash
-growpart /dev/sdX 1
+sudo growpart /dev/sdb 1
 ```
 
-### 6. Redimensionar o sistema de arquivos ext4
+#### 6. Redimensionar o sistema de arquivos EXT4 online (sem desmontar)
 ```bash
-resize2fs /dev/sdX1
+sudo resize2fs /dev/sdb1
 ```
 
-### 7. Confirmar novo espaço
+#### 7. Confirmar o novo espaço disponível
 ```bash
-df -hT
+df -hT /arquivos
 ```
 
 ---
