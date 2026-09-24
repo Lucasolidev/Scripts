@@ -521,14 +521,16 @@ if [[ "${CRIAR_USUARIO:-n}" =~ ^[Ss]$ && -n "${NOVO_USER:-}" ]]; then
   log_success "Usuário '$NOVO_USER' configurado e adicionado ao grupo $NOME_GRUPO."
 fi
 
-# 3. Auditoria da existência do usuário 'geset' para travas do Sudoers
-log_info "Auditando existência do usuário 'geset' para travas do Sudoers..."
+# 3. Auditoria da existência de contas administrativas para travas do Sudoers (root, administrador, geset)
+REGRAS_ADMIN_PASSWD=""
+log_info "Auditando contas administrativas para bloqueio de alteração de senha no Visudo..."
+if id "administrador" &>/dev/null; then
+  REGRAS_ADMIN_PASSWD="${REGRAS_ADMIN_PASSWD}, !/usr/bin/passwd administrador"
+  log_success "Usuário 'administrador' detectado. Bloqueio de passwd adicionado ao Visudo."
+fi
 if id "geset" &>/dev/null; then
-  REGRA_GESET=", !/usr/bin/passwd geset"
-  log_success "Usuário geset localizado. Trava de proteção adicionada ao Visudo."
-else
-  REGRA_GESET=""
-  log_info "Usuário geset não existe neste servidor. Trava de passwd geset dispensada."
+  REGRAS_ADMIN_PASSWD="${REGRAS_ADMIN_PASSWD}, !/usr/bin/passwd geset"
+  log_success "Usuário 'geset' detectado. Bloqueio de passwd adicionado ao Visudo."
 fi
 
 # 4. Auditoria e aplicação das regras de segurança no Visudo para os grupos operacionais
@@ -549,7 +551,7 @@ for grp in "${GRUPOS_PROCESSAR[@]}"; do
     SUDOERS_TMP=$(mktemp)
     cat << EOF > "$SUDOERS_TMP"
 # Regras de seguranca para o grupo $grp (Compativel com sudo tradicional e sudo-rs / Ubuntu 24.04 e 26.04)
-%$grp ALL=(ALL:ALL) ALL, !/usr/bin/passwd root${REGRA_GESET}, !/usr/bin/passwd "", !/usr/sbin/visudo, !/usr/sbin/usermod, !/usr/bin/gpasswd, !/usr/bin/su, !/usr/bin/sudo -i, !/usr/bin/sudo -s, !/usr/bin/sudo /bin/bash, !/usr/bin/sudo /bin/sh, !/usr/bin/sudoedit, !/usr/bin/nano /etc/shadow, !/usr/bin/nano /etc/sudoers, !/usr/bin/vi /etc/shadow, !/usr/bin/vi /etc/sudoers, !/usr/bin/vim /etc/shadow, !/usr/bin/vim /etc/sudoers, !/usr/bin/cat /etc/shadow, !/usr/bin/head /etc/shadow, !/usr/bin/tail /etc/shadow, !/usr/bin/less /etc/shadow, !/usr/bin/more /etc/shadow
+%$grp ALL=(ALL:ALL) ALL, !/usr/bin/passwd root${REGRAS_ADMIN_PASSWD}, !/usr/bin/passwd "", !/usr/sbin/visudo, !/usr/sbin/usermod, !/usr/bin/gpasswd, !/usr/bin/su, !/usr/bin/sudo -i, !/usr/bin/sudo -s, !/usr/bin/sudo /bin/bash, !/usr/bin/sudo /bin/sh, !/usr/bin/sudoedit, !/usr/bin/nano /etc/shadow, !/usr/bin/nano /etc/sudoers, !/usr/bin/vi /etc/shadow, !/usr/bin/vi /etc/sudoers, !/usr/bin/vim /etc/shadow, !/usr/bin/vim /etc/sudoers, !/usr/bin/cat /etc/shadow, !/usr/bin/head /etc/shadow, !/usr/bin/tail /etc/shadow, !/usr/bin/less /etc/shadow, !/usr/bin/more /etc/shadow
 EOF
     if visudo -cf "$SUDOERS_TMP" > /dev/null 2>&1; then
       mv "$SUDOERS_TMP" "$ARQ_SUDO"

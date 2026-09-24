@@ -363,7 +363,7 @@ O script gerencia automaticamente os três grupos operacionais corporativos padr
 * 📂 **Arquivos Gerados**: `/etc/sudoers.d/grupo_dev`, `/etc/sudoers.d/grupo_ti`, `/etc/sudoers.d/grupo_suporte` (permissão estrita `0440`).
 * ✅ **Permitido**: Executar comandos administrativos do dia a dia com `sudo` (ex: `apt update`, `systemctl`, `docker`, gerenciamento de serviços).
 * ❌ **Bloqueado por Segurança**:
-  - Alterar a senha do usuário `root` ou `geset` (`!/usr/bin/passwd root`, `!/usr/bin/passwd geset`, `!/usr/bin/passwd ""`).
+  - Alterar a senha das contas administrativas `root`, `administrador` e `geset` (`!/usr/bin/passwd root`, `!/usr/bin/passwd administrador`, `!/usr/bin/passwd geset`, `!/usr/bin/passwd ""`).
   - Execução de editores com privilégios de root sobre arquivos sensíveis (`!/usr/bin/sudoedit`, `!/usr/bin/nano /etc/shadow`, `!/usr/bin/vi /etc/shadow`, `!/usr/bin/vim /etc/shadow`, `!/usr/bin/nano /etc/sudoers`, `!/usr/bin/vi /etc/sudoers`, `!/usr/bin/vim /etc/sudoers`).
   - Leitura direta do arquivo de senhas hash (`/etc/shadow`) via `cat`, `head`, `tail`, `less`, `more`.
   - Execução direta de shells privilegiados sem log (`!/usr/bin/su`, `!/usr/bin/sudo -i`, `!/usr/bin/sudo -s`, `!/usr/bin/sudo /bin/bash`, `!/usr/bin/sudo /bin/sh`).
