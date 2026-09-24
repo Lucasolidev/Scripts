@@ -21,7 +21,7 @@
 # 11. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
 # 12. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH (22/tcp) e Zabbix Agent (10050/tcp).
 # 13. Configura e personaliza o editor Vim com tema Sonokai, Airline e plugins com suporte multi-usuário (/root, /etc/skel, /home).
-# 14. Instala o Banner dinâmico de Boas-Vindas no login (/etc/profile.d/motd_banner.sh) com Hostname, Sistema, Kernel, Uptime, RAM, Discos, IPs e Status do Firewall UFW.
+# 14. Instala o Banner dinâmico de Boas-Vindas no login (/usr/local/bin/motd_banner.sh integrado ao /etc/profile.d e /etc/bash.bashrc) com Hostname, Sistema, Kernel, Uptime, RAM, Discos, IPs e Status do Firewall UFW.
 # 15. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 
@@ -301,6 +301,7 @@ for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
     grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt-get update && sudo apt-get upgrade -y'" >> "$bashrc"
     grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt-get autoremove -y && sudo apt-get autoclean'" >> "$bashrc"
     grep -q "alias reload=" "$bashrc" || echo "alias reload='source ~/.bashrc'" >> "$bashrc"
+    grep -q "alias motd=" "$bashrc" || echo "alias motd='/usr/local/bin/motd_banner.sh'" >> "$bashrc"
   fi
 done
 log_success "Aliases de produtividade e segurança configurados em todos os perfis .bashrc."
@@ -654,79 +655,118 @@ done
 log_success "Editor Vim configurado com plugins (Sonokai/Airline) em /root, /etc/skel e /home."
 
 # ==============================================================================
-# 11. BANNER DINÂMICO DE BOAS-VINDAS NO LOGIN (/etc/profile.d/motd_banner.sh)
+# 11. BANNER DINÂMICO DE BOAS-VINDAS NO LOGIN (/usr/local/bin/motd_banner.sh)
 # ==============================================================================
 print_header "BANNER DE BOAS-VINDAS NO LOGIN"
-log_info "Configurando banner de boas-vindas dinâmico em /etc/profile.d/motd_banner.sh..."
+log_info "Configurando banner de boas-vindas dinâmico em /usr/local/bin/motd_banner.sh..."
 
-cat << 'EOF' > /etc/profile.d/motd_banner.sh
+cat << 'EOF' > /usr/local/bin/motd_banner.sh
 #!/bin/bash
 # ==============================================================================
 # Banner Dinâmico de Boas-Vindas e Diagnóstico do Servidor
 # Exibido automaticamente em sessões interativas de shell (SSH / Console)
 # ==============================================================================
-if [ -n "$PS1" ]; then
-  HOSTNAME=$(hostname 2>/dev/null || uname -n)
-  SISTEMA=$(lsb_release -ds 2>/dev/null || grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || echo "Linux")
-  KERNEL=$(uname -r)
-  UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
-  RAM_USO=$(free -h 2>/dev/null | awk '/^Mem:/ {print "Usado: " $3 " / Total: " $2 " (Livre: " $7 ")"}')
-  SWAP_USO=$(free -h 2>/dev/null | awk '/^Swap:/ { if ($2 == "0B" || $2 == "0" || $2 == "") print "Desativada (0B)"; else print "Usado: " $3 " / Total: " $2 " (Livre: " $4 ")" }')
 
-  echo -e "\033[1;36m================================================================\033[0m"
-  echo -e "  \033[1;32m📌 VOCÊ CONECTOU EM:\033[0m"
-  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Hostname:" "${HOSTNAME}"
-  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m \033[2m(Kernel %s)\033[0m\n" "Sistema:" "${SISTEMA}" "${KERNEL}"
-  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Uptime:" "${UPTIME}"
-  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória RAM:" "${RAM_USO}"
-  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória SWAP:" "${SWAP_USO:-Desativada (0B)}"
+# Executa apenas se a saída padrão for um terminal interativo (evita quebrar scp/sftp/rsync)
+[ -t 1 ] || exit 0
 
-  # Partições / Discos Físicos Montados
-  DISCOS_ENCONTRADOS=0
+HOSTNAME=$(hostname 2>/dev/null || uname -n)
+SISTEMA=$(lsb_release -ds 2>/dev/null || grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || echo "Linux")
+KERNEL=$(uname -r)
+UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
+RAM_USO=$(free -h 2>/dev/null | awk '/^Mem:/ {print "Usado: " $3 " / Total: " $2 " (Livre: " $7 ")"}')
+SWAP_USO=$(free -h 2>/dev/null | awk '/^Swap:/ { if ($2 == "0B" || $2 == "0" || $2 == "") print "Desativada (0B)"; else print "Usado: " $3 " / Total: " $2 " (Livre: " $4 ")" }')
+
+echo -e "\033[1;36m================================================================\033[0m"
+echo -e "  \033[1;32m📌 VOCÊ CONECTOU EM:\033[0m"
+printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Hostname:" "${HOSTNAME}"
+printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m \033[2m(Kernel %s)\033[0m\n" "Sistema:" "${SISTEMA}" "${KERNEL}"
+printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Uptime:" "${UPTIME}"
+printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória RAM:" "${RAM_USO}"
+printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória SWAP:" "${SWAP_USO:-Desativada (0B)}"
+
+# Partições / Discos Físicos Montados
+DISCOS_ENCONTRADOS=0
+DISCOS_RAW=$(df -hP -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs -x iso9660 -x rootfs 2>/dev/null | awk 'NR>1 && ($1 ~ /^\/dev/ || $1 ~ /:/) && $6 !~ /^\/boot/ {print $6, $3, $2, $4, $5}')
+if [ -n "$DISCOS_RAW" ]; then
   while read -r mountpoint used total free perc; do
     if [ -n "$mountpoint" ]; then
       DISCOS_ENCONTRADOS=1
       lbl="Disco (${mountpoint}):"
       printf "     \033[1m%-18s\033[0m \033[36mUsado: %s / Total: %s (Livre: %s | %s)\033[0m\n" "$lbl" "$used" "$total" "$free" "$perc"
     fi
-  done < <(df -hP -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs -x iso9660 -x rootfs 2>/dev/null | awk 'NR>1 && ($1 ~ /^\/dev/ || $1 ~ /:/) && $6 !~ /^\/boot/ {print $6, $3, $2, $4, $5}')
+  done <<< "$DISCOS_RAW"
+fi
 
-  if [ "$DISCOS_ENCONTRADOS" -eq 0 ]; then
-    ROOT_DF=$(df -h / 2>/dev/null | awk 'NR==2 {print "Usado: " $3 " / Total: " $2 " (Livre: " $4 " | " $5 ")"}')
-    printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Disco (/):" "${ROOT_DF}"
-  fi
+if [ "$DISCOS_ENCONTRADOS" -eq 0 ]; then
+  ROOT_DF=$(df -h / 2>/dev/null | awk 'NR==2 {print "Usado: " $3 " / Total: " $2 " (Livre: " $4 " | " $5 ")"}')
+  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Disco (/):" "${ROOT_DF}"
+fi
 
-  # Interfaces de Rede e Endereços IPv4 (por último, abaixo dos discos)
-  IPS_ENCONTRADOS=0
+# Interfaces de Rede e Endereços IPv4
+IPS_ENCONTRADOS=0
+IPS_RAW=$(ip -4 -o addr show scope global 2>/dev/null | awk '$2 != "lo" {split($4, a, "/"); print $2, a[1]}')
+if [ -n "$IPS_RAW" ]; then
   while read -r iface ip_addr; do
     if [ -n "$iface" ] && [ -n "$ip_addr" ]; then
       IPS_ENCONTRADOS=1
       lbl="IP (${iface}):"
       printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "$lbl" "$ip_addr"
     fi
-  done < <(ip -4 -o addr show scope global 2>/dev/null | awk '$2 != "lo" {split($4, a, "/"); print $2, a[1]}')
-
-  if [ "$IPS_ENCONTRADOS" -eq 0 ]; then
-    IP_FALLBACK=$(hostname -I 2>/dev/null | awk '{print $1}')
-    printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "IP Local:" "${IP_FALLBACK:-N/A}"
-  fi
-
-  # Status do Firewall UFW
-  if (grep -qs -i "^ENABLED=yes" /etc/ufw/ufw.conf 2>/dev/null && systemctl is-active --quiet ufw 2>/dev/null) || (ufw status 2>/dev/null | grep -qi "^Status:[[:space:]]*active"); then
-    UFW_STATUS_TXT="\033[1;32mAtivo\033[0m"
-  elif command -v ufw >/dev/null 2>&1; then
-    UFW_STATUS_TXT="\033[1;33mInativo\033[0m"
-  else
-    UFW_STATUS_TXT="\033[1;33mNão Instalado\033[0m"
-  fi
-  printf "     \033[1m%-18s\033[0m %b\n" "Firewall UFW:" "${UFW_STATUS_TXT}"
-
-  echo -e "\033[1;36m================================================================\033[0m\n"
+  done <<< "$IPS_RAW"
 fi
+
+if [ "$IPS_ENCONTRADOS" -eq 0 ]; then
+  IP_FALLBACK=$(hostname -I 2>/dev/null | awk '{print $1}')
+  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "IP Local:" "${IP_FALLBACK:-N/A}"
+fi
+
+# Status do Firewall UFW
+if (grep -qs -i "^ENABLED=yes" /etc/ufw/ufw.conf 2>/dev/null && systemctl is-active --quiet ufw 2>/dev/null) || (ufw status 2>/dev/null | grep -qi "^Status:[[:space:]]*active"); then
+  UFW_STATUS_TXT="\033[1;32mAtivo\033[0m"
+elif command -v ufw >/dev/null 2>&1; then
+  UFW_STATUS_TXT="\033[1;33mInativo\033[0m"
+else
+  UFW_STATUS_TXT="\033[1;33mNão Instalado\033[0m"
+fi
+printf "     \033[1m%-18s\033[0m %b\n" "Firewall UFW:" "${UFW_STATUS_TXT}"
+
+echo -e "\033[1;36m================================================================\033[0m\n"
 EOF
 
-chmod +x /etc/profile.d/motd_banner.sh
-log_success "Banner dinâmico configurado com sucesso em /etc/profile.d/motd_banner.sh."
+chmod 755 /usr/local/bin/motd_banner.sh
+
+log_info "Integrando banner ao /etc/profile.d/ e /etc/bash.bashrc com controle de sessão..."
+cat << 'EOF' > /etc/profile.d/motd_banner.sh
+#!/bin/sh
+# Exibe o banner apenas em terminais interativos (login shell)
+if [ -t 1 ] && [ -z "$__MOTD_SHOWN" ] && [ -x /usr/local/bin/motd_banner.sh ]; then
+  export __MOTD_SHOWN=1
+  /usr/local/bin/motd_banner.sh
+fi
+EOF
+chmod 755 /etc/profile.d/motd_banner.sh
+
+# Garante a chamada em /etc/bash.bashrc para shells interativos não-login
+if ! grep -q "motd_banner.sh" /etc/bash.bashrc 2>/dev/null; then
+  cat << 'EOF' >> /etc/bash.bashrc
+
+# Exibe o banner dinâmico do servidor em shells interativos (se ainda não exibido na sessão)
+if [ -t 1 ] && [ -z "$__MOTD_SHOWN" ] && [ -x /usr/local/bin/motd_banner.sh ]; then
+  export __MOTD_SHOWN=1
+  /usr/local/bin/motd_banner.sh
+fi
+EOF
+fi
+
+# Desativa notícias de publicidade do Ubuntu motd para manter login limpo
+chmod -x /etc/update-motd.d/10-help-text /etc/update-motd.d/50-motd-news 2>/dev/null || true
+rm -f /etc/update-motd.d/01-custom-banner 2>/dev/null || true
+
+# Remove qualquer .hushlogin que possa silenciar o login
+rm -f /root/.hushlogin /home/*/.hushlogin 2>/dev/null || true
+
+log_success "Banner dinâmico configurado em /usr/local/bin/motd_banner.sh, /etc/profile.d/ e /etc/bash.bashrc."
 
 # ==============================================================================
 # 12. RESUMO DA INSTALAÇÃO
@@ -766,7 +806,7 @@ echo -e "  ${BOLD}Atualiz. de Segurança:${NC} $(get_service_status unattended-u
 echo -e "  ${BOLD}Auditd (Integridade):${NC}  ${FG_GREEN}${AUDIT_STATUS}${NC}"
 echo -e "  ${BOLD}Editor Vim:${NC}            $( [ -f /root/.vimrc ] && echo -e "${FG_GREEN}Configurado (Tema Sonokai / Airline)${NC}" || echo -e "${FG_YELLOW}Padrão${NC}")"
 echo -e "  ${BOLD}Segurança SSH:${NC}         $(grep -qs -i "^PermitRootLogin[[:space:]]\+yes" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null && echo -e "${FG_YELLOW}Root Login Permitido${NC}" || echo -e "${FG_GREEN}Root Login Desabilitado (Hardened)${NC}")"
-echo -e "  ${BOLD}Banner no Login:${NC}       $( [ -f /etc/profile.d/motd_banner.sh ] && echo -e "${FG_GREEN}Ativo (/etc/profile.d/motd_banner.sh)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
+echo -e "  ${BOLD}Banner no Login:${NC}       $( [ -x /usr/local/bin/motd_banner.sh ] && echo -e "${FG_GREEN}Ativo (/etc/profile.d & /etc/bash.bashrc)${NC}" || echo -e "${FG_YELLOW}Inativo${NC}")"
 if command -v ufw >/dev/null 2>&1; then
   if ufw status 2>/dev/null | grep -q "^Status:[[:space:]]*active"; then
     PORTAS_RAW=$(ufw status 2>/dev/null | grep -i "ALLOW" | awk '{print $1}' | sort -u)

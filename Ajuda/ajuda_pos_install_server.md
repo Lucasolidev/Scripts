@@ -16,7 +16,8 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 | :--- | :--- |
 | `/root/relatorio_pos_install_server_*.log` | Log completo e detalhado com timestamp da execução do script pós-instalação. |
 | `/root/relatorio_pos_install_server_latest.log` | Atalho fixo apontando para o último log gerado de pós-instalação. |
-| `/etc/profile.d/motd_banner.sh` | Script do banner dinâmico de boas-vindas exibido após o login via SSH ou console. |
+| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, CPU, RAM, Disco, IP, UFW). |
+| `/etc/profile.d/motd_banner.sh` | Disparador automático do banner no login interativo via SSH ou console local. |
 | `/etc/fail2ban/jail.local` | Configuração local da jaula de proteção contra força bruta no SSH. |
 | `/etc/default/ufw` | Configurações do firewall UFW (incluindo suporte a IPv6 ativo `IPV6=yes`). |
 | `/etc/default/keyboard` | Mapeamento dual de layout de teclado (`ABNT2` + `US-International`). |
@@ -61,6 +62,7 @@ Os aliases abaixo são configurados automaticamente em `/root/.bashrc`, `/etc/sk
 | `update` | `sudo apt update && sudo apt upgrade -y` | Atualiza a lista de repositórios e pacotes do sistema com um só comando. |
 | `clean` | `sudo apt autoremove -y && sudo apt autoclean` | Remove pacotes órfãos e limpa o cache de pacotes baixados pelo APT. |
 | `reload` | `source ~/.bashrc` | Recarrega as configurações do shell sem necessidade de deslogar da sessão. |
+| `motd` | `/usr/local/bin/motd_banner.sh` | Exibe o banner com diagnóstico e métricas do servidor sob demanda. |
 | `..` | `cd ..` | Sobe um nível de diretório. |
 | `...` | `cd ../..` | Sobe dois níveis de diretório. |
 
