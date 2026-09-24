@@ -269,7 +269,70 @@ Para auditar o diretório da aplicação web e os arquivos de configuração do 
 
 ---
 
-## 💡 7. Como Interpretar os Logs do Auditd
+## 📁 7. Auditoria de Pastas Personalizadas e Anatomia das Regras
+
+### Anatomia de uma Regra de Monitoramento (`-w`)
+
+As regras de vigilância de arquivos e diretórios (*watches*) utilizam a seguinte sintaxe estrutural:
+
+```ini
+-w <caminho_do_arquivo_ou_pasta> -p <permissoes> -k <chave_identificadora>
+```
+
+| Parâmetro | Nome | Descrição |
+| :--- | :--- | :--- |
+| `-w` | *Watch* | Caminho absoluto do arquivo ou diretório monitorado. Ao apontar para uma pasta, o `auditd` monitora de forma **recursiva** todas as criações, modificações, alterações e exclusões dentro de sua estrutura. |
+| `-p` | *Permissions* | Permissões monitoradas: `r` (leitura), `w` (escrita/criação/exclusão), `x` (execução), `a` (alteração de atributos, permissões com `chmod` ou dono com `chown`). |
+| `-k` | *Key* | Rótulo identificador (tag) associado ao evento para facilitar consultas futuras com o utilitário `ausearch`. |
+
+> 💡 *Evite utilizar `-p r` (leitura) em diretórios com alto volume de acesso ou leitura contínua, pois isso pode sobrecarregar rapidamente o disco com logs. Para monitoramento de integridade e alterações de arquivos, a combinação `-p wa` é a mais indicada.*
+
+### Criar Regra para uma Pasta Específica (ex: `/arquivos`)
+
+Crie um arquivo modular terminado em `.rules` dentro de `/etc/audit/rules.d/` (por exemplo, `/etc/audit/rules.d/arquivos.rules`):
+
+```ini
+# Monitora criação, edição, exclusão (w) e mudança de atributos/permissões (a) na pasta /arquivos
+-w /arquivos/ -p wa -k audit_arquivos
+```
+
+### Validar e Carregar as Regras no Kernel (MANDATÓRIO)
+
+```bash
+# Validar a sintaxe dos arquivos de regras antes de carregá-los
+sudo augenrules --check
+```
+
+```bash
+# Compilar os arquivos de /etc/audit/rules.d/ e aplicar as novas regras no kernel
+sudo augenrules --load
+```
+
+```bash
+# Confirmar se a regra da pasta foi devidamente carregada no kernel
+sudo auditctl -l | grep audit_arquivos
+```
+
+### Consultas e Rastreamento de Eventos da Pasta
+
+```bash
+# Consultar todas as ações registradas na pasta auditada
+sudo ausearch -k audit_arquivos -i
+```
+
+```bash
+# Consultar apenas alterações recentes ocorridas na pasta
+sudo ausearch -k audit_arquivos -ts recent -i
+```
+
+```bash
+# Rastrear ações ocorridas em um arquivo específico dentro do diretório
+sudo ausearch -f /arquivos/<nome_do_arquivo> -i
+```
+
+---
+
+## 💡 8. Como Interpretar os Logs do Auditd
 
 Ao inspecionar a saída do `ausearch`, preste atenção aos quatro campos principais:
 

@@ -175,6 +175,87 @@ O comando `chmod` (change mode) define quem pode ler (`r`), escrever (`w`) ou ex
   chmod g-r arquivo.txt    # Remove permissão de leitura do grupo (group)
   ```
 
+### Permissões Avançadas e Compartilhamento com POSIX ACLs (`setfacl` e `getfacl`)
+
+O modelo tradicional de permissões do Linux (`chmod`) só permite **um dono**, **um grupo** e os **outros**. Quando você tem múltiplos usuários ou serviços diferentes que precisam colaborar na mesma pasta (por exemplo: time de desenvolvimento `DEV`, administradores `administrador` e `geset`, banco de dados `mysql` e servidor Web `www-data`), as permissões clássicas tornam-se limitadas. 
+
+O **POSIX ACL (Access Control Lists)** resolve isso permitindo conceder permissões sob medida para **quantos usuários e grupos forem necessários** em um mesmo diretório, com suporte a herança automática para novos arquivos.
+
+> 💡 **Pré-requisito:** Em sistemas Ubuntu Server minimalistas ou limpos, certifique-se de que o pacote `acl` está instalado:
+> ```bash
+> sudo apt update && sudo apt install -y acl
+> ```
+
+#### 1. Consultar Permissões Detalhadas (`getfacl`)
+Substitui o `ls -l` quando o arquivo possui um símbolo `+` no final das permissões (ex: `drwxrwxr-x+`):
+```bash
+getfacl /caminho/do/diretorio
+```
+*Exemplo de saída com ACLs ativas:*
+```text
+# file: arquivos
+# owner: root
+# group: root
+user::rwx
+user:administrador:rwx
+user:geset:rwx
+group::r-x
+group:DEV:rwx
+group:sudo:rwx
+mask::rwx
+other::r-x
+default:user::rwx
+default:user:administrador:rwx
+default:user:geset:rwx
+default:group::r-x
+default:group:DEV:rwx
+default:group:sudo:rwx
+default:mask::rwx
+default:other::r-x
+```
+
+#### 2. Conceder Permissões para Usuários e Grupos (`-m`)
+* **Liberar para usuários específicos (para gravarem diretamente sem precisar de `sudo`):**
+  ```bash
+  sudo setfacl -R -m u:administrador:rwx,u:geset:rwx /arquivos
+  ```
+* **Liberar para um grupo inteiro (ex: time de desenvolvimento `DEV` e administradores `sudo`):**
+  ```bash
+  sudo setfacl -R -m g:DEV:rwx,g:sudo:rwx /arquivos
+  ```
+* **Liberar para serviços do sistema (Banco de Dados e Servidor Web):**
+  ```bash
+  sudo setfacl -R -m u:mysql:rwx,u:www-data:rwx /arquivos
+  ```
+
+#### 3. Herança Automática para Novos Arquivos e Subpastas (`-d` / Default)
+> ⚠️ **Atenção:** Se você aplicar apenas o `-m`, novos arquivos criados posteriormente por outros usuários não herdarão essas permissões! Para garantir que **qualquer novo arquivo ou pasta** criado no futuro herde automaticamente o acesso de todos, utilize sempre a flag **`-d` (Default)**:
+
+```bash
+# Define a herança automática (Default) em cascata para novos arquivos e subpastas:
+sudo setfacl -R -d -m u:administrador:rwx,u:geset:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx /arquivos
+```
+
+#### 4. Remover Permissões de ACL (`-x` e `-b`)
+* **Remover o acesso de um usuário ou grupo específico:**
+  ```bash
+  sudo setfacl -R -x u:usuario_antigo /arquivos
+  sudo setfacl -R -d -x u:usuario_antigo /arquivos
+  ```
+* **Limpar todas as regras de ACL e voltar ao padrão clássico do chmod:**
+  ```bash
+  sudo setfacl -R -b /arquivos
+  ```
+
+#### 5. Resumo Comparativo: chmod vs SGID vs ACL
+| Método | Como funciona | Melhor Uso |
+| :--- | :--- | :--- |
+| **`chmod 775`** | 1 dono e 1 grupo apenas. | Arquivos pessoais ou pastas simples sem compartilhamento cruzado. |
+| **`chmod 2775 (SGID)`** | Novos arquivos herdam automaticamente o grupo da pasta pai. | Compartilhamento simples restrito a **apenas 1 grupo**. |
+| **`setfacl (POSIX ACL)`** | Múltiplos usuários e múltiplos grupos na mesma pasta com herança. | **Ambientes corporativos reais**: colaboração entre Devs, Admins, Banco e Web. |
+
+---
+
 ### ⚠️ Redirecionamento com Sudo (`>` vs `tee`) — A Pegadinha do "Permissão Negada"
 
 Um erro clássico no Linux ao tentar gravar em arquivos protegidos do sistema (como em `/sys/`, `/proc/` ou `/etc/`) é executar:
@@ -647,16 +728,44 @@ lsblk -f
 
 ---
 
-### 8. Aplicar Permissões Iniciais no Novo Disco
-Por padrão, um disco recém-formatado pertence ao usuário `root:root` com permissão restrita. Ajuste conforme a finalidade:
-```bash
-# Para permitir que o servidor Web e usuários gravem (usando ACLs):
-sudo chown -R www-data:www-data /arquivos
-sudo chmod -R 775 /arquivos
+### 8. Aplicar Permissões e Compartilhamento no Novo Disco (ACLs vs Chmod)
 
-# Conceder acesso a um desenvolvedor específico (ex: zelio_dev) com POSIX ACLs:
-sudo setfacl -R -m u:www-data:rwx,g:www-data:rwx,u:zelio_dev:rwx,g:zelio_dev:rwx /arquivos
-sudo setfacl -R -d -m u:www-data:rwx,g:www-data:rwx,u:zelio_dev:rwx,g:zelio_dev:rwx /arquivos
+Por padrão, um disco recém-formatado pertence ao usuário `root:root` com permissão `755` (`drwxr-xr-x`), permitindo apenas leitura para os outros usuários. Para liberar a criação e edição de arquivos, escolha a abordagem ideal:
+
+#### 🌟 Opção A: Compartilhamento Completo via POSIX ACLs (Recomendado para Ambientes com Devs, Admins e Banco)
+Permite que o grupo de desenvolvedores (`DEV`), administradores (`administrador`, `geset`), banco de dados (`mysql`) e servidor Web (`www-data`) criem e alterem arquivos diretamente **sem precisar de `sudo`**, com **herança automática** para novos arquivos:
+
+```bash
+# 1. Garante que o utilitário de ACLs está instalado:
+sudo apt update && sudo apt install -y acl
+
+# 2. Concede permissão de leitura, escrita e navegação (rwx) nos arquivos/pastas existentes:
+sudo setfacl -R -m u:administrador:rwx,u:geset:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx,u:www-data:rwx /arquivos 2>/dev/null || \
+sudo setfacl -R -m u:administrador:rwx,g:DEV:rwx,g:sudo:rwx /arquivos
+
+# 3. Define a herança automática (Default) para que QUALQUER novo arquivo ou subpasta herde o acesso:
+sudo setfacl -R -d -m u:administrador:rwx,u:geset:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx,u:www-data:rwx /arquivos 2>/dev/null || \
+sudo setfacl -R -d -m u:administrador:rwx,g:DEV:rwx,g:sudo:rwx /arquivos
+
+# 4. Validar as regras aplicadas:
+getfacl /arquivos
+```
+
+#### 📁 Opção B: Compartilhamento Simples por Grupo com SGID (`2775`)
+Indicado se apenas um grupo específico (ex: `DEV`) utilizará a pasta:
+```bash
+# Define o dono como administrador e o grupo como DEV:
+sudo chown -R administrador:DEV /arquivos
+
+# Concede rwx para dono e grupo com SGID (o bit 2 força novos arquivos a herdarem o grupo DEV):
+sudo chmod -R 2775 /arquivos
+```
+
+#### 👥 Opção C: Liberar para Todos os Usuários do Sistema (Grupo `users` com SGID)
+Como todo usuário comum no Ubuntu pertence ao grupo `users` (GID 100):
+```bash
+sudo chown -R root:users /arquivos
+sudo chmod -R 2775 /arquivos
 ```
 
 ---
@@ -721,15 +830,27 @@ df -h /arquivos
 ```
 
 #### 7. Ajustar Proprietário e Permissões Iniciais
-```bash
-# Ajusta o proprietário para o usuário da aplicação ou operador:
-sudo chown -R administrador:administrador /arquivos
-```
 
-```bash
-# Define permissão de leitura, escrita e execução para dono e grupo:
-sudo chmod 775 /arquivos
-```
+* **Opção 1: Permissões simples de operador (Chmod):**
+  ```bash
+  # Ajusta o proprietário e define permissão 775 (dono e grupo):
+  sudo chown -R administrador:administrador /arquivos
+  sudo chmod 775 /arquivos
+  ```
+
+* **Opção 2: Compartilhamento avançado para múltiplos grupos e serviços (POSIX ACLs - Recomendado):**
+  ```bash
+  # Garante pacote acl instalado e aplica herança para Devs, Admins e Banco:
+  sudo apt update && sudo apt install -y acl
+  sudo setfacl -R -m u:administrador:rwx,u:geset:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx /arquivos 2>/dev/null || \
+  sudo setfacl -R -m u:administrador:rwx,g:DEV:rwx,g:sudo:rwx /arquivos
+
+  sudo setfacl -R -d -m u:administrador:rwx,u:geset:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx /arquivos 2>/dev/null || \
+  sudo setfacl -R -d -m u:administrador:rwx,g:DEV:rwx,g:sudo:rwx /arquivos
+
+  # Validar:
+  getfacl /arquivos
+  ```
 
 ---
 
