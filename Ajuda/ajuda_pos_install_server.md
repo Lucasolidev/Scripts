@@ -356,12 +356,27 @@ O arquivo de configuração `/root/.vimrc` (repassado para `/etc/skel` e todos o
 
 ---
 
-## 🔒 9. Gerenciamento de Usuários e Regras do Visudo
+## 🔒 9. Gerenciamento de Usuários e Regras do Visudo (Grupos DEV, TI, SUPORTE)
 
-Ao solicitar a criação de um grupo customizado (ex: `TI`, `DEV`) durante a execução do script, o sistema gera uma regra de segurança em `/etc/sudoers.d/`:
+O script gerencia automaticamente os três grupos operacionais corporativos padrão (**`DEV`**, **`TI`** e **`SUPORTE`**), garantindo compatibilidade total com o utilitário clássico `sudo` (Ubuntu 24.04) e com o novo `sudo-rs` (Ubuntu 26.04):
 
-* ✅ **Permitido**: Executar comandos administrativos do dia a dia com `sudo`.
+* 📂 **Arquivos Gerados**: `/etc/sudoers.d/grupo_dev`, `/etc/sudoers.d/grupo_ti`, `/etc/sudoers.d/grupo_suporte` (permissão estrita `0440`).
+* ✅ **Permitido**: Executar comandos administrativos do dia a dia com `sudo` (ex: `apt update`, `systemctl`, `docker`, gerenciamento de serviços).
 * ❌ **Bloqueado por Segurança**:
-  - Alterar a senha do usuário `root` ou `geset` (`!/usr/bin/passwd root`, `!/usr/bin/passwd geset`).
-  - Leitura direta do arquivo de senhas hash (`/etc/shadow`) via `cat`, `less`, `more`, `tail`, `grep`, `nano`, `vi`, `cp`.
-  - Execução direta de shells privilegiados sem log (`sudo -i`, `sudo -s`, `sudo /bin/bash`, `sudo /bin/sh`).
+  - Alterar a senha do usuário `root` ou `geset` (`!/usr/bin/passwd root`, `!/usr/bin/passwd geset`, `!/usr/bin/passwd ""`).
+  - Execução de editores com privilégios de root sobre arquivos sensíveis (`!/usr/bin/sudoedit`, `!/usr/bin/nano /etc/shadow`, `!/usr/bin/vi /etc/shadow`, `!/usr/bin/vim /etc/shadow`, `!/usr/bin/nano /etc/sudoers`, `!/usr/bin/vi /etc/sudoers`, `!/usr/bin/vim /etc/sudoers`).
+  - Leitura direta do arquivo de senhas hash (`/etc/shadow`) via `cat`, `head`, `tail`, `less`, `more`.
+  - Execução direta de shells privilegiados sem log (`!/usr/bin/su`, `!/usr/bin/sudo -i`, `!/usr/bin/sudo -s`, `!/usr/bin/sudo /bin/bash`, `!/usr/bin/sudo /bin/sh`).
+  - Alteração de regras administrativas ou grupos (`!/usr/sbin/visudo`, `!/usr/sbin/usermod`, `!/usr/bin/gpasswd`).
+
+### Comandos de Validação e Diagnóstico:
+```bash
+# Verificar quais comandos um usuário específico pode ou não executar no sudo:
+sudo -l -U vitor_dev
+
+# Validar se a sintaxe de todos os arquivos no sudoers está 100% íntegra:
+sudo visudo -c
+
+# Conferir grupos vinculados ao usuário:
+id vitor_dev
+```

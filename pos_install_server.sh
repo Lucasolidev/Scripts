@@ -18,7 +18,7 @@
 # 8. Configura o Auditd com rotação de logs e regras ativas para monitorar identidades, sudoers, ssh, rede e persistência.
 # 9. Configura a jaula do Fail2Ban (força bruta SSH) e ativa atualizações automáticas de segurança (unattended-upgrades).
 # 10. Oferece criação opcional dos usuários padrão 'administrador' (sudo) e 'geset' (sudo).
-# 11. Permite criar grupo customizado (TI, DEV) e novo usuário com restrições dinâmicas no Visudo (bloqueio de senha root/geset e shadow).
+# 11. Gerencia os grupos operacionais (DEV, TI, SUPORTE) e usuários com regras estritas no Visudo (compatíveis com sudo-rs no Ubuntu 24.04/26.04).
 # 12. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH (22/tcp) e Zabbix Agent (10050/tcp).
 # 13. Configura e personaliza o editor Vim com tema Sonokai, Airline e plugins com suporte multi-usuário (/root, /etc/skel, /home).
 # 14. Instala o Banner dinâmico de Boas-Vindas no login (/usr/local/bin/motd_banner.sh integrado ao /etc/profile.d e /etc/bash.bashrc) com Hostname, Sistema, Kernel, Uptime, RAM, Discos, IPs e Status do Firewall UFW.
@@ -28,7 +28,7 @@
 set -Eeuo pipefail
 umask 077
 
-VERSION="2.2"
+VERSION="2.4"
 export VERSION
 export DEBIAN_FRONTEND=noninteractive
 
@@ -156,10 +156,14 @@ read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja habilitar o Firewall UFW? (
 HABILITAR_UFW=${HABILITAR_UFW:-S}
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'administrador' (sudo)? (s/N): ${NC}")" CRIAR_ADMIN || true
 read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar o usuário 'geset' (sudo)? (s/N): ${NC}")" CRIAR_GESET || true
-read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um grupo restrito (ex: TI, DEV) e um novo usuário vinculado a ele? (s/N): ${NC}")" CRIAR_USUARIO || true
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar/auditar os grupos operacionais padrão (DEV, TI, SUPORTE)? (S/n): ${NC}")" CRIAR_GRUPOS_PADRAO || true
+CRIAR_GRUPOS_PADRAO=${CRIAR_GRUPOS_PADRAO:-S}
+read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Deseja criar um novo usuário vinculado a um desses grupos ou customizado? (s/N): ${NC}")" CRIAR_USUARIO || true
 
+NOME_GRUPO=""
+NOVO_USER=""
 if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
-  read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do GRUPO que deseja criar (ex: TI, DEV, SUPORTE): ${NC}")" NOME_GRUPO || true
+  read -r -p "$(echo -e "  ${FG_YELLOW}${ARROW} Digite o nome do GRUPO para o usuário (ex: DEV, TI, SUPORTE): ${NC}")" NOME_GRUPO || true
   while [ -z "${NOME_GRUPO:-}" ]; do
     read -r -p "$(echo -e "  ${FG_RED}${ARROW} O nome do grupo não pode ser vazio. Digite novamente: ${NC}")" NOME_GRUPO || true
   done
@@ -479,14 +483,28 @@ else
 fi
 
 # ==============================================================================
-# 8. CRIAÇÃO DO GRUPO PARAMETRIZADO, USUÁRIO EXCLUSIVO E REGRAS DO VISUDO
+# 8. GESTÃO DE GRUPOS OPERACIONAIS (DEV, TI, SUPORTE) E REGRAS DO VISUDO
 # ==============================================================================
-if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
-  print_header "GRUPO CUSTOMIZADO E VISUDO"
-  
-  NOME_GRUPO=$(echo "$NOME_GRUPO" | tr '[:lower:]' '[:upper:]')
+print_header "GRUPOS OPERACIONAIS E REGRAS DO VISUDO"
 
-  log_info "Criando/Verificando o grupo customizado '$NOME_GRUPO'..."
+# 1. Criação/Verificação dos grupos operacionais padrão (DEV, TI, SUPORTE)
+if [[ "${CRIAR_GRUPOS_PADRAO:-S}" =~ ^[Ss]$ ]]; then
+  log_info "Verificando/Criando grupos operacionais padrão (DEV, TI, SUPORTE)..."
+  for g_padrao in "DEV" "TI" "SUPORTE"; do
+    if ! getent group "$g_padrao" > /dev/null; then
+      groupadd "$g_padrao"
+      log_success "Grupo '$g_padrao' criado com sucesso."
+    else
+      log_success "Grupo '$g_padrao' já existe no sistema."
+    fi
+  done
+fi
+
+# 2. Criação do usuário customizado (se solicitado no prompt)
+if [[ "${CRIAR_USUARIO:-n}" =~ ^[Ss]$ && -n "${NOVO_USER:-}" ]]; then
+  NOME_GRUPO=$(echo "${NOME_GRUPO:-}" | tr '[:lower:]' '[:upper:]')
+
+  log_info "Criando/Verificando o grupo '$NOME_GRUPO'..."
   getent group "$NOME_GRUPO" > /dev/null || groupadd "$NOME_GRUPO"
 
   log_info "Criando o usuário '$NOVO_USER'..."
@@ -501,35 +519,48 @@ if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
   usermod -aG "$NOME_GRUPO" "$NOVO_USER"
   garantir_home "$NOVO_USER"
   log_success "Usuário '$NOVO_USER' configurado e adicionado ao grupo $NOME_GRUPO."
-
-  log_info "Auditando existência do usuário 'geset' para regras do Sudoers..."
-  if id "geset" &>/dev/null; then
-    REGRA_GESET=", !/usr/bin/passwd geset"
-    log_success "Usuário geset localizado. Amarra de proteção adicionada ao Visudo."
-  else
-    REGRA_GESET=""
-    log_warning "Usuário geset não existe neste servidor. Removendo amarra pendente para evitar falha no Visudo."
-  fi
-
-  log_info "Aplicando restrições de segurança dinâmicas para o grupo $NOME_GRUPO no visudo..."
-  SUDOERS_TMP=$(mktemp)
-  
-  cat << EOF > "$SUDOERS_TMP"
-# Grupo $NOME_GRUPO com restricao de alterar senha do root e geset (se aplicavel) e leitura de shadow
-%$NOME_GRUPO ALL=(ALL:ALL) ALL, !/usr/bin/passwd root${REGRA_GESET}, !/usr/bin/passwd "", !/usr/sbin/visudo, !/usr/sbin/usermod, !/usr/bin/gpasswd, !/usr/bin/su, !/usr/bin/sudo -i, !/usr/bin/sudo -s, !/usr/bin/sudo /bin/bash, !/usr/bin/sudo /bin/sh, !/usr/bin/sudoedit /etc/sudoers*, !/usr/bin/sudoedit /etc/shadow, !/usr/bin/nano /etc/shadow, !/usr/bin/vi /etc/shadow, !/usr/bin/nano /etc/sudoers*, !/usr/bin/vi /etc/sudoers*, !/usr/bin/cat /etc/shadow, !/usr/bin/head /etc/shadow, !/usr/bin/tail /etc/shadow, !/usr/bin/grep * /etc/shadow, !/usr/bin/less /etc/shadow, !/usr/bin/awk * /etc/shadow, !/usr/bin/cp /etc/shadow *, !/usr/bin/chmod * *shadow*, !/usr/bin/chown * *shadow*, !/usr/bin/cat *shadow*
-EOF
-
-  ARQUIVO_FINAL_SUDO=$(echo "grupo_${NOME_GRUPO}" | tr '[:upper:]' '[:lower:]')
-
-  if visudo -cf "$SUDOERS_TMP" > /dev/null 2>&1; then
-    mv "$SUDOERS_TMP" "/etc/sudoers.d/$ARQUIVO_FINAL_SUDO"
-    chmod 0440 "/etc/sudoers.d/$ARQUIVO_FINAL_SUDO"
-    log_success "Regras do visudo para o grupo $NOME_GRUPO aplicadas com sucesso!"
-  else
-    log_error "Erro crítico: Sintaxe das regras do visudo inválida. As restrições NÃO foram applied."
-    rm -f "$SUDOERS_TMP"
-  fi
 fi
+
+# 3. Auditoria da existência do usuário 'geset' para travas do Sudoers
+log_info "Auditando existência do usuário 'geset' para travas do Sudoers..."
+if id "geset" &>/dev/null; then
+  REGRA_GESET=", !/usr/bin/passwd geset"
+  log_success "Usuário geset localizado. Trava de proteção adicionada ao Visudo."
+else
+  REGRA_GESET=""
+  log_info "Usuário geset não existe neste servidor. Trava de passwd geset dispensada."
+fi
+
+# 4. Auditoria e aplicação das regras de segurança no Visudo para os grupos operacionais
+GRUPOS_AUDITADOS=("DEV" "TI" "SUPORTE")
+if [[ -n "${NOME_GRUPO:-}" ]]; then
+  GRUPOS_AUDITADOS+=("$NOME_GRUPO")
+fi
+
+# Remove duplicatas
+mapfile -t GRUPOS_PROCESSAR < <(printf "%s\n" "${GRUPOS_AUDITADOS[@]}" | sort -u)
+
+for grp in "${GRUPOS_PROCESSAR[@]}"; do
+  if getent group "$grp" > /dev/null; then
+    ARQ_FINAL="grupo_$(echo "$grp" | tr '[:upper:]' '[:lower:]')"
+    ARQ_SUDO="/etc/sudoers.d/$ARQ_FINAL"
+    log_info "Grupo '$grp' detectado. Gerando regras no visudo ($ARQ_SUDO)..."
+    
+    SUDOERS_TMP=$(mktemp)
+    cat << EOF > "$SUDOERS_TMP"
+# Regras de seguranca para o grupo $grp (Compativel com sudo tradicional e sudo-rs / Ubuntu 24.04 e 26.04)
+%$grp ALL=(ALL:ALL) ALL, !/usr/bin/passwd root${REGRA_GESET}, !/usr/bin/passwd "", !/usr/sbin/visudo, !/usr/sbin/usermod, !/usr/bin/gpasswd, !/usr/bin/su, !/usr/bin/sudo -i, !/usr/bin/sudo -s, !/usr/bin/sudo /bin/bash, !/usr/bin/sudo /bin/sh, !/usr/bin/sudoedit, !/usr/bin/nano /etc/shadow, !/usr/bin/nano /etc/sudoers, !/usr/bin/vi /etc/shadow, !/usr/bin/vi /etc/sudoers, !/usr/bin/vim /etc/shadow, !/usr/bin/vim /etc/sudoers, !/usr/bin/cat /etc/shadow, !/usr/bin/head /etc/shadow, !/usr/bin/tail /etc/shadow, !/usr/bin/less /etc/shadow, !/usr/bin/more /etc/shadow
+EOF
+    if visudo -cf "$SUDOERS_TMP" > /dev/null 2>&1; then
+      mv "$SUDOERS_TMP" "$ARQ_SUDO"
+      chmod 0440 "$ARQ_SUDO"
+      log_success "Regras do visudo para o grupo $grp aplicadas com sucesso em $ARQ_SUDO."
+    else
+      log_error "Erro crítico: Falha de sintaxe ao validar regras para o grupo $grp no visudo."
+      rm -f "$SUDOERS_TMP"
+    fi
+  fi
+done
 
 # ==============================================================================
 # 9. CONFIGURAÇÃO DE FIREWALL (UFW)
@@ -844,10 +875,15 @@ fi
 if [[ "$CRIAR_GESET" =~ ^[Ss]$ ]]; then
   echo -e "  ${BOLD}Usuário Geset:${NC}          ${FG_CYAN}geset${NC} (Sudo Ativo)"
 fi
-if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ ]]; then
+if [[ "$CRIAR_USUARIO" =~ ^[Ss]$ && -n "${NOVO_USER:-}" ]]; then
   echo -e "  ${BOLD}Usuário Customizado:${NC}    ${FG_CYAN}${NOVO_USER}${NC} (Grupo: ${NOME_GRUPO})"
-  echo -e "  ${BOLD}Regras no Visudo:${NC}       /etc/sudoers.d/${ARQUIVO_FINAL_SUDO}"
 fi
+for g_audit in "DEV" "TI" "SUPORTE"; do
+  arq_chk="/etc/sudoers.d/grupo_$(echo "$g_audit" | tr '[:upper:]' '[:lower:]')"
+  if [ -f "$arq_chk" ]; then
+    echo -e "  ${BOLD}Regras Visudo ($g_audit):${NC}    ${arq_chk}"
+  fi
+done
 echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
 echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
 
