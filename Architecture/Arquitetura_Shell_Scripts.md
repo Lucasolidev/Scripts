@@ -44,22 +44,43 @@
 >    - Utilize o padrão `  ${FG_YELLOW}${ARROW} Pergunta? (s/N): ${NC}` nas perguntas do `read` (onde `(s/N)` indica que o padrão ao apertar ENTER é Não).
 >    - **Feedback Visual Imediato (`log_info`)**: Imediatamente após a coleta de qualquer entrada do usuário (seja um valor digitado, gerado aleatoriamente ou o valor padrão assumido ao dar ENTER), exiba uma linha com `log_info` confirmando o valor definido (ex: `log_info "Nome do Banco definido: ${FG_GREEN}${JOOMLA_DB_NAME}${NC}"`). Isso dá clareza e segurança visual ao operador.
 >    - **Exceção Obrigatória para Segredos**: Senhas, tokens, chaves e outros segredos devem usar `read -r -s`/`read -r -sp`. O feedback deve confirmar apenas que o valor foi recebido ou gerado, sem revelar conteúdo, comprimento ou parte do segredo no console ou log.
+>    - Na criação de contas, preferir o diálogo nativo `passwd`, sem eco e sem capturar a senha em variável. Esse diálogo ocorre após criar a conta; é exceção à coleta inicial para evitar armazenamento intermediário de credenciais.
+>    - Antes de `passwd`, identificar explicitamente a conta e informar que será definida uma nova senha, seguida da confirmação. Com captura por `tee`, escrever essa orientação também diretamente no terminal (`/dev/tty`) para garantir que apareça antes do prompt nativo. Nunca registrar a senha.
+>    - Se a conta já existe, anunciar explicitamente que criação e definição de senha foram puladas e que a senha atual foi preservada. Aplicar o mesmo feedback a contas administrativas e operacionais; repetir no resumo final, por conta solicitada, se foi criada ou preservada e o grupo vinculado. Não chamar `passwd` em conta existente somente porque a opção criar/garantir foi aceita.
+>    - Falha de `passwd` na definição inicial deve oferecer nova tentativa (padrão Sim) ou cancelamento com código 2, preservando códigos de sinais. Não capturar senha nem usar `set -x`. Em reexecução, contas com campo de senha vazio, `!` ou `!!` podem ter definição inicial pendente: consultar emitindo somente essa classificação, nunca hash, e oferecer retomada com confirmação explícita (padrão Não). Senhas existentes, inclusive hashes bloqueados, e contas desabilitadas com `*` permanecem preservadas. Recusa da retomada registra pendência; não anunciar senha configurada.
 > 
 > 4. **Instalação Silenciosa e Limpa (`apt-get`)**:
 >    - **Regra Obrigatória:** Sempre utilize **`apt-get`** em vez de `apt` para garantir máxima compatibilidade, estabilidade de CLI e execução não-interativa segura sem avisos ou caracteres ocultos nos arquivos de log.
->    - Execute a instalação de forma loopada e individual para cada pacote de forma silenciosa (`> /dev/null 2>&1`), exibindo um log claro de `log_success` se instalado, ou `log_warning` / `log_error` caso falhe.
+>    - Instalar individualmente com feedback por pacote e espera limitada pelo lock do APT. Separar dependências essenciais de utilitários opcionais: falha essencial interrompe; falha opcional entra no resumo de pendências. Sucesso significa retorno verificado, nunca uma lista fixa de pacotes. Evitar registrar saídas que possam conter credenciais de repositórios.
 > 
 > 5. **Configuração de Teclado, Locales e Fuso Horário (America/Sao_Paulo)**:
+>    - Selecionar o arquivo de locale conforme a versão e o layout oficial do pacote. No Ubuntu 26.04, usar `/etc/locale.conf`; no 24.04, preservar o layout legado ou usar `/etc/locale.conf` quando `/etc/default/locale` for seu link de compatibilidade. Validar esse destino conhecido, fazer backup do arquivo regular e preservar o link. Não liberar links arbitrários nas funções administrativas. Para escrita atômica, copiar os valores existentes para temporário privado, executar `update-locale --locale-file` nesse temporário e publicar com a função administrativa.
 >    Quando houver configuração de locales, teclado e fuso horário, utilize o bloco padrão:
 >    ```bash
 >    log_info "Configurando suporte completo a UTF-8 (en_US.UTF-8 e pt_BR.UTF-8)..."
->    sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
->    sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+>    # Exemplo usa LOG_DIR privado e helpers de backup/escrita atômica.
+>    sed -e 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' \
+>        -e 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen > "$LOG_DIR/locale.gen"
+>    install_config "$LOG_DIR/locale.gen" /etc/locale.gen
 >    locale-gen en_US.UTF-8 pt_BR.UTF-8 > /dev/null 2>&1
->    update-locale LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 > /dev/null 2>&1
+>    if [[ -L /etc/default/locale ]]; then
+>        [[ $(readlink -f -- /etc/default/locale) == /etc/locale.conf ]] || exit 1
+>    fi
+>    case "$VERSION_ID" in
+>        24.04)
+>            if [[ -L /etc/default/locale ]]; then LOCALE_FILE=/etc/locale.conf
+>            else LOCALE_FILE=/etc/default/locale; fi
+>            ;;
+>        26.04) LOCALE_FILE=/etc/locale.conf ;;
+>        *) exit 1 ;;
+>    esac
+>    backup_file "$LOCALE_FILE"
+>    if [[ -f "$LOCALE_FILE" ]]; then cp -- "$LOCALE_FILE" "$LOG_DIR/locale"; fi
+>    update-locale --locale-file "$LOG_DIR/locale" LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8
+>    install_config "$LOG_DIR/locale" "$LOCALE_FILE"
 >
 >    log_info "Ajustando fuso horário (America/Sao_Paulo)..."
->    timedatectl set-timezone America/Sao_Paulo > /dev/null 2>&1 || true
+>    timedatectl set-timezone America/Sao_Paulo || exit 1
 >
 >    log_info "Configurando layouts de teclado (US-International com Acentos + ABNT2)..."
 >    cat <<EOF > /etc/default/keyboard
@@ -72,40 +93,30 @@
 >
 >    udevadm trigger --subsystem-match=input --action=change > /dev/null 2>&1 || true
 >    setupcon --force > /dev/null 2>&1 || true
->    log_success "Teclado e fuso horário ajustados com sucesso."
+>    log_info "Configuração de teclado gravada; confira a aplicação no console."
+>    if [ "$(timedatectl show -p NTPSynchronized --value)" = yes ]; then
+>        log_success "NTP sincronizado."
+>    else
+>        log_warning "Sincronização NTP ainda não confirmada."
+>    fi
 >    ```
 > 
 > 6. **Configuração de Aliases do Shell (Seção Dedicada)**:
 >    - Criar uma seção própria no fluxo do script com `print_header "ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)"`.
->    - Injetar/atualizar aliases nos perfis `/root/.bashrc`, `/etc/skel/.bashrc` e `/home/*/.bashrc`:
+>    - Manter aliases compartilhados em arquivo administrativo, por exemplo `/etc/pos-install-server/bash_aliases`, modo `0644`, restrito a shells interativos. Incluir uma única chamada nos perfis, preservando o conteúdo existente.
+>    - Informar se o arquivo compartilhado foi instalado, atualizado ou já tinha o conteúdo esperado, e se a chamada em cada perfil foi adicionada ou já existia. Anunciar sucesso somente após a gravação; falhas por perfil entram nas pendências. Explicar que persistência não carrega aliases na sessão atual: eles ficam disponíveis no próximo Bash interativo ou após `source ~/.bashrc` pelo próprio usuário.
+>    - Para `/root` e `/etc/skel`, usar backup e substituição atômica em diretório controlado por root. Para homes, obter conta/home pelo NSS (`getent passwd`) e executar toda a escrita e o backup com os privilégios do proprietário (`runuser`), sem carregar o perfil do usuário ou `BASH_ENV`.
+>    - Nunca executar redirecionamentos, cópias ou `chown -R` como root sobre caminhos controlados por usuários. Rejeitar links antes de editar perfis e abandonar root antes da escrita para que a segurança não dependa somente de uma checagem sujeita a corrida.
+>    - Exemplo da chamada a adicionar uma única vez ao `.bashrc`:
 >    ```bash
->    print_header "ALIASES DO SHELL (PRODUTIVIDADE E SEGURANÇA)"
->    log_info "Configurando aliases de produtividade e segurança no Shell..."
->    for bashrc in /root/.bashrc /etc/skel/.bashrc /home/*/.bashrc; do
->      if [ -f "$bashrc" ]; then
->        grep -q "alias ll=" "$bashrc" && sed -i "s/alias ll=.*/alias ll='ls -alFh'/" "$bashrc" || grep -q "#alias ll=" "$bashrc" && sed -i "s/#alias ll=.*/alias ll='ls -alFh'/" "$bashrc" || echo "alias ll='ls -alFh'" >> "$bashrc"
->        grep -q "alias rm=" "$bashrc" || echo "alias rm='rm -i'" >> "$bashrc"
->        grep -q "alias cp=" "$bashrc" || echo "alias cp='cp -i'" >> "$bashrc"
->        grep -q "alias mv=" "$bashrc" || echo "alias mv='mv -i'" >> "$bashrc"
->        grep -q "alias df=" "$bashrc" || echo "alias df='df -h'" >> "$bashrc"
->        grep -q "alias free=" "$bashrc" || echo "alias free='free -h'" >> "$bashrc"
->        grep -q "alias ports=" "$bashrc" || echo "alias ports='sudo ss -tulanp'" >> "$bashrc"
->        grep -q "alias myip=" "$bashrc" || echo "alias myip='curl -s ifconfig.me; echo'" >> "$bashrc"
->        grep -q "alias \.\.=" "$bashrc" || echo "alias ..='cd ..'" >> "$bashrc"
->        grep -q "alias \.\.\.=" "$bashrc" || echo "alias ...='cd ../..'" >> "$bashrc"
->        grep -q "alias update=" "$bashrc" || echo "alias update='sudo apt-get update && sudo apt-get upgrade -y'" >> "$bashrc"
->        grep -q "alias clean=" "$bashrc" || echo "alias clean='sudo apt-get autoremove -y && sudo apt-get autoclean'" >> "$bashrc"
->        grep -q "alias reload=" "$bashrc" || echo "alias reload='source ~/.bashrc'" >> "$bashrc"
->      fi
->    done
->    log_success "Aliases de produtividade e segurança configurados nos perfis .bashrc."
+>    [ ! -r /etc/pos-install-server/bash_aliases ] || . /etc/pos-install-server/bash_aliases
 >    ```
-> 
+>
 > 7. **Hardening de Segurança e Manutenção**:
->    - **SSH Hardening**: Ajustar `PermitEmptyPasswords no`, `ClientAliveInterval 300` e `ClientAliveCountMax 2`.
+>    - **SSH Hardening**: Validar `PermitEmptyPasswords no`, `ClientAliveInterval 300` e `ClientAliveCountMax 2` na configuração efetiva. ClientAlive verifica clientes sem resposta; não é timeout de inatividade humana. Aplicar as regras de acesso e recuperação do item 18.
 >    - **Fail2Ban**: Instalar e ativar proteção contra força bruta no SSH quando for ambiente Server.
 >    - **Firewall UFW**: Ativar regras de proteção de borda.
->    - **Limpeza do Sistema**: Executar `apt-get autoremove -y` e `apt-get autoclean -y` ao final das instalações.
+>    - **Limpeza do Sistema**: `autoremove` pode remover pacotes em uso fora do controle do instalador. Fazer limpeza somente quando solicitada e com revisão dos candidatos; disponibilizar aliases de manutenção não autoriza executá-los automaticamente.
 > 
 > 8. **Estrutura Sequencial e Numerada de Etapas (Seções e Subseções)**:
 >    - Todas as etapas lógicas de execução do script devem ser claramente identificadas por blocos de comentários numerados sequencialmente. Use números inteiros para grandes blocos e decimais (ex: 1.1, 1.2) para sub-etapas do mesmo contexto.
@@ -133,57 +144,23 @@
 >    - **Default ACLs Restritas**: Aplique ACLs recursivas e padrão somente dentro das pastas mutáveis. É proibido conceder `rwx` recursivo ao serviço web sobre todo o `DocumentRoot`.
 > 
 > 10. **Isolamento e Separação Rígida por Versão da Distribuição (OS Release Branching)**:
->    - **Regra Arquitetural Obrigatória:** Quando houver diferenças de repositórios, versões de pacotes ou comportamentos entre versões de SO (ex: Ubuntu 22.04 / 24.04 LTS vs Ubuntu 26.04 Dev), **SEPARE RIGOROSAMENTE** os blocos de código em condicionais explícitas baseadas em `lsb_release -rs` ou `/etc/os-release`.
->    - **Proteção do Ambiente Estável de Produção:** Mudanças ou adaptações para versões em desenvolvimento (ex: Ubuntu 26.04) **JAMAIS** devem alterar, sobrescrever ou arriscar o fluxo de versões LTS estáveis de produção (ex: Ubuntu 22.04 / 24.04). Mantenha fluxos de código isolados e dedicados por ramo de distribuição.
+>    - **Regra Arquitetural Obrigatória:** Quando houver diferenças de repositórios, versões de pacotes ou comportamentos entre versões de SO (ex: Ubuntu 22.04 / 24.04 LTS vs Ubuntu 26.04), **SEPARE RIGOROSAMENTE** os blocos de código em condicionais explícitas baseadas em `lsb_release -rs` ou `/etc/os-release`.
+>    - **Proteção do Ambiente Estável de Produção:** Mudanças ou adaptações para outras versões **JAMAIS** devem alterar, sobrescrever ou arriscar o fluxo de versões já homologadas em produção. Mantenha fluxos de código isolados e dedicados por ramo de distribuição.
 > 
 > 11. **Registro e Salvamento de Logs Padronizados (`relatorio_*`) (Etapa Final Obrigatória)**:
 >    - **Regra Arquitetural de Nomenclatura:** Todos os logs gerados pelos scripts devem obrigatoriamente iniciar com o prefixo **`relatorio_`** e utilizar a formatação de data/hora no padrão brasileiro **`DDMMYYYY_HHMM`** (ex: `relatorio_install_lamp_ubuntu_joomla5_25082026_2015.log`). Isso facilita a busca e auto-complete no terminal (`ls /root/relatorio_*`).
->    - No início da execução (logo após validação de privilégios), inicialize a captura do console e arquivo temporário:
->      ```bash
->      LOG_TIMESTAMP=$(date '+%d%m%Y_%H%M')
->      LOG_FILENAME="relatorio_nome_do_script_${LOG_TIMESTAMP}.log"
->      LOG_LATEST="relatorio_nome_do_script_latest.log"
->      umask 077
->      RUNTIME_DIR=$(mktemp -d -p /tmp nome_do_script.XXXXXXXX) || exit 1
->      chmod 700 "$RUNTIME_DIR"
->      LOG_TMP="${RUNTIME_DIR}/${LOG_FILENAME}"
->      touch "$LOG_TMP" && chmod 600 "$LOG_TMP"
->      cleanup() { rm -rf -- "$RUNTIME_DIR"; }
->      trap cleanup EXIT INT TERM HUP
->      exec > >(tee -a "$LOG_TMP") 2>&1
->      ```
->    - Na **última etapa numerada do script**, salve automaticamente cópias com timestamp e o atalho padronizado `relatorio_<nome_do_script>_latest.log` no diretório `/root` e na Home do usuário real que executou o comando via `sudo`:
->      ```bash
->      # ==============================================================================
->      # [NÚMERO_ETAPA]. GERAÇÃO E SALVAMENTO DOS ARQUIVOS DE LOG DE INSTALAÇÃO
->      # ==============================================================================
->      print_header "ARQUIVOS DE LOG DA INSTALAÇÃO"
+>    - Após validar root e ambiente, criar temporário privado com `mktemp -d` e `umask 077`. Capturar stdout/stderr com `tee`, guardando os descritores originais e o PID do processo de captura.
+>    - Registrar um finalizador `EXIT`, além de handlers de sinais que encerram com código próprio. O finalizador deve preservar a falha original, salvar o relatório também em erro/cancelamento e só remover os temporários quando a cópia administrativa estiver confirmada.
+>    - Antes de copiar o relatório, restaurar stdout/stderr e aguardar `tee`; copiar enquanto a captura ainda escreve pode truncar as últimas mensagens. Não imprimir comandos completos, variáveis de senha, arquivos de autenticação ou saídas potencialmente sensíveis no handler de erros.
+>    - Publicar as cópias em `/root` com modo `0600`, por arquivo temporário no mesmo diretório e rename atômico. `latest` é uma cópia regular. Evitar colisões de nomes em execuções no mesmo minuto.
+>    - Na home do usuário sudo, abrir a origem administrativa antes de abandonar root e transmitir pelo stdin para um processo do próprio usuário. Criar o temporário e fazer rename já sem root. Não copiar como root seguido de `chown` em diretório do usuário.
+>    - Falhas ao salvar o relatório devem ser informadas, preservando a origem e o código de falha. Funções chamadas por `if`, `!` ou `||` precisam propagar erros explicitamente: `set -e` pode estar desabilitado nesses contextos.
+>    - A última etapa numerada deve anunciar o salvamento pelo finalizador. Referência de implementação: funções `install_config`, `copy_to_home` e `finalizar` do `pos_install_server.sh`.
 >
->      # Salva cópias no diretório /root
->      cp "$LOG_TMP" "/root/${LOG_FILENAME}" 2>/dev/null || true
->      cp "$LOG_TMP" "/root/${LOG_LATEST}" 2>/dev/null || true
->      chmod 600 "/root/${LOG_FILENAME}" "/root/${LOG_LATEST}" 2>/dev/null || true
->      log_success "Log salvo em: /root/${LOG_FILENAME}"
->      log_success "Atalho do último log: /root/${LOG_LATEST}"
->
->      # Se executado via sudo, salva também na pasta home do usuário real
->      if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
->        REAL_USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
->        if [ -d "$REAL_USER_HOME" ]; then
->          cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_FILENAME}" 2>/dev/null || true
->          cp "$LOG_TMP" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
->          chmod 600 "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
->          chown "$SUDO_USER:$SUDO_USER" "${REAL_USER_HOME}/${LOG_FILENAME}" "${REAL_USER_HOME}/${LOG_LATEST}" 2>/dev/null || true
->          log_success "Log salvo na Home ($SUDO_USER): ${REAL_USER_HOME}/${LOG_FILENAME}"
->        fi
->      fi
->
->      draw_separator
->      echo -e "  ${DIM}Processo finalizado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}\n"
->      ```
-> 
 > 12. **Resultado Final Estruturado (Resumo da Instalação)**:
 >    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
+>    - Preservar o resumo colorido nas refatorações: rótulos em negrito, informações em ciano, estados confirmados em verde e pendências/estados não verificados em amarelo. Não usar verde para auditoria apenas gravada ou sincronização não confirmada. Ao usar `printf`, reservar `%b` aos estilos ANSI controlados e `%s` aos valores para não interpretar escapes nos dados. Referência: `print_summary` do `pos_install_server.sh`.
+>    - Agrupar o painel por assunto e manter cada serviço importante em um bloco identificado, com espaço e separador: estado, configuração, regras ou agendamento e histórico quando aplicável. Saídas nativas, como `ufw status`, pertencem ao bloco do próprio serviço, com indentação; nunca anexá-las sem título ao serviço anterior. Distinguir ferramentas manuais (como ACL) de serviços ativos e controles efetivamente aplicados. Quebrar listas extensas de pacotes em linhas e alinhar rótulos considerando caracteres acentuados, não apenas bytes.
 >    **Obrigatório**: É fundamental incluir a linha de **Pacotes/Programas Instalados** detalhando os softwares adicionados ao sistema durante a execução (armazenando na array `PACOTES_INSTALADOS` e formatando com `LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")`).
 >    
 >    Exemplo de bloco de resumo:
@@ -199,14 +176,15 @@
 >    fi
 >    LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
 >
->    echo -e "  ${FG_GREEN}${BOLD}✔ PROCESSO FINALIZADO COM SUCESSO!${NC}\n"
+>    # Anunciar sucesso somente quando as verificações obrigatórias passarem.
+>    # Caso contrário, listar pendências ou falha e retornar o código correspondente.
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
->    echo -e "  ${BOLD}Status do Sistema:${NC}     ${FG_GREEN}Operacional${NC}"
+>    echo -e "  ${BOLD}Status do Sistema:${NC}     ${STATUS_VERIFICADO}"
 >    echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-Nenhum}${NC}"
 >    echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
 >    echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
 >    echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
->    echo -e "  ${BOLD}Fuso Horário:${NC}          ${FG_GREEN}America/Sao_Paulo (NTP Ativo)${NC}"
+>    echo -e "  ${BOLD}Fuso Horário:${NC}          $(timedatectl show -p Timezone --value) / NTP: ${NTP_STATUS}"
 >    echo -e "  ${BOLD}Serviço Principal:${NC}     $(get_service_status nome_do_servico)"
 >    echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
 >    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
@@ -244,6 +222,7 @@
 > 
 > 16. **Cadeia de Suprimentos e Arquivos Temporários**:
 >    - É proibido executar conteúdo remoto diretamente com construções como `curl ... | bash` ou `wget ... | sh`. Baixar por HTTPS, fixar a origem/versão e verificar assinatura ou checksum publicado por canal oficial antes de executar ou extrair.
+>    - Para plugins distribuídos por Git, fixar commits consultados no repositório oficial via HTTPS e conferir o objeto obtido antes de publicar. Não carregar código de branches móveis como root. Fixação garante reprodutibilidade, não revisão da segurança do fornecedor.
 >    - Nunca usar nomes previsíveis em `/tmp`. Criar diretório privado com `mktemp -d`, modo `0700`, arquivos modo `0600` e limpeza via `trap`. Validar arquivos compactados contra caminhos absolutos e travessia (`../`) antes da extração.
 > 
 > 17. **Menor Privilégio para Bancos, Rede e Serviços Web**:
@@ -258,5 +237,32 @@
 >    - Instaladores para servidor novo devem recusar sobreposição de DocumentRoot não vazio e sites personalizados ativos. Falha em configuração ou dependência essencial deve interromper sem anunciar proteção ativa.
 >    - Documentar separadamente o que foi validado estaticamente e o que ainda depende de homologação. ShellCheck não valida configuração Apache/Nginx/FPM, comportamento HTTP ou segurança de mídia migrada.
 > 
+> 18. **Acesso Administrativo, SSH e Recuperação**:
+>    - Sudo amplo (`ALL`) com negações de comandos é uma barreira operacional contornável, não separação de privilégios. Documentar essa escolha quando o proprietário exigir autonomia para instalar e configurar aplicações. Não prometer impedir tomada de controle por outro administrador.
+>    - Respeitar as escolhas do operador em todas as etapas relacionadas: recusar gestão de grupos também preserva suas regras. Aplicar a política somente ao grupo explicitamente informado, sem criar conjuntos padrão implicitamente. Preservar maiúsculas/minúsculas do nome tanto na identidade NSS quanto no sudoers; evitar colisões de nomes de arquivo. Reutilizar arquivo legado somente quando sua regra corresponde ao grupo exato, sem sobrescrever regras de outro grupo. Não remover grupos/regras anteriores automaticamente. Permitir gestão do grupo sem exigir criação de usuário.
+>    - Validar nomes de contas/grupos antes de compor sudoers. Preparar arquivo temporário, validar com o `visudo` instalado, aplicar com modo `0440`, conferir a configuração completa e restaurar o arquivo anterior se houver erro.
+>    - Conferir recursos no parser de cada runtime suportado: sudo-rs pode rejeitar curingas em argumentos aceitos pelo sudo tradicional. Para uma política comum, preferir formas explícitas e documentar o alcance dos bloqueios; não generalizar compatibilidade pela versão do Ubuntu.
+>    - Preparar contas antes de restringir SSH. Desabilitar root somente após declaração de login alternativo previamente testado e verificações locais compatíveis. Se não for possível comprovar as condições, preservar a política anterior e registrar pendência.
+>    - Preservar personalizações e considerar a precedência de `Include` e `Match`. Validar com `sshd -t` e `sshd -T`, incluindo contextos conhecidos com `-C`. Isso não prova acesso a partir de todas as origens nem substitui uma nova conexão real.
+>    - Quando a política deve ficar no `sshd_config` principal, atualizar a primeira ocorrência global da diretiva, inclusive comentada, no mesmo local e remover duplicatas globais dessa diretiva. Preservar os demais parâmetros e todos os blocos `Match`. Inserir diretivas ausentes antes do primeiro `Match`, evitando escrever opções globais dentro de contexto condicional. Não apagar Includes de terceiros para forçar precedência; conflito efetivo exige restauração e revisão.
+>    - Na migração de política separada gerada por versão anterior, fazer backup do principal e do legado, reconhecer origem e conteúdo gerenciado antes da remoção e recusar arquivos personalizados ou Includes complexos. Remover o Include legado e publicar as diretivas no principal na mesma etapa protegida por restauração; validar antes de recarregar. A restauração deve recuperar os dois arquivos e suas permissões anteriores.
+>    - Usar backup e restauração em falha/interrupção da etapa SSH, preferindo reload a restart. Não ativar firewall antes de permitir portas efetivas, listeners de `ssh.socket` e a porta da conexão atual, quando disponíveis. Exceções de firewall explicitamente solicitadas devem ser documentadas.
+>    - Logs locais podem ser modificados por root. Encaminhamento externo requer destino e política próprios; não inventar endpoints, credenciais ou configurar integração não solicitada.
+>
+> 19. **Configuração Reexecutável e Validação de Estado**:
+>
+>    - Na homologação, verificar o componente efetivamente instalado/ativado: pacotes virtuais podem ser atendidos por `Provides`, serviços podem iniciar por sockets habilitados e ações de firewall podem usar nftables em vez de iptables. Não presumir nomes de cadeias ou exigir dois mecanismos de inicialização simultâneos. Confirmar o provedor, a unidade ou o backend real e testar o comportamento correspondente.
+>    - Para validar plugins/configurações de editor, abrir como usuário comum com o mesmo modo de inicialização do uso real. No Vim, `-es` ignora inicializações sem `-u`; um teste com esse modo não comprova descoberta automática do `.vimrc`. Não executar plugins como root apenas para validar a instalação.
+>    - Registrar código de cada execução, verificações aprovadas/falhas/limitadas, ambiente e versão do artefato. Preservar evidência de testes corrigidos e a razão da correção. Unidades de kernel falhas no WSL devem ser informadas explicitamente como indisponíveis; não ocultar com `reset-failed` nem declarar todos os serviços ativos.
+>    - Aplicar arquivos por substituição atômica, com backup por execução e retorno explícito de erros. Separar configuração solicitada, gravada, ativa e efetivamente verificada.
+>    - Sucesso do gerenciador de pacotes não comprova os pré-requisitos do serviço. Conferir contas de serviço antes de configurar o daemon e usar a definição sysusers oficial do pacote, sem inventar UID/GID. Não remover ou contornar genericamente diversions/stubs. Exceção documentada do Ubuntu 26.04 em WSL: se o stub conhecido contém somente `#!/bin/sh` e `exit 0`, a diversion aponta exatamente para `.real` e o binário original regular tem proprietário root, permissões sem escrita de grupo/outros, checksum correspondente aos metadados instalados e identificação systemd, pode usá-lo diretamente, anunciando a recuperação. Não executar todos os arquivos sysusers, apenas a definição do serviço necessário. Casos desconhecidos continuam interrompendo.
+>    - Preferir arquivo próprio em `jail.d` a sobrescrever `jail.local`; conferir configuração e disponibilidade da jaula após o serviço iniciar. Exceções de redes são parâmetros, não pressuposições de confiança.
+>    - Não deduzir que atualizações automáticas funcionam apenas por `unattended-upgrades.service`, que pode ser um auxiliar de encerramento. Conferir os parâmetros efetivos de atualização de índices e instalação automática do APT, timers ativos e habilitados e próxima execução calculada; mostrar esses dados no resumo. Preservar horários existentes e distinguir agendamento de execução comprovada no histórico. Serviços oneshot podem ficar inativos entre disparos sem indicar falha; execução real e origens ainda requerem homologação.
+>    - Gerar regras auditd para caminhos existentes e confirmar regras no kernel. Conferir `/dev/shm` com `findmnt`; localizar uma string no fstab não comprova flags de montagem.
+>    - Personalizações de editores devem ser opcionais, com perfis existentes preservados e sem copiar diretórios pessoais de root para usuários.
+>    - Etapas opcionais de editores devem informar progresso de obtenção/verificação por plugin e resumir pacote instalado/existente, recursos configurados e resultados por perfil (adicionado, já vinculado, personalizado preservado ou falha). Conferir os diretórios esperados antes de anunciar plugins disponíveis. Instalação compartilhada não comprova carregamento em perfil personalizado preservado; anunciar essa distinção e informar recusa/falha explicitamente.
+>    - Documentar códigos de saída. Convenção de referência: 0 = etapas solicitadas verificadas; 1 = falha; 2 = cancelamento; 3 = conclusão com pendências; sinais mantêm códigos convencionais.
+>    - Homologação dinâmica deve ocorrer somente nos ambientes descartáveis autorizados. Se o proprietário fará a instalação, executar apenas análise estática e entregar roteiro de verificação manual, incluindo reexecução, opção de recusa, falhas e restauração.
+>
 > Aqui está o script original que deve ser adaptado:
 > `[INSIRA O SCRIPT AQUI]`"

@@ -46,7 +46,10 @@ Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e ut
 ## 🛠️ Principais Scripts de Instalação e Automação
 
 ### 1. Pós-Instalação do Ubuntu Server (`pos_install_server.sh`)
-Prepara um novo servidor Ubuntu Server aplicando atualizações, instalando utilitários essenciais (`curl`, `vim`, `ncdu`, `btop`, `htop`, `tmux`, `fail2ban`, `dnsutils`, `net-tools`, `mtr`, `iperf3`, `nmap`, `tcpdump`, `iotop`, `jq`, `tree`, `rsync`, `unzip`, `p7zip`, `sysstat`, `lynis`), fuso horário `America/Sao_Paulo` (NTP), layout dual de teclado (ABNT2 + US-Intl), hardening no SSH, proteção RAM `/dev/shm` (noexec), proteção Fail2Ban, UFW IPv4/IPv6 e gerenciamento de usuários com Visudo:
+A versão **2.5** prepara Ubuntu Server 24.04/26.04 com utilitários, locales, teclado, horário, SSH validado, Fail2Ban, Auditd e UFW. Preserva a liberação Zabbix `10050/tcp`, detecta portas SSH e aplica administração ampla somente ao grupo operacional informado, preservando maiúsculas/minúsculas, com barreiras operacionais contra alterações diretas de contas e SSH — sem prometer isolamento contra outro administrador. Inclui backups de configurações, relatório em falhas e Vim opcional com perfis existentes preservados.
+
+Consulte as opções, códigos de saída e o [roteiro de homologação em VM limpa](Ajuda/ajuda_pos_install_server.md#-11-roteiro-de-homologação-na-vm-limpa). Alterações locais precisam ser transferidas à VM; o comando abaixo baixa somente a versão já publicada em `main`.
+
 ```bash
 wget https://raw.githubusercontent.com/lucasolidev/scripts/main/pos_install_server.sh -O pos_install_server.sh && chmod +x pos_install_server.sh && sudo ./pos_install_server.sh
 ```

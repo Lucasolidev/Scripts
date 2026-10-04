@@ -17,7 +17,7 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 | `/root/relatorio_pos_install_server_*.log` | Log completo e detalhado com timestamp da execução do script pós-instalação. |
 | `/root/relatorio_pos_install_server_latest.log` | Cópia regular do último relatório, modo `0600`; salva também quando há falha após iniciar a captura. |
 | `/root/backup_pos_install_server_*` | Backups administrativos por execução. Não incluem uma reversão completa de pacotes, usuários ou firewall. |
-| `/etc/ssh/pos-install-server.conf` | Política SSH do script, incluída no início de `sshd_config`. |
+| `/etc/ssh/sshd_config` | Arquivo principal: contém diretamente PermitRootLogin, PermitEmptyPasswords e os dois parâmetros de keepalive aplicados pelo script. |
 | `/etc/audit/rules.d/server_security.rules` | Regras de auditoria de contas, sudoers, SSH, rede e persistência. |
 | `/etc/pos-install-server/` | Aliases compartilhados e configuração opcional do Vim. |
 | `/usr/local/share/pos-install-server/vim/2.5` | Plugins opcionais fixados por commit, compartilhados e pertencentes a root. |
@@ -83,8 +83,34 @@ Se reexecutar após uma falha, a conta pode existir sem senha inicial. O script 
 - SSH: valida configuração antes do reload e confere o contexto conhecido. `ClientAliveInterval 300` e `ClientAliveCountMax 2` verificam clientes sem resposta, não inatividade humana.
 - Configuração SSH personalizada, autenticação exclusivamente por chave, MFA ou regras Allow/Deny podem exigir revisão manual; o script preserva/restaura o SSH em vez de alterar esses mecanismos.
 - Fail2Ban: backend systemd, portas SSH detectadas e verificação da jaula. Exceções anteriores da jaula SSH são substituídas pelos parâmetros informados; outras jaulas são preservadas.
-- Atualizações automáticas: timers e parâmetro APT verificados; origens permitidas existentes são preservadas. Conferir execução real na homologação.
+- Atualizações automáticas: o resumo informa o serviço auxiliar, os timers ativos/habilitados e suas próximas execuções. Verifica os dois parâmetros periódicos do APT; preserva origens permitidas e horários da distribuição. Conferir resultados no histórico.
 - QEMU/VMware: agente correspondente; ausência do canal QEMU é reportada sem esperar indefinidamente.
+
+### Organização do resumo final
+
+O painel mantém as cores de estado e separa sistema/virtualização, contas/sudo/SSH, Fail2Ban, UFW, auditd, atualizações automáticas, ACL, shell/Vim e pacotes disponíveis. Cada serviço reúne seu estado e os caminhos úteis de configuração ou histórico. A tabela de regras atuais do UFW aparece dentro do bloco de firewall, separada do agente da VM. Listas extensas de pacotes são distribuídas em linhas.
+
+O bloco ACL confirma a disponibilidade de `getfacl` e `setfacl` e explica seu uso para permissões adicionais de arquivos por usuário/grupo. ACL não é um serviço; o instalador disponibiliza as ferramentas para uso manual e não aplica ACLs automaticamente a diretórios.
+
+### Política SSH centralizada no arquivo principal
+
+As quatro diretivas são gravadas diretamente em `/etc/ssh/sshd_config`: `PermitRootLogin`, `PermitEmptyPasswords`, `ClientAliveInterval` e `ClientAliveCountMax`. O script aproveita a primeira linha global correspondente, ativa ou comentada, atualizando o valor no mesmo local e removendo as outras ocorrências globais da mesma diretiva. Comentários explicativos depois do valor são preservados. Diretivas ausentes são acrescentadas antes do primeiro `Match`, ou ao final se não houver esse bloco.
+
+Os blocos `Match`, portas, demais opções e Includes de terceiros são preservados. Se houver conflito com os valores solicitados no contexto efetivo conferido, o script restaura a configuração anterior, em vez de declarar sucesso ou apagar personalizações de outros arquivos.
+
+**Migração de instalações anteriores da 2.5:** o arquivo `/etc/ssh/pos-install-server.conf` e seu Include são removidos após preparar a política no arquivo principal. Antes disso, ambos os arquivos recebem backup. O arquivo separado precisa ser regular, identificado como gerado pelo script e conter somente as quatro diretivas gerenciadas; configurações extras, Include com múltiplos destinos ou dentro de `Match` exigem revisão manual e interrompem antes de gravar. Não é criado um novo arquivo separado de política SSH.
+
+Para conferir as linhas no arquivo principal:
+
+```bash
+sudo grep -nE '^[[:space:]]*(PermitRootLogin|PermitEmptyPasswords|ClientAliveInterval|ClientAliveCountMax)[[:space:]]' /etc/ssh/sshd_config
+```
+
+Para conferir os valores globais efetivamente interpretados pelo SSH:
+
+```bash
+sudo sshd -T | grep -E '^(permitrootlogin|permitemptypasswords|clientaliveinterval|clientalivecountmax) '
+```
 
 ### O que o script prepara no servidor
 
@@ -434,6 +460,38 @@ sudo ufw reload
 
 ---
 
+### 6.4 Atualizações automáticas (`unattended-upgrades`)
+
+O script grava `APT::Periodic::Update-Package-Lists "1"` e `APT::Periodic::Unattended-Upgrade "1"` em `/etc/apt/apt.conf.d/20auto-upgrades`. O valor `1` habilita a política diária. As origens permitidas continuam definidas pela distribuição, normalmente em `/etc/apt/apt.conf.d/50unattended-upgrades`; isso não equivale a atualizar automaticamente todos os pacotes de qualquer repositório.
+
+`apt-daily.timer` agenda a atualização dos índices; `apt-daily-upgrade.timer` agenda a instalação das atualizações permitidas. O resumo mostra se ambos estão ativos e habilitados para iniciar com o sistema, além do próximo horário calculado pelo systemd. Os horários existentes são preservados e podem incluir atraso aleatório. Sem política confirmada, timers habilitados/ativos ou próximo horário disponível, o script registra uma pendência.
+
+```bash
+# Ambos devem responder enabled e active, respectivamente
+systemctl is-enabled apt-daily.timer apt-daily-upgrade.timer
+systemctl is-active apt-daily.timer apt-daily-upgrade.timer
+
+# NEXT indica o próximo disparo; LAST indica o anterior
+systemctl list-timers --all --no-pager apt-daily.timer apt-daily-upgrade.timer
+
+# Ambos devem retornar '1' na configuração efetiva
+apt-config shell indices APT::Periodic::Update-Package-Lists atualizacoes APT::Periodic::Unattended-Upgrade
+
+# Resultado da última execução e histórico
+systemctl show apt-daily-upgrade.service -p Result -p ExecMainStatus
+sudo journalctl -u apt-daily-upgrade.service --since '7 days ago' --no-pager
+sudo tail -n 80 /var/log/unattended-upgrades/unattended-upgrades.log
+
+# Simula a seleção das atualizações sem instalá-las
+sudo unattended-upgrade --dry-run --debug
+```
+
+`unattended-upgrades.service` é um serviço auxiliar para coordenar o encerramento do sistema; estar ativo não significa que uma atualização esteja em andamento. `apt-daily-upgrade.service` executa sob demanda e normalmente fica `inactive (dead)` entre execuções. `Result=success` e `ExecMainStatus=0`, acompanhados do histórico, confirmam sucesso da última execução, quando houver uma. Um disparo sem pacotes elegíveis pode terminar com sucesso sem instalar nada.
+
+O agendamento confirma a intenção de executar. Rede, repositórios disponíveis e bloqueios do APT ainda podem afetar cada execução; confira o journal e o log para confirmar o resultado. Se o log ainda não existir, confira o journal e a simulação antes de concluir que ocorreu uma falha.
+
+---
+
 ## ⚡ 7. Produtividade, Manipulação de Dados e Arquivos
 
 ### 7.1 Manipulação e Formatação de JSON (`jq`)
@@ -537,7 +595,7 @@ Em uma VM limpa, informar `dev` cria somente `/etc/sudoers.d/grupo_dev`, com reg
 | `sudo passwd root`, `administrador` ou `geset` | Negado nas formas diretas listadas; opções e outros caminhos não são isolamento. |
 | `sudo passwd` sem argumento | Negado, pois atuaria sobre root. |
 | Editar arquivos protegidos | Bloqueia editor + caminho absoluto exato em nano, vi, vim, vim.tiny e editor; sudoedit também é negado. |
-| Caminhos SSH protegidos pelas barreiras | `sshd_config`, `pos-install-server.conf` e arquivos `.conf` existentes em `sshd_config.d/` com nomes simples, sob `/etc/ssh/`. |
+| Caminhos SSH protegidos pelas barreiras | `sshd_config` e arquivos `.conf` existentes em `sshd_config.d/` com nomes simples, sob `/etc/ssh/`. A negação para `pos-install-server.conf` permanece por compatibilidade com a política legada, mas esse arquivo não é criado nas novas execuções. |
 | Outros bloqueios preservados | visudo, usermod, gpasswd, su e leituras diretas específicas de shadow. Também é negado executar sudo dentro de outro sudo. |
 
 > ⚠️ Shells, instaladores e outros programas privilegiados continuam capazes de modificar contas e SSH. As regras não impedem que outro administrador tome controle do servidor. Outras concessões sudoers ou associação ao grupo sudo também podem alterar o resultado efetivo; confira a política de cada conta.
@@ -668,7 +726,9 @@ findmnt --mountpoint /dev/shm -o TARGET,OPTIONS
 8. Na VM descartável, testar falha de dependência, configuração preexistente inválida e interrupção durante a execução: exigir relatório de falha, ausência de sucesso falso e recuperação do SSH quando sua etapa estiver em andamento.
 9. Aceitar a opção Vim em outro teste e conferir tema/plugins com conta comum. Testar também uma home com `.vimrc` simbólico: o alvo não deve ser modificado como root.
 
-**Validação da entrega:** `bash -n`, ShellCheck 0.9.0/0.11.0 e análise de sintaxe dos trechos shell gerados passaram no Ubuntu 24.04/26.04. Uma política representativa passou nos dois parsers visudo. Em 30/09/2026, a Ubuntu-26.04-Teste foi recriada e o instalador executado duas vezes com todas as opções Sim, grupo `dev` e três contas: nenhuma mensagem de erro do instalador, código 3 pelas pendências WSL. Foram aprovadas 91 verificações, incluindo logins SSH reais por loopback, sudo-rs, bloqueio Fail2Ban no nftables, pacotes, aliases e Vim carregados. Três verificações limitadas correspondem a auditoria do kernel/unidades auditd falhas e `/dev/shm`. Acesso de outro computador, Ubuntu 24.04 e controles de kernel em VM convencional permanecem pendentes.
+**Homologação de 30/09/2026, anterior à centralização do SSH:** `bash -n`, ShellCheck 0.9.0/0.11.0 e análise de sintaxe dos trechos shell gerados passaram no Ubuntu 24.04/26.04. Uma política representativa passou nos dois parsers visudo. A Ubuntu-26.04-Teste foi recriada e o instalador executado duas vezes com todas as opções Sim, grupo `dev` e três contas: nenhuma mensagem de erro do instalador, código 3 pelas pendências WSL. Foram aprovadas 91 verificações, incluindo logins SSH reais por loopback, sudo-rs, bloqueio Fail2Ban no nftables, pacotes, aliases e Vim carregados. Três verificações limitadas correspondem a auditoria do kernel/unidades auditd falhas e `/dev/shm`. Esse ensaio não comprova controles de kernel em VM convencional.
+
+**Validação de 04/10/2026:** sintaxe Bash e ShellCheck aprovados; 16 verificações isoladas na Ubuntu-26.04-Teste cobriram edição de comentários, duplicatas, diretivas ausentes, preservação de `Match`/Includes, reexecução, migração e recusas de arquivos legados personalizados. O parser real `sshd -t/-T` conferiu os valores; a etapa real operou sobre arquivos temporários com recarga simulada, incluindo restauração em conflito `Match` e falha de recarga. Nove cenários isolados validaram a confirmação do agendamento APT; o painel agrupado foi renderizado com dados simulados. Após restaurar o snapshot inicial da sandbox Ubuntu 26.04 e receber a cópia atualizada, o proprietário confirmou uma nova instalação completa sem erros e aprovou o resumo. Esse relato não substitui verificações individuais de cada controle; Ubuntu 24.04 continua sem teste dinâmico dessa revisão.
 
 ---
 
@@ -698,9 +758,9 @@ O erro `Destino administrativo é um link simbólico: /etc/default/locale` foi c
 
 ### Restaurar configurações após falha
 
-Backups ficam no diretório informado no relatório, mantendo caminhos como `etc/ssh/sshd_config`. Na falha da etapa SSH, o script tenta restaurar os dois arquivos gerenciados e recarregar o serviço. Em `SIGKILL`, queda de energia ou falha de disco, a restauração automática não é garantida.
+Backups ficam no diretório informado no relatório, mantendo caminhos como `etc/ssh/sshd_config`. Na falha da etapa SSH, o script tenta restaurar o arquivo principal e o estado anterior do arquivo legado, quando presente, e recarregar o serviço. Em `SIGKILL`, queda de energia ou falha de disco, a restauração automática não é garantida.
 
-Pelo console, compare o arquivo atual ao backup da execução. Restaure somente os arquivos envolvidos, incluindo o arquivo de política SSH se ele já existia; se era novo, remova apenas esse arquivo gerado e restaure o `sshd_config` original. Antes de recarregar:
+Pelo console, compare o arquivo atual ao backup da execução. Restaure somente os arquivos envolvidos. Se a execução migrou o arquivo legado, restaure também `/etc/ssh/pos-install-server.conf` a partir do seu backup e o `sshd_config` anterior com o Include correspondente. Em instalação sem arquivo legado, restaure somente o arquivo principal. Antes de recarregar:
 
 ```bash
 sudo sshd -t

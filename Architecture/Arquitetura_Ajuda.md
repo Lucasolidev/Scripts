@@ -130,6 +130,10 @@ Use emojis padronizados para manter a consistência visual nos títulos H2 e des
    * **Comentários Inline**: Adicionar comentários curtos dentro dos blocos de código `#` para explicar flags complexas ou listar atalhos alternativos (`# Ou de forma simplificada:`).
 4. **Alerta de Operações Destrutivas**:
    * Comandos de deleção (`rm -rf`, `docker system prune -a`, `ufw reset`) devem conter avisos claros com `⚠️` ou `🔴`.
+5. **Explicação dos Componentes de Instaladores**:
+   * Em ajudas de instaladores, incluir uma visão do fluxo e um inventário dos pacotes solicitados diretamente, com finalidade e ação efetiva do script: apenas disponibilizado para uso manual, configurado, habilitado/iniciado ou condicionado a opção/ambiente.
+   * Identificar dependências essenciais, condições por versão/hipervisor, pacotes virtuais e plugins obtidos fora do APT. Distinguir configurações geradas de programas instalados e deixar claro quando uma porta liberada não significa que o serviço correspondente foi instalado.
+   * Não atribuir varredura, captura, backup recorrente, integração remota ou frequência de coleta ao instalador somente porque ele instala a ferramenta. Conferir as listas e etapas da versão atual do script ao atualizar o inventário.
 
 ---
 
@@ -172,6 +176,7 @@ Antes de finalizar qualquer novo arquivo `ajuda_*.md`, verifique:
 - [ ] Possui badges do Shields.io funcionando e alinhados abaixo do H1?
 - [ ] As seções H2 possuem emojis relevantes, números organizados e divisores `---`?
 - [ ] A tabela de diretórios e arquivos vitais foi incluída?
+- [ ] Em ajudas de instaladores, os pacotes/componentes têm finalidade, condições de instalação e ação efetiva do script documentadas, distinguindo uso manual de configuração automática?
 - [ ] Os blocos de código contêm especificação de linguagem (`bash`, `yaml`, `nginx`, etc.)?
 - [ ] Cada comando, regra ou instrução copiável está em um bloco de código separado?
 - [ ] Foram incluídos comandos de validação de sintaxe antes de comandos de reinício/reload?
