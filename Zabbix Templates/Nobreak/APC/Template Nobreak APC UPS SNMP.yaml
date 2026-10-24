@@ -1,0 +1,497 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: 6aab4be35b42402b9322c22c2667bbeb
+      template: 'Template Nobreak APC UPS SNMP'
+      name: 'Template Nobreak APC UPS SNMP'
+      templates:
+        - name: 'Template ICMP'
+      groups:
+        - name: Templates
+      items:
+        - uuid: de28ec2dbbea4229baf6671955e7330a
+          name: Contact
+          type: SNMP_AGENT
+          snmp_oid: sysContact.0
+          key: sysContact
+          delay: 6h
+          history: 7d
+          value_type: CHAR
+          trends: '0'
+          inventory_link: CONTACT
+          tags:
+            - tag: Application
+              value: System
+        - uuid: 18d93f32f4eb4957a5d17fc4340a477b
+          name: 'Software version (full)'
+          type: SNMP_AGENT
+          snmp_oid: 'SNMPv2-MIB::sysDescr.0'
+          key: sysDescr
+          delay: 6h
+          history: 7d
+          value_type: CHAR
+          trends: '0'
+          inventory_link: OS_FULL
+          tags:
+            - tag: Application
+              value: System
+        - uuid: cab7f8aa4aaf40c48668fca235d247dc
+          name: 'Device Location'
+          type: SNMP_AGENT
+          snmp_oid: sysLocation.0
+          key: sysLocation
+          delay: 6h
+          history: 7d
+          value_type: CHAR
+          trends: '0'
+          inventory_link: LOCATION
+          tags:
+            - tag: Application
+              value: System
+        - uuid: 3d783e4a919a4c72900151ea72c74d8d
+          name: 'Device Name'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.318.1.1.1.1.1.2.0
+          key: sysName
+          delay: 6h
+          history: 7d
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Bkp
+            SNMPv2-MIB::sysName.0
+          inventory_link: NAME
+          tags:
+            - tag: Application
+              value: System
+        - uuid: 238a404174cc4073a5f64b37e4781792
+          name: 'System Uptime'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: sysUpTime
+          history: 7d
+          trends: 180d
+          units: uptime
+          description: |
+            Bkp
+            SNMPv2-MIB::sysUpTime.0
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            - tag: Application
+              value: Status
+        - uuid: c67cf3ef340b499a8a48d1fd048f4944
+          name: 'UPS battery capacity (%)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.318.1.1.1.2.2.1.0
+          key: upsAdvBatteryCapacity
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: '%'
+          tags:
+            - tag: Application
+              value: Power
+          triggers:
+            - uuid: f4b80a0d504649cf9899ac7f50668ed5
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsAdvBatteryCapacity)<90'
+              name: 'Batery Capacity <90%'
+              priority: AVERAGE
+        - uuid: c5a3656de6e34e5895c007a3436da05a
+          name: 'UPS batery packst'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.2.1.2.0
+          key: upsAdvBatteryNumOfBattPacks
+          delay: 1h
+          history: 7d
+          trends: 180d
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: cb8500435ca5441eb62e32ac811e2094
+          name: 'UPS battery temperature'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.2.2.2.0
+          key: upsAdvBatteryTemperature
+          history: 7d
+          trends: 180d
+          units: °C
+          tags:
+            - tag: Application
+              value: Power
+          triggers:
+            - uuid: 00fe5f37736841168a0cf29c1d9c6c1b
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsAdvBatteryTemperature)>40'
+              name: 'High battery temperature'
+              priority: HIGH
+        - uuid: f9c767d36f2941e1b6c6131c25ce5a9a
+          name: 'UPS battery voltage'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.2.2.8.0
+          key: upsAdvBatVoltage
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: VAC
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: 5c7986748f8c42d5a555b275bfa39cfb
+          name: 'Software version'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.1.2.1.0
+          key: upsAdvIdentFirmwareRevision
+          delay: 6h
+          history: 7d
+          value_type: CHAR
+          trends: '0'
+          inventory_link: OS
+          tags:
+            - tag: Application
+              value: System
+        - uuid: 3c72c8dad1874368935fa6f79bdacf3b
+          name: 'Device Serial Number'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.1.2.3.0
+          key: upsAdvIdentSerialNumber
+          delay: 6h
+          history: 7d
+          value_type: CHAR
+          trends: '0'
+          inventory_link: SERIALNO_A
+          tags:
+            - tag: Application
+              value: System
+        - uuid: b33bccb236994088858926da92907044
+          name: 'UPS input frequency'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.318.1.1.1.3.2.4.0
+          key: upsAdvInputLoad
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: Hz
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: 12c6089f09e74bbb957aad68f269bb06
+          name: 'UPS input voltage'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.318.1.1.1.3.2.1.0
+          key: upsAdvInputVoltage
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: VAC
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: afa792b83f684ff2a281e3bdccb246d1
+          name: 'UPS current load (Amps)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.4.2.4.0
+          key: upsAdvOutputCurrent
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: amp
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: 9a16b33e0db54547a6ea9c42373838f5
+          name: 'UPS output frequency'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.4.1.318.1.1.1.4.2.2.0
+          key: upsAdvOutputFrequency
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: Hz
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: fee90b24492d473da4aae30ca394e72d
+          name: 'UPS output load (%)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.4.2.3.0
+          key: upsAdvOutputLoad
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: '%'
+          tags:
+            - tag: Application
+              value: Power
+          triggers:
+            - uuid: 467aca2f9bfa42a5929274a4fb0e0764
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsAdvOutputLoad)>85'
+              name: 'Output Load Critical >85%'
+              priority: HIGH
+            - uuid: 3c7495f90f8148e3abb87242cea5f6fd
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsAdvOutputLoad)>90'
+              name: 'Output load High'
+              priority: WARNING
+        - uuid: b157b8b489594e03b4c59a989924e7b5
+          name: 'UPS output load (W)'
+          type: CALCULATED
+          key: upsAdvOutputLoadW
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: W
+          params: 'last(//upsAdvOutputVoltage) * last(//upsAdvOutputCurrent)'
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: 4d5c5cd4120b4e45be8656935510c6ed
+          name: 'UPS output voltage'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.4.2.1.0
+          key: upsAdvOutputVoltage
+          history: 7d
+          value_type: FLOAT
+          trends: 180d
+          units: VAC
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: e1e245eb49094d11bc0c9b438cd940c2
+          name: 'UPS replace battery indicator'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.2.2.4.0
+          key: upsAdvReplaceBatteryIndicator
+          history: 7d
+          trends: 180d
+          valuemap:
+            name: apcBatteryReplacementStatus
+          tags:
+            - tag: Application
+              value: Power
+          triggers:
+            - uuid: 65d9f190d159406199cf68d8ffa44811
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsAdvReplaceBatteryIndicator)<>1'
+              name: 'Battery Needs Replaced'
+              priority: AVERAGE
+        - uuid: 43272f1e1e624d41946710bc20c401d4
+          name: 'UPS battery time remaining'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.2.2.3.0
+          key: upsAdvRunTimeRemaining
+          history: 7d
+          trends: 180d
+          units: s
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            - tag: Application
+              value: Power
+          triggers:
+            - uuid: 582608a242844da78ded1ee817ae2787
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsAdvRunTimeRemaining)<20'
+              name: 'Batery Time Remaining <20min'
+              priority: HIGH
+            - uuid: 048b7e84e5494b3286a7cf934abe4add
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsAdvRunTimeRemaining)<10'
+              name: 'Run time remaining CRITICAL'
+              priority: DISASTER
+        - uuid: 02c6b60141244455bc68786333e2aac3
+          name: 'UPS battery status'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.2.1.1.0
+          key: upsBasicBatteryStatus
+          history: 7d
+          trends: 180d
+          valuemap:
+            name: apcBatteryStatus
+          tags:
+            - tag: Application
+              value: Power
+          triggers:
+            - uuid: 68e94591eb0d4b2eae3a2339b1547223
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsBasicBatteryStatus)=3'
+              name: 'The battery power is too low to support the load'
+              priority: AVERAGE
+        - uuid: 44875fd4f2744191abae9830e9a85536
+          name: 'UPS Time on Battery'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.2.1.2.0
+          key: upsBasicBatteryTimeOnBattery
+          history: 7d
+          trends: 180d
+          units: s
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            - tag: Application
+              value: Power
+        - uuid: e683d45d4e3143dcb514f733c16155af
+          name: 'Device Model Name'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.1.1.1.0
+          key: upsBasicIdentModel
+          delay: 6h
+          history: 7d
+          value_type: CHAR
+          trends: '0'
+          inventory_link: TYPE
+          tags:
+            - tag: Application
+              value: System
+        - uuid: 6df7f86de5344532883a8c95e790edda
+          name: 'UPS status'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.318.1.1.1.4.1.1.0
+          key: upsBasicOutputStatus
+          history: 7d
+          trends: 180d
+          valuemap:
+            name: apcStatus
+          tags:
+            - tag: Application
+              value: Power
+          triggers:
+            - uuid: 1dd8b23a2dd64364b6b93b7d7bbb381b
+              expression: 'last(/Template Nobreak APC UPS SNMP/upsBasicOutputStatus)<>2'
+              name: 'Nobreak Status'
+              priority: AVERAGE
+      valuemaps:
+        - uuid: 96ebc0116c71451e83a50e92f58431f6
+          name: apcBatteryReplacementStatus
+          mappings:
+            - value: '1'
+              newvalue: noBatteryNeedsReplacing
+            - value: '2'
+              newvalue: batteryNeedsReplacing
+        - uuid: 5929cc5dcb7c48d4af5841a1b837c997
+          name: apcBatteryStatus
+          mappings:
+            - value: '1'
+              newvalue: unknown
+            - value: '2'
+              newvalue: batteryNormal
+            - value: '3'
+              newvalue: batteryLow
+        - uuid: f341c0ccc2324f10ae36d6b1219cdca0
+          name: apcStatus
+          mappings:
+            - value: '1'
+              newvalue: unknown
+            - value: '2'
+              newvalue: onLine
+            - value: '3'
+              newvalue: onBattery
+            - value: '4'
+              newvalue: onSmartBoost
+            - value: '5'
+              newvalue: timedSleeping
+            - value: '6'
+              newvalue: softwareBypass
+            - value: '7'
+              newvalue: 'off'
+            - value: '8'
+              newvalue: rebooting
+            - value: '9'
+              newvalue: switchedBypass
+            - value: '10'
+              newvalue: harwareFailureBypass
+            - value: '11'
+              newvalue: sleepingUnitPowerReturn
+            - value: '12'
+              newvalue: onSmartTrim
+            - value: '13'
+              newvalue: ecoMode
+            - value: '14'
+              newvalue: hotStandby
+            - value: '15'
+              newvalue: onBatteryTest
+  triggers:
+    - uuid: 8d17f2262be641d4a670eb90dddf9e9e
+      expression: |
+        last(/Template Nobreak APC UPS SNMP/upsBasicBatteryTimeOnBattery)>0
+        and
+        last(/Template Nobreak APC UPS SNMP/upsAdvRunTimeRemaining)>=0
+      name: 'Nobreak on Battery'
+      opdata: 'Operando: {ITEM.LASTVALUE1}  |  Restante: {ITEM.LASTVALUE2}'
+      priority: HIGH
+      description: |
+        Operando: {ITEM.LASTVALUE1} 
+        Restante: {ITEM.LASTVALUE2}
+  graphs:
+    - uuid: aab542a90f084a73877431efec789d00
+      name: 'Battery status'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: C80000
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsBasicBatteryStatus
+        - sortorder: '1'
+          drawtype: BOLD_LINE
+          color: 00C800
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsAdvReplaceBatteryIndicator
+    - uuid: 13bc8bd4c8d047d49dfdd712db0fb890
+      name: 'UPS Capacity'
+      ymin_type_1: FIXED
+      graph_items:
+        - sortorder: '1'
+          drawtype: FILLED_REGION
+          color: 4CAF50
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsAdvBatteryCapacity
+        - sortorder: '2'
+          drawtype: BOLD_LINE
+          color: CC0000
+          yaxisside: RIGHT
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsAdvRunTimeRemaining
+    - uuid: 3c93113a7ed243d58ac3e002b5b80a57
+      name: 'UPS load'
+      graph_items:
+        - color: C80000
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsAdvOutputCurrent
+        - sortorder: '1'
+          color: 0000CC
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsAdvOutputLoad
+    - uuid: 216c556d80b943d7a0ca377f6362219b
+      name: 'UPS temperature'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: '660000'
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsAdvBatteryTemperature
+    - uuid: d1bea9c588d544339e4f956e5f5d2c8a
+      name: 'UPS voltage'
+      graph_items:
+        - color: 0000CC
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsAdvOutputVoltage
+        - sortorder: '1'
+          color: CC0000
+          item:
+            host: 'Template Nobreak APC UPS SNMP'
+            key: upsAdvInputVoltage

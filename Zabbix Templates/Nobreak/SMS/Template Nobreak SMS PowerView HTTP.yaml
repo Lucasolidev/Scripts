@@ -1,0 +1,463 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: '10000000000140008000000000000002'
+      template: 'Template Nobreak SMS PowerView  HTTP'
+      name: 'Template Nobreak SMS PowerView  HTTP'
+      description: |
+        Requisitos: SMS PowerView em execução e Zabbix Agent instalado no Windows que executará a coleta.
+
+        Copiar scripts/collector_nobreak_sms.ps1 para <pasta_do_zabbix_agent>\scripts\collector_nobreak_sms.ps1.
+        A conta do serviço Zabbix Agent precisa ler/executar o script e acessar o HTTP do PowerView.
+
+        Adicionar ao arquivo de configuração carregado pelo Zabbix Agent, substituindo <pasta_do_zabbix_agent> pelo caminho real:
+        UserParameter=system.nobreak.sms[*],powershell.exe -NoProfile -NonInteractive -File "<pasta_do_zabbix_agent>\scripts\collector_nobreak_sms.ps1" -hostParam "$1" -portParam "$2"
+        Reiniciar o serviço Zabbix Agent após configurar o UserParameter.
+        Vincular o template ao host com interface Agent apontando para esse Windows.
+
+        Macros do host:
+        {$NOBREAK_URL}: endereço do PowerView visto pelo agente, sem http:// nem caminho; padrão 127.0.0.1 se estiver no mesmo Windows.
+        {$NOBREAK_PORT}: porta HTTP configurada no PowerView; padrão 8080.
+        {$NOBREAK.NODATA.TIMEOUT}: tempo sem coleta para alertar; padrão 5m. Manter maior que o intervalo de coleta de 60s.
+      groups:
+        - name: Templates
+      items:
+        - uuid: '10000000000240008000000000000003'
+          name: 'Nobreak Collector Error'
+          type: DEPENDENT
+          key: nobreak.agent.error
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          description: 'Mensagem de erro retornada pelo coletor quando falha.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - 'try { var obj = JSON.parse(value); return obj && obj.error ? obj.error : ''''; } catch(e) { return ''''; }'
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+          triggers:
+            - uuid: '10000000000340008000000000000004'
+              expression: 'last(/Template Nobreak SMS PowerView  HTTP/nobreak.agent.error)<>""'
+              name: 'Nobreak SMS: Collector reportou erro'
+              opdata: '{HOST.IP}'
+              priority: DISASTER
+        - uuid: '10000000000440008000000000000005'
+          name: 'Nobreak Collector Agent IP'
+          type: DEPENDENT
+          key: nobreak.agent.ip
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.agent_ip
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: '10000000000540008000000000000006'
+          name: 'Nobreak Collector: Port'
+          type: DEPENDENT
+          key: nobreak.agent.port
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.collector_port
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: '10000000000640008000000000000007'
+          name: 'Nobreak Collector: Host'
+          type: DEPENDENT
+          key: nobreak.agent.url
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.collector_host
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: '10000000000740008000000000000008'
+          name: 'Nobreak SMS: Frequencia Saida'
+          type: DEPENDENT
+          key: nobreak.frequencia.saida
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: Hz
+          description: 'Frequência de saída do Nobreak, geralmente 60Hz +- 1%.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.frequencia_saida
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+          triggers:
+            - uuid: '10000000000840008000000000000009'
+              expression: 'last(/Template Nobreak SMS PowerView  HTTP/nobreak.frequencia.saida)>60.2 or last(/Template Nobreak SMS PowerView  HTTP/nobreak.frequencia.saida)<59.8'
+              name: 'Nobreak SMS: Frequencia de Saida Irregular'
+              priority: WARNING
+        - uuid: 1000000000094000800000000000000a
+          name: 'Nobreak SMS: Potencia Saida'
+          type: DEPENDENT
+          key: nobreak.potencia.saida
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: '%'
+          description: 'Potência de saída do nobreak, quanto mais equipamentos ligados maior será a potência e menor a autonomia.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.potencia_saida
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+          triggers:
+            - uuid: 10000000000a4000800000000000000b
+              expression: 'last(/Template Nobreak SMS PowerView  HTTP/nobreak.potencia.saida)>85'
+              name: 'Nobreak SMS: Potência de Saída Elevada'
+              priority: AVERAGE
+        - uuid: '10000000001840008000000000000019'
+          name: 'Nobreak Status: Alerta (On/Off)'
+          type: DEPENDENT
+          key: nobreak.status.alerta
+          delay: '0'
+          history: 7d
+          description: 'Indicador de alerta do coletor: 0 = inativo (Off), 1 = ativo (On).'
+          valuemap:
+            name: 'SMS PowerView: Alerta'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status_alerta
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: '10000000001540008000000000000016'
+          name: 'Nobreak Status: Bateria (On/Off)'
+          type: DEPENDENT
+          key: nobreak.status.bateria
+          delay: '0'
+          history: 7d
+          description: 'Indicador de bateria do coletor: 0 = inativo (Off), 1 = ativo (On). Não interpretar isoladamente como operação em bateria; a semântica física depende do coletor PowerView.'
+          valuemap:
+            name: 'SMS PowerView: Bateria'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status_bateria
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: 1000000000194000800000000000001a
+          name: 'Nobreak Status: Gateway Mobile (On/Off)'
+          type: DEPENDENT
+          key: nobreak.status.gateway_mobile
+          delay: '0'
+          history: 7d
+          description: 'Indicador de Gateway Mobile do coletor: 0 = inativo (Off), 1 = ativo (On).'
+          valuemap:
+            name: 'SMS PowerView: Gateway Mobile'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status_gateway_mobile
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: 10000000001a4000800000000000001b
+          name: 'Nobreak Status: Potencia Elevada (On/Off)'
+          type: DEPENDENT
+          key: nobreak.status.potencia_elevada
+          delay: '0'
+          history: 7d
+          description: 'Indicador de potência elevada do coletor: 0 = inativo (Off), 1 = ativo (On).'
+          valuemap:
+            name: 'SMS PowerView: Potência elevada'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status_potencia_elevada
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: '10000000001440008000000000000015'
+          name: 'Nobreak Status: Rede Eletrica (On/Off)'
+          type: DEPENDENT
+          key: nobreak.status.rede_eletrica
+          delay: '0'
+          history: 7d
+          description: 'Indicador de rede elétrica do coletor: 0 = inativo (Off), 1 = ativo (On).'
+          valuemap:
+            name: 'SMS PowerView: Rede elétrica'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status_rede_eletrica
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: '10000000001740008000000000000018'
+          name: 'Nobreak Status: Teste (On/Off)'
+          type: DEPENDENT
+          key: nobreak.status.teste
+          delay: '0'
+          history: 7d
+          description: 'Indicador de teste do coletor: 0 = inativo (Off), 1 = ativo (On).'
+          valuemap:
+            name: 'SMS PowerView: Teste'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status_teste
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: '10000000001640008000000000000017'
+          name: 'Nobreak Status: UPS (On/Off)'
+          type: DEPENDENT
+          key: nobreak.status.ups
+          delay: '0'
+          history: 7d
+          description: 'Indicador UPS do coletor: 0 = inativo (Off), 1 = ativo (On). Não interpretar isoladamente como nobreak desligado ou ligado; a semântica física depende do coletor PowerView.'
+          valuemap:
+            name: 'SMS PowerView: UPS'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status_ups
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: 10000000000b4000800000000000000c
+          name: 'Nobreak SMS: Temperatura'
+          type: DEPENDENT
+          key: nobreak.temperatura
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: C
+          description: 'Temperatura do nobreak.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.temperatura
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+          triggers:
+            - uuid: 10000000000c4000800000000000000d
+              expression: 'last(/Template Nobreak SMS PowerView  HTTP/nobreak.temperatura)>40'
+              name: 'Nobreak SMS: Temperatura Elevada'
+              priority: HIGH
+        - uuid: 10000000000d4000800000000000000e
+          name: 'Nobreak SMS: Carga Bateria (%)'
+          type: DEPENDENT
+          key: nobreak.tensao.bateria
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: '%'
+          description: 'Tensão da bateria reportado em %.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.carga_bateria
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+          triggers:
+            - uuid: 10000000000e4000800000000000000f
+              expression: 'last(/Template Nobreak SMS PowerView  HTTP/nobreak.tensao.bateria)<70'
+              name: 'Nobreak SMS: Bateria com pouca carga'
+              priority: HIGH
+            - uuid: 10000000000f40008000000000000010
+              expression: 'last(/Template Nobreak SMS PowerView  HTTP/nobreak.tensao.bateria)<>100'
+              name: 'Nobreak SMS: Bateria não está com carga total'
+              priority: INFO
+        - uuid: '10000000001040008000000000000011'
+          name: 'Nobreak SMS: Tensao Entrada'
+          type: DEPENDENT
+          key: nobreak.tensao.entrada
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: V
+          description: 'Tensão de Entrada em Volts.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.tensao_entrada
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+          triggers:
+            - uuid: '10000000001140008000000000000012'
+              expression: 'last(/Template Nobreak SMS PowerView  HTTP/nobreak.tensao.entrada)<=200 or last(/Template Nobreak SMS PowerView  HTTP/nobreak.tensao.entrada)>=238'
+              name: 'Nobreak SMS: Falha de Energia na Entrada'
+              priority: AVERAGE
+        - uuid: '10000000001240008000000000000013'
+          name: 'Nobreak SMS: Tensao Saida'
+          type: DEPENDENT
+          key: nobreak.tensao.saida
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: V
+          description: 'Tensão de Saída em Volts.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.tensao_saida
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+          triggers:
+            - uuid: '10000000001340008000000000000014'
+              expression: 'last(/Template Nobreak SMS PowerView  HTTP/nobreak.tensao.saida)>222 or last(/Template Nobreak SMS PowerView  HTTP/nobreak.tensao.saida)<218'
+              name: 'Nobreak SMS: Tensão de Saída fora do padrão 220v'
+              priority: AVERAGE
+        - uuid: 10000000001b4000800000000000001c
+          name: 'Nobreak: Ultimo Evento'
+          type: DEPENDENT
+          key: nobreak.ultimo_evento
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.ultimo_evento
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: 10000000001c4000800000000000001d
+          name: 'Nobreak: Ultimo Evento - Data'
+          type: DEPENDENT
+          key: nobreak.ultimo_evento_data
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.ultimo_evento_data
+          master_item:
+            key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+        - uuid: 10000000001d4000800000000000001e
+          name: 'Nobreak RAW'
+          key: 'system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}]'
+          delay: 60s
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          triggers:
+            - uuid: 10000000001e4000800000000000001f
+              expression: 'nodata(/Template Nobreak SMS PowerView  HTTP/system.nobreak.sms[{$NOBREAK_URL},{$NOBREAK_PORT}],{$NOBREAK.NODATA.TIMEOUT},"strict")=1'
+              name: 'Nobreak SMS: Sem coleta do RAW há {$NOBREAK.NODATA.TIMEOUT}'
+              opdata: 'Host: {HOST.HOST} | IP: {HOST.IP} | Limite sem dados: {$NOBREAK.NODATA.TIMEOUT}'
+              priority: DISASTER
+              description: 'O item Nobreak RAW não recebeu dados durante o período configurado. Verificar agente Zabbix, UserParameter system.nobreak.sms, coletor PowerView e comunicação com o nobreak. O modo strict alerta também em ausência de dados causada por indisponibilidade do proxy. Recuperação automática quando o RAW voltar a receber dados. Este evento indica perda de monitoramento, não confirma falha elétrica ou desligamento do nobreak. Erros recebidos em JSON continuam tratados pela trigger Nobreak SMS: Collector reportou erro.'
+      tags:
+        - tag: Nobreak
+          value: SMS
+        - tag: Type
+          value: Nobreak
+      macros:
+        - macro: '{$NOBREAK_PORT}'
+          value: '8080'
+        - macro: '{$NOBREAK_URL}'
+          value: 127.0.0.1
+        - macro: '{$NOBREAK.NODATA.TIMEOUT}'
+          value: 5m
+          description: 'Tempo sem dados no Nobreak RAW para gerar Desastre. Usar período maior que a coleta de 60s, recomendado 5m ou mais; mínimo aceito por nodata: 30s.'
+      valuemaps:
+        - uuid: 39644b571a0741ce8d25b1f38334bd3b
+          name: 'SMS PowerView: Alerta'
+          mappings:
+            - value: '0'
+              newvalue: Inativo
+            - value: '1'
+              newvalue: Ativo
+            - type: DEFAULT
+              newvalue: Desconhecido
+        - uuid: c29a441e035d4ed28b704ec52ef27541
+          name: 'SMS PowerView: Bateria'
+          mappings:
+            - value: '0'
+              newvalue: Inativo
+            - value: '1'
+              newvalue: Ativo
+            - type: DEFAULT
+              newvalue: Desconhecido
+        - uuid: 03611d35526a474abcf9a5c6b656f25a
+          name: 'SMS PowerView: Gateway Mobile'
+          mappings:
+            - value: '0'
+              newvalue: Inativo
+            - value: '1'
+              newvalue: Ativo
+            - type: DEFAULT
+              newvalue: Desconhecido
+        - uuid: 672db4d8a34644c5944dd3edf16cb25f
+          name: 'SMS PowerView: Potência elevada'
+          mappings:
+            - value: '0'
+              newvalue: Inativo
+            - value: '1'
+              newvalue: Ativo
+            - type: DEFAULT
+              newvalue: Desconhecido
+        - uuid: 38544b5eb64a411eabf839620c5960c0
+          name: 'SMS PowerView: Rede elétrica'
+          mappings:
+            - value: '0'
+              newvalue: Inativo
+            - value: '1'
+              newvalue: Ativo
+            - type: DEFAULT
+              newvalue: Desconhecido
+        - uuid: 33fab8b2c0cc40aea4ea56700a511b95
+          name: 'SMS PowerView: Teste'
+          mappings:
+            - value: '0'
+              newvalue: Inativo
+            - value: '1'
+              newvalue: Ativo
+            - type: DEFAULT
+              newvalue: Desconhecido
+        - uuid: 307d7626d47440b999e0c861e875d875
+          name: 'SMS PowerView: UPS'
+          mappings:
+            - value: '0'
+              newvalue: Inativo
+            - value: '1'
+              newvalue: Ativo
+            - type: DEFAULT
+              newvalue: Desconhecido
+  graphs:
+    - uuid: 0e5dadb0a1794afa8764f3470590e596
+      name: 'Carga Bateria (%)'
+      graph_items:
+        - color: 1A7C11
+          calc_fnc: ALL
+          item:
+            host: 'Template Nobreak SMS PowerView  HTTP'
+            key: nobreak.tensao.bateria
+    - uuid: 884bf3cebf32421abc9052409271b249
+      name: 'Potencia Saida'
+      graph_items:
+        - color: 1A7C11
+          calc_fnc: ALL
+          item:
+            host: 'Template Nobreak SMS PowerView  HTTP'
+            key: nobreak.potencia.saida
+    - uuid: 9daa47205a164fa2932245a609da537c
+      name: Temperatura
+      graph_items:
+        - color: 1A7C11
+          calc_fnc: ALL
+          item:
+            host: 'Template Nobreak SMS PowerView  HTTP'
+            key: nobreak.temperatura

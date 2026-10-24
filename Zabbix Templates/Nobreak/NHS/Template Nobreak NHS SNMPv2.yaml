@@ -1,0 +1,1050 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+  - uuid: 7df96b18c230490a9a0a9e2307226338
+    name: Templates
+  templates:
+  - uuid: b96e6d922317424a8f936a3c87e27c52
+    template: Template Nobreak NHS SNMP
+    name: Template Nobreak NHS (SNMP)
+    description: |-
+      Monitoramento de nobreak NHS com módulo Ethernet, por consultas SNMP diretas à UPS-MIB RFC 1628.
+
+      Formato de exportação Zabbix 7.0; use servidor e proxy compatíveis.
+
+      Configuração obrigatória no HOST: criar {$SNMP_COMMUNITY} com a comunidade autorizada, preferencialmente como Secret text.
+
+      Na interface SNMP do host, selecionar SNMPv2 (versão 2), porta 161 e preencher SNMP community com {$SNMP_COMMUNITY}.
+    vendor:
+      name: Lucasolidev
+      version: 7.0-2
+    groups:
+    - name: Templates
+    templates:
+    - name: Template ICMP
+    items:
+    - uuid: 770b1f7325dd4440940180d6e1a5890b
+      name: 'NHS: Contato'
+      type: SNMP_AGENT
+      key: nhs.system.contact
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: CHAR
+      description: 'Objeto sysContact; OID 1.3.6.1.2.1.1.4.0. '
+      tags:
+      - tag: component
+        value: system
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.1.4.0
+    - uuid: 3536f2463b354f42a75d937ed219fb59
+      name: 'NHS: Descrição da placa'
+      type: SNMP_AGENT
+      key: nhs.system.description
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: CHAR
+      description: Objeto sysDescr; OID 1.3.6.1.2.1.1.1.0. sysDescr descreve o agente SNMP, não necessariamente a versão do
+        firmware do nobreak.
+      tags:
+      - tag: component
+        value: system
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.1.1.0
+    - uuid: f50f7770eacc4304bf05f5376cf0920a
+      name: 'NHS: Localização'
+      type: SNMP_AGENT
+      key: nhs.system.location
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: CHAR
+      description: 'Objeto sysLocation; OID 1.3.6.1.2.1.1.6.0. '
+      tags:
+      - tag: component
+        value: system
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.1.6.0
+    - uuid: 5a782a1f97ec4dc999cae2c9452eeb06
+      name: 'NHS: Nome da placa'
+      type: SNMP_AGENT
+      key: nhs.system.name
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: CHAR
+      description: 'Objeto sysName; OID 1.3.6.1.2.1.1.5.0. '
+      tags:
+      - tag: component
+        value: system
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.1.5.0
+    - uuid: f10f1dba2f2d4a50b608def9d99e4c21
+      name: 'NHS: Uptime da placa SNMP'
+      type: SNMP_AGENT
+      key: nhs.system.uptime
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: Objeto sysUpTime; OID 1.3.6.1.2.1.1.3.0. TimeTicks em centésimos de segundo; mede o agente/placa, não o
+        tempo de operação do nobreak.
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.01'
+      tags:
+      - tag: component
+        value: system
+      trends: 90d
+      units: uptime
+      snmp_oid: 1.3.6.1.2.1.1.3.0
+      triggers:
+      - uuid: 3add8d245dcd4083ad556dfdf5c3a13f
+        expression: nodata(/Template Nobreak NHS SNMP/nhs.system.uptime,{$NHS.NODATA})=1
+        name: 'NHS: Sem coleta SNMP da placa'
+        opdata: Consultar estado do item Uptime da placa SNMP
+        priority: AVERAGE
+        description: Sem amostra recente de sysUpTime da placa. Verificar rede, UDP/161, versão, comunidade e processos do
+          servidor/proxy. Não comprova que o nobreak está desligado.
+        tags:
+        - tag: component
+          value: availability
+    - uuid: e7d66fa4802f488690517ba85a1ef487
+      name: 'NHS: Modelo'
+      type: SNMP_AGENT
+      key: nhs.ups.model
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: CHAR
+      description: 'Objeto upsIdentModel; OID 1.3.6.1.2.1.33.1.1.2.0. '
+      tags:
+      - tag: component
+        value: system
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.33.1.1.2.0
+    - uuid: bca24fbb4cf54cf5b1a7196b02ae2021
+      name: 'NHS: Fabricante'
+      type: SNMP_AGENT
+      key: nhs.ups.manufacturer
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: CHAR
+      description: 'Objeto upsIdentManufacturer; OID 1.3.6.1.2.1.33.1.1.1.0. '
+      tags:
+      - tag: component
+        value: system
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.33.1.1.1.0
+    - uuid: b8a4372d61e041128de61e86414729d9
+      name: 'NHS: Versão do firmware do nobreak'
+      type: SNMP_AGENT
+      key: nhs.ups.firmware
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: CHAR
+      description: 'Objeto upsIdentUPSSoftwareVersion; OID 1.3.6.1.2.1.33.1.1.3.0. '
+      tags:
+      - tag: component
+        value: system
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.33.1.1.3.0
+    - uuid: 1650c09408824b3f94fea0683eff80f8
+      name: 'NHS: Versão do agente SNMP'
+      type: SNMP_AGENT
+      key: nhs.ups.agent_firmware
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: CHAR
+      description: 'Objeto upsIdentAgentSoftwareVersion; OID 1.3.6.1.2.1.33.1.1.4.0. '
+      tags:
+      - tag: component
+        value: system
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.33.1.1.4.0
+    - uuid: 4a74d9b49ddc43f7ad2ad94d5d9306e4
+      name: 'NHS: Carga da bateria'
+      type: SNMP_AGENT
+      key: nhs.ups.battery.charge
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsEstimatedChargeRemaining; OID 1.3.6.1.2.1.33.1.2.4.0. '
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - '100'
+      tags:
+      - tag: component
+        value: battery
+      trends: 90d
+      units: '%'
+      snmp_oid: 1.3.6.1.2.1.33.1.2.4.0
+    - uuid: db2ca402959c4eb69aa29b2f6efba983
+      name: 'NHS: Tensão da bateria'
+      type: SNMP_AGENT
+      key: nhs.ups.battery.voltage
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsBatteryVoltage; OID 1.3.6.1.2.1.33.1.2.5.0. '
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.1'
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: battery
+      trends: 90d
+      units: V
+      snmp_oid: 1.3.6.1.2.1.33.1.2.5.0
+    - uuid: 15901a19d82443168f6b9147dab670f3
+      name: 'NHS: Corrente da bateria'
+      type: SNMP_AGENT
+      key: nhs.ups.battery.current
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: Objeto upsBatteryCurrent; OID 1.3.6.1.2.1.33.1.2.6.0. Corrente DC assinada; pode ser negativa conforme
+        o sentido de carga/descarga.
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.1'
+      tags:
+      - tag: component
+        value: battery
+      trends: 90d
+      units: A
+      snmp_oid: 1.3.6.1.2.1.33.1.2.6.0
+    - uuid: 58ed82fa4a514059a03824d647743bd3
+      name: 'NHS: Temperatura da bateria'
+      type: SNMP_AGENT
+      key: nhs.ups.battery.temperature
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsBatteryTemperature; OID 1.3.6.1.2.1.33.1.2.7.0. Temperatura assinada em °C, sem multiplicador.
+        Zero não é descartado automaticamente: confirmar se há sensor no modelo.'
+      tags:
+      - tag: component
+        value: health
+      trends: 90d
+      units: °C
+      snmp_oid: 1.3.6.1.2.1.33.1.2.7.0
+    - uuid: 80b415ca4d184bf886ccc3cd6ab76a7b
+      name: 'NHS: Estado da bateria'
+      type: SNMP_AGENT
+      key: nhs.ups.battery.status
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: UNSIGNED
+      description: 'Objeto upsBatteryStatus; OID 1.3.6.1.2.1.33.1.2.1.0. '
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '1'
+        - '4'
+      tags:
+      - tag: component
+        value: battery
+      trends: 90d
+      valuemap:
+        name: NHS UPS battery status
+      snmp_oid: 1.3.6.1.2.1.33.1.2.1.0
+    - uuid: 18fdaacdff7d4982ac82af5713b26635
+      name: 'NHS: Autonomia estimada restante'
+      type: SNMP_AGENT
+      key: nhs.ups.battery.runtime
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: Objeto upsEstimatedMinutesRemaining; OID 1.3.6.1.2.1.33.1.2.3.0. RFC 1628 fornece minutos. 999 não é sentinela
+        definida pela MIB; confirme com o fabricante antes de filtrar. Macros de autonomia também usam minutos.
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      - type: JAVASCRIPT
+        parameters:
+        - |-
+          var sentinel = Number('{$NHS.RUNTIME.UNKNOWN}');
+          if (!isFinite(sentinel) || sentinel < 0) { throw 'Macro NHS.RUNTIME.UNKNOWN inválida'; }
+          if (sentinel > 0 && Number(value) === sentinel) { throw 'Autonomia não informada pelo firmware (sentinela configurada)'; }
+          return value;
+      tags:
+      - tag: component
+        value: battery
+      trends: 90d
+      units: '!min'
+      snmp_oid: 1.3.6.1.2.1.33.1.2.3.0
+    - uuid: 68ff54111d8d402db39b5b8d6b7a040d
+      name: 'NHS: Tempo em bateria'
+      type: SNMP_AGENT
+      key: nhs.ups.battery.seconds
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: UNSIGNED
+      description: Objeto upsSecondsOnBattery; OID 1.3.6.1.2.1.33.1.2.2.0. Já expresso em segundos pela RFC 1628. Não aplicar
+        o multiplicador de TimeTicks usado no APC.
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: battery
+      trends: 90d
+      units: s
+      snmp_oid: 1.3.6.1.2.1.33.1.2.2.0
+    - uuid: df038234866a4d7ab5e1887e1a69a538
+      name: 'NHS: Fonte da saída'
+      type: SNMP_AGENT
+      key: nhs.ups.output.source
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: UNSIGNED
+      description: 'Objeto upsOutputSource; OID 1.3.6.1.2.1.33.1.4.1.0. '
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '1'
+        - '7'
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      valuemap:
+        name: NHS UPS output source
+      snmp_oid: 1.3.6.1.2.1.33.1.4.1.0
+    - uuid: 9461df88be394820a0847e157e11c567
+      name: 'NHS: Quantidade de linhas de entrada'
+      type: SNMP_AGENT
+      key: nhs.ups.input.lines
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: UNSIGNED
+      description: 'Objeto upsInputNumLines; OID 1.3.6.1.2.1.33.1.3.2.0. '
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      snmp_oid: 1.3.6.1.2.1.33.1.3.2.0
+    - uuid: 8d16f395881c48999c3d85fcbcb3aa13
+      name: 'NHS: Quantidade de linhas de saída'
+      type: SNMP_AGENT
+      key: nhs.ups.output.lines
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: UNSIGNED
+      description: 'Objeto upsOutputNumLines; OID 1.3.6.1.2.1.33.1.4.3.0. '
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      snmp_oid: 1.3.6.1.2.1.33.1.4.3.0
+    - uuid: e5258220e9594014bff858ef2ca69a88
+      name: 'NHS: Tensão de entrada'
+      type: SNMP_AGENT
+      key: nhs.ups.input.voltage
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsInputVoltage; OID 1.3.6.1.2.1.33.1.3.3.1.3.{$NHS.INPUT.INDEX}. '
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: V
+      snmp_oid: 1.3.6.1.2.1.33.1.3.3.1.3.{$NHS.INPUT.INDEX}
+    - uuid: 5f8831686fa94153aec80bcc2c62ae8c
+      name: 'NHS: Corrente de entrada'
+      type: SNMP_AGENT
+      key: nhs.ups.input.current
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsInputCurrent; OID 1.3.6.1.2.1.33.1.3.3.1.4.{$NHS.INPUT.INDEX}. '
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.1'
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: A
+      snmp_oid: 1.3.6.1.2.1.33.1.3.3.1.4.{$NHS.INPUT.INDEX}
+    - uuid: c61d2837e54943c2af3445aa62125f46
+      name: 'NHS: Frequência de entrada'
+      type: SNMP_AGENT
+      key: nhs.ups.input.frequency
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsInputFrequency; OID 1.3.6.1.2.1.33.1.3.3.1.2.{$NHS.INPUT.INDEX}. '
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.1'
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: Hz
+      snmp_oid: 1.3.6.1.2.1.33.1.3.3.1.2.{$NHS.INPUT.INDEX}
+    - uuid: b69772833cf745edbe64a443751eb25d
+      name: 'NHS: Potência ativa de entrada'
+      type: SNMP_AGENT
+      key: nhs.ups.input.power
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsInputTruePower; OID 1.3.6.1.2.1.33.1.3.3.1.5.{$NHS.INPUT.INDEX}. '
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: W
+      snmp_oid: 1.3.6.1.2.1.33.1.3.3.1.5.{$NHS.INPUT.INDEX}
+    - uuid: 2df97c8e94e341a4b72fabecf3a6b044
+      name: 'NHS: Tensão de saída'
+      type: SNMP_AGENT
+      key: nhs.ups.output.voltage
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsOutputVoltage; OID 1.3.6.1.2.1.33.1.4.4.1.2.{$NHS.OUTPUT.INDEX}. '
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: V
+      snmp_oid: 1.3.6.1.2.1.33.1.4.4.1.2.{$NHS.OUTPUT.INDEX}
+    - uuid: 813c21eba72d463eaf172f9dc2ee80ba
+      name: 'NHS: Corrente de saída'
+      type: SNMP_AGENT
+      key: nhs.ups.output.current
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsOutputCurrent; OID 1.3.6.1.2.1.33.1.4.4.1.3.{$NHS.OUTPUT.INDEX}. '
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.1'
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: A
+      snmp_oid: 1.3.6.1.2.1.33.1.4.4.1.3.{$NHS.OUTPUT.INDEX}
+    - uuid: fc040625ecbd44bf83572e212820be3e
+      name: 'NHS: Frequência de saída'
+      type: SNMP_AGENT
+      key: nhs.ups.output.frequency
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsOutputFrequency; OID 1.3.6.1.2.1.33.1.4.2.0. '
+      preprocessing:
+      - type: MULTIPLIER
+        parameters:
+        - '0.1'
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: Hz
+      snmp_oid: 1.3.6.1.2.1.33.1.4.2.0
+    - uuid: b3595b30cdd244fd9ad48c7a22ed10c2
+      name: 'NHS: Carga da saída'
+      type: SNMP_AGENT
+      key: nhs.ups.output.load
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsOutputPercentLoad; OID 1.3.6.1.2.1.33.1.4.4.1.5.{$NHS.OUTPUT.INDEX}. '
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - '200'
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: '%'
+      snmp_oid: 1.3.6.1.2.1.33.1.4.4.1.5.{$NHS.OUTPUT.INDEX}
+    - uuid: ce7c7496a3f246b7a1b8a51090eb718a
+      name: 'NHS: Potência ativa de saída'
+      type: SNMP_AGENT
+      key: nhs.ups.output.power
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsOutputPower; OID 1.3.6.1.2.1.33.1.4.4.1.4.{$NHS.OUTPUT.INDEX}. '
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '0'
+        - ''
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: W
+      snmp_oid: 1.3.6.1.2.1.33.1.4.4.1.4.{$NHS.OUTPUT.INDEX}
+    - uuid: eb51f28bb838422fae594ae39fbc85c4
+      name: 'NHS: Quantidade de alarmes ativos'
+      type: SNMP_AGENT
+      key: nhs.ups.alarms.count
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: UNSIGNED
+      description: 'Objeto upsAlarmsPresent; OID 1.3.6.1.2.1.33.1.6.1.0. '
+      tags:
+      - tag: component
+        value: health
+      trends: 90d
+      snmp_oid: 1.3.6.1.2.1.33.1.6.1.0
+    - uuid: aac784f8f3494f40b0a4fe26bdc511da
+      name: 'NHS: Resultado do último autoteste'
+      type: SNMP_AGENT
+      key: nhs.ups.test.result
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: UNSIGNED
+      description: Objeto upsTestResultsSummary; OID 1.3.6.1.2.1.33.1.7.3.0. Somente consulta o resultado. Não inicia nem
+        cancela testes.
+      preprocessing:
+      - type: IN_RANGE
+        parameters:
+        - '1'
+        - '6'
+      tags:
+      - tag: component
+        value: health
+      trends: 90d
+      valuemap:
+        name: NHS UPS test result
+      snmp_oid: 1.3.6.1.2.1.33.1.7.3.0
+    - uuid: 45c6fea45ff446edb427fa809c0d21f5
+      name: 'NHS: Detalhes do último autoteste'
+      type: SNMP_AGENT
+      key: nhs.ups.test.details
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: TEXT
+      description: 'Objeto upsTestResultsDetail; OID 1.3.6.1.2.1.33.1.7.4.0. '
+      tags:
+      - tag: component
+        value: health
+      trends: '0'
+      snmp_oid: 1.3.6.1.2.1.33.1.7.4.0
+    - uuid: e360b2a43e98492bbaa3932a37b588b0
+      name: 'NHS: Potência aparente nominal informada'
+      type: SNMP_AGENT
+      key: nhs.ups.rated.apparent_power
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsConfigOutputVA; OID 1.3.6.1.2.1.33.1.9.5.0. '
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: VA
+      snmp_oid: 1.3.6.1.2.1.33.1.9.5.0
+    - uuid: 35e11a62c86c42a88a2b1a4e1141e361
+      name: 'NHS: Potência ativa nominal informada'
+      type: SNMP_AGENT
+      key: nhs.ups.rated.power
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      value_type: FLOAT
+      description: 'Objeto upsConfigOutputPower; OID 1.3.6.1.2.1.33.1.9.6.0. '
+      tags:
+      - tag: component
+        value: power
+      trends: 90d
+      units: W
+      snmp_oid: 1.3.6.1.2.1.33.1.9.6.0
+    - uuid: 4f1e56cf5b20410ab605ff36b567d19c
+      name: 'NHS: Potência aparente de saída (V × A)'
+      type: CALCULATED
+      key: nhs.ups.output.apparent_power
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      trends: 90d
+      value_type: FLOAT
+      tags:
+      - tag: component
+        value: power
+      units: VA
+      description: Potência aparente calculada em VA a partir das últimas leituras de tensão e corrente da saída. Consultas
+        independentes podem ocorrer em instantes diferentes. Sem dados recentes de ambas, o cálculo fica indisponível por
+        divisão por zero; não transforma falta de dados em potência zero.
+      params: last(//nhs.ups.output.voltage)*last(//nhs.ups.output.current)/((nodata(//nhs.ups.output.voltage,{$NHS.NODATA})=0)
+        and (nodata(//nhs.ups.output.current,{$NHS.NODATA})=0))
+    - uuid: ce18893cbdc9480e9d5392e7baa0e6a1
+      name: 'NHS: Operando em bateria'
+      type: CALCULATED
+      key: nhs.ups.on_battery
+      delay: '{$NHS.POLL.INTERVAL}'
+      history: 7d
+      trends: 90d
+      value_type: UNSIGNED
+      tags:
+      - tag: component
+        value: battery
+      description: 'Indicador calculado: Sim quando a fonte da saída é bateria (5) ou o tempo em bateria é maior que zero.
+        Exige ambas as medições recentes; sem elas o cálculo fica indisponível, sem assumir estado normal. O cálculo pode
+        atualizar depois dos itens SNMP.'
+      valuemap:
+        name: NHS boolean
+      params: (last(//nhs.ups.output.source)=5 or last(//nhs.ups.battery.seconds)>0)/((nodata(//nhs.ups.output.source,{$NHS.NODATA})=0)
+        and (nodata(//nhs.ups.battery.seconds,{$NHS.NODATA})=0))
+    tags:
+    - tag: class
+      value: power
+    - tag: target
+      value: nhs
+    macros:
+    - macro: '{$NHS.POLL.INTERVAL}'
+      value: 1m
+      description: Intervalo das consultas SNMP diretas e dos dois itens calculados.
+    - macro: '{$NHS.INPUT.INDEX}'
+      value: '1'
+      description: Índice da linha de entrada na UPS-MIB; confirmar nos dados brutos.
+    - macro: '{$NHS.OUTPUT.INDEX}'
+      value: '1'
+      description: Índice da linha de saída na UPS-MIB; confirmar nos dados brutos.
+    - macro: '{$NHS.NODATA}'
+      value: 5m
+      description: Janela de ausência de dados. Deve ser maior que POLL.INTERVAL.
+    - macro: '{$NHS.BATTERY.CHARGE.MIN}'
+      value: '90'
+      description: Carga mínima em %. Alerta após cinco minutos abaixo do limite.
+    - macro: '{$NHS.BATTERY.CHARGE.RECOVERY}'
+      value: '95'
+      description: Carga em % para recuperar o alerta; deve ser maior que CHARGE.MIN.
+    - macro: '{$NHS.BATTERY.TEMP.MAX}'
+      value: '40'
+      description: Temperatura máxima em °C; ajustar conforme fabricante e sensor.
+    - macro: '{$NHS.BATTERY.TEMP.HYST}'
+      value: '2'
+      description: Histerese em °C para recuperação do alerta de temperatura.
+    - macro: '{$NHS.RUNTIME.HIGH}'
+      value: '20'
+      description: Autonomia baixa em minutos, somente operando em bateria. Deve ser maior que RUNTIME.CRIT.
+    - macro: '{$NHS.RUNTIME.CRIT}'
+      value: '10'
+      description: Autonomia crítica em minutos, somente operando em bateria.
+    - macro: '{$NHS.RUNTIME.UNKNOWN}'
+      value: '0'
+      description: 0 desativa o filtro. Configurar 999 somente após confirmação de que o firmware usa esse valor como autonomia
+        desconhecida.
+    - macro: '{$NHS.OUTPUT.LOAD.WARN}'
+      value: '85'
+      description: Carga de saída em % para aviso; deve ser menor que LOAD.CRIT.
+    - macro: '{$NHS.OUTPUT.LOAD.CRIT}'
+      value: '95'
+      description: Carga de saída em % para alerta crítico.
+    valuemaps:
+    - uuid: 7abf29932b424614a2ced978c3970d8d
+      name: NHS UPS battery status
+      mappings:
+      - value: '1'
+        newvalue: Estado desconhecido
+      - value: '2'
+        newvalue: Bateria normal
+      - value: '3'
+        newvalue: Bateria baixa
+      - value: '4'
+        newvalue: Bateria esgotada
+    - uuid: fc2910ba66114a87b0032e391b489aa2
+      name: NHS UPS output source
+      mappings:
+      - value: '1'
+        newvalue: Outro/desconhecido
+      - value: '2'
+        newvalue: Sem fonte de saída
+      - value: '3'
+        newvalue: Rede normal
+      - value: '4'
+        newvalue: Bypass
+      - value: '5'
+        newvalue: Bateria
+      - value: '6'
+        newvalue: Elevando tensão (AVR)
+      - value: '7'
+        newvalue: Reduzindo tensão (AVR)
+    - uuid: a2b3c4991ecb4f6e8eefde3f0e02c561
+      name: NHS UPS test result
+      mappings:
+      - value: '1'
+        newvalue: Aprovado
+      - value: '2'
+        newvalue: Concluído com aviso
+      - value: '3'
+        newvalue: Concluído com erro
+      - value: '4'
+        newvalue: Abortado
+      - value: '5'
+        newvalue: Em andamento
+      - value: '6'
+        newvalue: Nenhum teste realizado
+    - uuid: 5e059c3345d14ec2af6e5678f05768dc
+      name: NHS boolean
+      mappings:
+      - value: '0'
+        newvalue: Não
+      - value: '1'
+        newvalue: Sim
+  triggers:
+  - uuid: dd989dd5d16a4eba860f0d231a40d20a
+    expression: (nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.charge,{$NHS.NODATA})=1 or nodata(/Template Nobreak NHS
+      SNMP/nhs.ups.input.voltage,{$NHS.NODATA})=1 or nodata(/Template Nobreak NHS SNMP/nhs.ups.output.voltage,{$NHS.NODATA})=1
+      or nodata(/Template Nobreak NHS SNMP/nhs.ups.output.source,{$NHS.NODATA})=1) and nodata(/Template Nobreak NHS SNMP/nhs.system.uptime,{$NHS.NODATA})=0
+    name: 'NHS: Sem coleta de medições essenciais do nobreak'
+    opdata: Conferir os itens de carga da bateria, tensões e fonte da saída
+    priority: AVERAGE
+    description: A placa responde via sysUpTime, mas carga da bateria, tensão de entrada/saída ou fonte da saída não possuem
+      dados recentes. Conferir individualmente esses itens, índice e comunicação da placa com o nobreak.
+    tags:
+    - tag: component
+      value: availability
+    dependencies:
+    - name: 'NHS: Sem coleta SNMP da placa'
+      expression: nodata(/Template Nobreak NHS SNMP/nhs.system.uptime,{$NHS.NODATA})=1
+  - uuid: b8649627530e456583619e5667b1d414
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.on_battery)=1 and nodata(/Template Nobreak NHS SNMP/nhs.ups.on_battery,{$NHS.NODATA})=0
+      and nodata(/Template Nobreak NHS SNMP/nhs.ups.output.source,{$NHS.NODATA})=0 and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.seconds,{$NHS.NODATA})=0
+    name: 'NHS: Operando em bateria'
+    opdata: 'Operando em bateria: {ITEM.LASTVALUE1}'
+    priority: WARNING
+    description: Identificado pela fonte da saída ou pelo tempo em bateria, ambos confirmados na resposta SNMP. Não depende
+      da tabela de alarmes.
+    tags:
+    - tag: component
+      value: on_battery
+  - uuid: c5082bb85d714cf49d0aec5037abe715
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.battery.status)=3 and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.status,{$NHS.NODATA})=0
+    name: 'NHS: Bateria baixa'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: AVERAGE
+    description: Estado batteryLow(3) reportado pela UPS-MIB.
+    tags:
+    - tag: component
+      value: battery
+  - uuid: 4e0aef33eb37439eb3631199fcbd50c3
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.battery.status)=4 and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.status,{$NHS.NODATA})=0
+    name: 'NHS: Bateria esgotada'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: DISASTER
+    description: 'Estado batteryDepleted(4): a bateria não sustenta a carga quando faltar energia.'
+    tags:
+    - tag: component
+      value: battery
+  - uuid: b07591ae892c431a92f9932621adf76f
+    expression: min(/Template Nobreak NHS SNMP/nhs.ups.battery.status,5m)=1 and max(/Template Nobreak NHS SNMP/nhs.ups.battery.status,5m)=1
+      and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.status,{$NHS.NODATA})=0
+    name: 'NHS: Estado da bateria desconhecido'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: WARNING
+    description: Estado unknown(1) persistente. Conferir comunicação e firmware.
+    tags:
+    - tag: component
+      value: battery
+  - uuid: 8d1f22bb652341bba5a494982613d091
+    expression: max(/Template Nobreak NHS SNMP/nhs.ups.battery.charge,5m)<{$NHS.BATTERY.CHARGE.MIN} and nodata(/Template Nobreak
+      NHS SNMP/nhs.ups.battery.charge,{$NHS.NODATA})=0
+    name: 'NHS: Carga da bateria abaixo de {$NHS.BATTERY.CHARGE.MIN}%'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: AVERAGE
+    description: Alerta sustentado por cinco minutos; recuperação com histerese configurável.
+    tags:
+    - tag: component
+      value: battery
+    recovery_mode: RECOVERY_EXPRESSION
+    recovery_expression: last(/Template Nobreak NHS SNMP/nhs.ups.battery.charge)>={$NHS.BATTERY.CHARGE.RECOVERY} and nodata(/Template
+      Nobreak NHS SNMP/nhs.ups.battery.charge,{$NHS.NODATA})=0
+  - uuid: c80e1a3c0a7e4bd8a9121c0be3a6a878
+    expression: min(/Template Nobreak NHS SNMP/nhs.ups.battery.temperature,3m)>{$NHS.BATTERY.TEMP.MAX} and nodata(/Template
+      Nobreak NHS SNMP/nhs.ups.battery.temperature,{$NHS.NODATA})=0
+    name: 'NHS: Temperatura da bateria elevada'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: HIGH
+    description: Necessita sensor e leitura válida. Zero não garante temperatura normal se o modelo não possuir sensor.
+    tags:
+    - tag: component
+      value: battery
+    recovery_mode: RECOVERY_EXPRESSION
+    recovery_expression: last(/Template Nobreak NHS SNMP/nhs.ups.battery.temperature)<({$NHS.BATTERY.TEMP.MAX}-{$NHS.BATTERY.TEMP.HYST})
+      and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.temperature,{$NHS.NODATA})=0
+  - uuid: a9a7c31332e74adaabf8d98bce8fd666
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.battery.runtime)<{$NHS.RUNTIME.CRIT} and last(/Template Nobreak NHS
+      SNMP/nhs.ups.on_battery)=1 and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.runtime,{$NHS.NODATA})=0 and nodata(/Template
+      Nobreak NHS SNMP/nhs.ups.on_battery,{$NHS.NODATA})=0 and nodata(/Template Nobreak NHS SNMP/nhs.ups.output.source,{$NHS.NODATA})=0
+      and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.seconds,{$NHS.NODATA})=0
+    name: 'NHS: Autonomia crítica em bateria'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: DISASTER
+    description: Autonomia em minutos. Faixas mutuamente exclusivas; somente em bateria e com autonomia recente.
+    tags:
+    - tag: component
+      value: battery
+  - uuid: 32ac58f276b442a0895df7305972a966
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.battery.runtime)<{$NHS.RUNTIME.HIGH} and last(/Template Nobreak NHS
+      SNMP/nhs.ups.battery.runtime)>={$NHS.RUNTIME.CRIT} and last(/Template Nobreak NHS SNMP/nhs.ups.on_battery)=1 and nodata(/Template
+      Nobreak NHS SNMP/nhs.ups.battery.runtime,{$NHS.NODATA})=0 and nodata(/Template Nobreak NHS SNMP/nhs.ups.on_battery,{$NHS.NODATA})=0
+      and nodata(/Template Nobreak NHS SNMP/nhs.ups.output.source,{$NHS.NODATA})=0 and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.seconds,{$NHS.NODATA})=0
+    name: 'NHS: Autonomia baixa em bateria'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: HIGH
+    description: Autonomia em minutos. Faixas mutuamente exclusivas; somente em bateria e com autonomia recente.
+    tags:
+    - tag: component
+      value: battery
+  - uuid: ff1903aa21a641aab6b2b438be576a95
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.on_battery)=1 and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.runtime,{$NHS.NODATA})=1
+      and nodata(/Template Nobreak NHS SNMP/nhs.ups.on_battery,{$NHS.NODATA})=0 and nodata(/Template Nobreak NHS SNMP/nhs.ups.output.source,{$NHS.NODATA})=0
+      and nodata(/Template Nobreak NHS SNMP/nhs.ups.battery.seconds,{$NHS.NODATA})=0
+    name: 'NHS: Autonomia indisponível durante operação em bateria'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: WARNING
+    description: O nobreak está em bateria e a autonomia não está sendo atualizada, inclusive quando há sentinela configurada.
+      Não é possível estimar o tempo até desligamento.
+    tags:
+    - tag: component
+      value: battery
+  - uuid: 85a283db10624d66b7a93cb452f6a958
+    expression: max(/Template Nobreak NHS SNMP/nhs.ups.input.voltage,2m)=0 and nodata(/Template Nobreak NHS SNMP/nhs.ups.input.voltage,{$NHS.NODATA})=0
+    name: 'NHS: Sem tensão de entrada'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: AVERAGE
+    description: Entrada em zero por dois minutos. Confirmar ausência de rede na interface do nobreak.
+    tags:
+    - tag: component
+      value: input
+  - uuid: 17c6ef7ce8a94ac2964d29b2678989f7
+    expression: max(/Template Nobreak NHS SNMP/nhs.ups.output.voltage,2m)=0 and nodata(/Template Nobreak NHS SNMP/nhs.ups.output.voltage,{$NHS.NODATA})=0
+    name: 'NHS: Saída sem tensão'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: DISASTER
+    description: Saída em zero por dois minutos. Pode indicar que a carga deixou de receber energia; conferir equipamento
+      e leitura.
+    tags:
+    - tag: component
+      value: output
+  - uuid: 27de0d895cb04fb186094cdc9ad4779b
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.output.load)>={$NHS.OUTPUT.LOAD.CRIT} and nodata(/Template Nobreak
+      NHS SNMP/nhs.ups.output.load,{$NHS.NODATA})=0
+    name: 'NHS: Carga de saída crítica'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: HIGH
+    description: Faixas mutuamente exclusivas. Ajustar limites às especificações do modelo.
+    tags:
+    - tag: component
+      value: output
+  - uuid: 774ff3bcfdc84d6cbc63ef08dcfa6998
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.output.load)>={$NHS.OUTPUT.LOAD.WARN} and last(/Template Nobreak NHS
+      SNMP/nhs.ups.output.load)<{$NHS.OUTPUT.LOAD.CRIT} and nodata(/Template Nobreak NHS SNMP/nhs.ups.output.load,{$NHS.NODATA})=0
+    name: 'NHS: Carga de saída elevada'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: WARNING
+    description: Faixas mutuamente exclusivas. Ajustar limites às especificações do modelo.
+    tags:
+    - tag: component
+      value: output
+  - uuid: 76b9511b9b7b42e590ecab4bf5302db7
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.output.source)=2 and nodata(/Template Nobreak NHS SNMP/nhs.ups.output.source,{$NHS.NODATA})=0
+    name: 'NHS: Fonte da saída indica ausência de energia'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: DISASTER
+    description: Estado informado por upsOutputSource. Booster(6) e reducer(7) são regulação de tensão e não são tratados
+      como falta de rede.
+    tags:
+    - tag: component
+      value: output
+  - uuid: c4ea5f26a3e740a3883d64e63213ed32
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.output.source)=4 and nodata(/Template Nobreak NHS SNMP/nhs.ups.output.source,{$NHS.NODATA})=0
+    name: 'NHS: Operando em bypass'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: WARNING
+    description: Estado informado por upsOutputSource. Booster(6) e reducer(7) são regulação de tensão e não são tratados
+      como falta de rede.
+    tags:
+    - tag: component
+      value: output
+  - uuid: fb1082ce719046c8b9193b224190ba33
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.alarms.count)>0 and nodata(/Template Nobreak NHS SNMP/nhs.ups.alarms.count,{$NHS.NODATA})=0
+    name: 'NHS: Nobreak informa alarmes ativos'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: WARNING
+    description: Contagem upsAlarmsPresent maior que zero. Consultar a interface web do nobreak para identificar os alarmes;
+      a resposta fornecida não contém linhas da tabela de alarmes e não permite identificar troca de bateria ou desligamento
+      iminente.
+    tags:
+    - tag: component
+      value: alarms
+  - uuid: 8b33e8d0cfd349fc9f06ea98b17de999
+    expression: last(/Template Nobreak NHS SNMP/nhs.ups.test.result)=3 and nodata(/Template Nobreak NHS SNMP/nhs.ups.test.result,{$NHS.NODATA})=0
+    name: 'NHS: Último autoteste terminou com erro'
+    opdata: '{ITEM.LASTVALUE1}'
+    priority: AVERAGE
+    description: Resultado doneError(3). O template apenas consulta o último teste realizado pelo equipamento.
+    tags:
+    - tag: component
+      value: test
+  graphs:
+  - uuid: 32554b6c293b41bb9b305d92499b28d4
+    name: 'NHS: Bateria - carga e autonomia'
+    graph_items:
+    - sortorder: '0'
+      drawtype: BOLD_LINE
+      color: 4CAF50
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.battery.charge
+    - sortorder: '1'
+      drawtype: BOLD_LINE
+      color: CC0000
+      yaxisside: RIGHT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.battery.runtime
+  - uuid: 7c9002fc026a4b3ca251c9456f952831
+    name: 'NHS: Tensões de entrada e saída'
+    graph_items:
+    - sortorder: '0'
+      drawtype: BOLD_LINE
+      color: 0000CC
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.input.voltage
+    - sortorder: '1'
+      drawtype: BOLD_LINE
+      color: 1E88E5
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.output.voltage
+  - uuid: c38b2e8d3c21485aaa77be5b33f34fea
+    name: 'NHS: Correntes de entrada e saída'
+    graph_items:
+    - sortorder: '0'
+      drawtype: BOLD_LINE
+      color: 0000CC
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.input.current
+    - sortorder: '1'
+      drawtype: BOLD_LINE
+      color: 4CAF50
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.output.current
+  - uuid: 3638bdc0dc964934a4bde605e1f057d4
+    name: 'NHS: Frequências de entrada e saída'
+    graph_items:
+    - sortorder: '0'
+      drawtype: BOLD_LINE
+      color: 0000CC
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.input.frequency
+    - sortorder: '1'
+      drawtype: BOLD_LINE
+      color: 1E88E5
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.output.frequency
+  - uuid: 035a27a5689749b0bf3a6f56545ae7d0
+    name: 'NHS: Potência ativa e aparente de saída'
+    graph_items:
+    - sortorder: '0'
+      drawtype: BOLD_LINE
+      color: 4CAF50
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.output.power
+    - sortorder: '1'
+      drawtype: BOLD_LINE
+      color: 1E88E5
+      yaxisside: RIGHT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.output.apparent_power
+  - uuid: 108d3104e4cb45e2a2396ed69ebca6fd
+    name: 'NHS: Carga de saída'
+    graph_items:
+    - sortorder: '0'
+      drawtype: BOLD_LINE
+      color: CC0000
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.output.load
+  - uuid: 96017a318aac45ee94369453b78b9edd
+    name: 'NHS: Temperatura da bateria'
+    graph_items:
+    - sortorder: '0'
+      drawtype: BOLD_LINE
+      color: CC0000
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.battery.temperature
+  - uuid: a231b58d4da14c38858648a5653f21ac
+    name: 'NHS: Tensão da bateria'
+    graph_items:
+    - sortorder: '0'
+      drawtype: BOLD_LINE
+      color: 0000CC
+      yaxisside: LEFT
+      item:
+        host: Template Nobreak NHS SNMP
+        key: nhs.ups.battery.voltage

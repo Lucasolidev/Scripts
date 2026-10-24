@@ -1,0 +1,995 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: a9e832821f614f3dbf0d9e2a1d2ef927
+      template: Template Nobreak NHS Monitor 3.1 HTTP
+      name: Template Nobreak NHS Monitor 3.1 (HTTP)
+      description: |-
+        Requisitos: exclusivamente NHS Nobreak Monitor 3.1 - Sistema de Monitoramento de Nobreaks em execução, com GET /status e GET /equipamento acessíveis ao servidor Zabbix ou ao proxy responsável pelo host. Não usar com NHS Nobreak Monitor 4.0 beta. A identificação NHS Nobreak Monitor 3.1 deve estar presente nas páginas. Usar Zabbix 7.0 e coletor com suporte a HTTP agent/libcurl.
+
+        Configurar obrigatoriamente {$NHS.HTTP.URL} no host com a URL base do computador que executa o Monitor, incluindo protocolo e porta, sem barra final: http://<ip_do_computador>:2001. O padrão http://127.0.0.1:2001 só funciona quando o Monitor está no próprio coletor. Usar URL literal, sem outras macros dentro do valor. A coleta não exige interface Agent/SNMP nem Zabbix Agent ou UserParameter.
+
+        Se o Monitor estiver em outro local, configurar acesso privado a partir do servidor ou selecionar um proxy Zabbix com acesso à rede do Monitor. localhost/127.0.0.1 refere-se ao servidor/proxy coletor, não ao computador remoto.
+
+        {$NHS.HTTP.INTERVAL}: coleta de status, padrão 1m. {$NHS.HTTP.EQUIPMENT.INTERVAL}: configuração nominal, padrão 30m. {$NHS.HTTP.TIMEOUT}: timeout por GET, padrão 10s. {$NHS.HTTP.NODATA}: prazo sem status, padrão 5m. {$NHS.HTTP.EQUIPMENT.NODATA}: prazo sem equipamento, padrão 2h. Manter os prazos maiores que os respectivos intervalos.
+
+        {$NHS.HTTP.LOAD.WARN}: carga elevada, padrão 85%. {$NHS.HTTP.LOAD.CRIT}: carga crítica, padrão 95%. {$NHS.HTTP.LOAD.HYST}: histerese, padrão 5 pontos percentuais. {$NHS.HTTP.PROBLEM.WINDOW}: janela de amostras dos alertas de carga, padrão 2m.
+
+        {$NHS.HTTP.INPUT.OK.MATCHES}, {$NHS.HTTP.OUTPUT.OK.MATCHES} e {$NHS.HTTP.BATTERY.OK.MATCHES}: expressões regulares dos estados aceitos; padrões OK, Normal e Carregada, respectivamente. Ajustar apenas após conferir os textos e a semântica no equipamento.
+
+        As páginas devem retornar HTTP 200 sem autenticação de sessão ou redirecionamento. Para URL HTTPS, o certificado e o nome do servidor devem ser confiáveis para o coletor. Nenhum outro template é obrigatório.
+      vendor:
+        name: Lucasolidev
+        version: 7.0-4
+      groups:
+        - name: Templates
+      items:
+        - uuid: d59f3535e156412cb975c34fdc427d23
+          name: 'NHS HTTP: Coleta Status atual'
+          type: HTTP_AGENT
+          key: nhs.http.status.get
+          delay: '{$NHS.HTTP.INTERVAL}'
+          history: 1d
+          value_type: TEXT
+          trends: '0'
+          description: GET /status; converte as tabelas em JSON. Erros de layout ficam nos diagnósticos dependentes.
+            Falhas HTTP tornam o item não suportado. Resposta HTTP recente não comprova comunicação serial/USB recente
+            do nobreak.
+          url: '{$NHS.HTTP.URL}/status'
+          timeout: '{$NHS.HTTP.TIMEOUT}'
+          status_codes: '200'
+          follow_redirects: 'NO'
+          retrieve_mode: BODY
+          request_method: GET
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          tags:
+            - tag: component
+              value: collector
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var pageTitle = "Status atual";
+                  var fields = [["Entrada", "Estado", "input_state", "input.state", "Estado da entrada", "CHAR", ""], ["Entrada", "Tensão de entrada", "input_voltage", "input.voltage", "Tensão de entrada", "FLOAT", "V"], ["Entrada", "Tensão de entrada mínima", "input_min", "input.voltage.min", "Tensão de entrada mínima registrada", "FLOAT", "V"], ["Entrada", "Tensão de entrada máxima", "input_max", "input.voltage.max", "Tensão de entrada máxima registrada", "FLOAT", "V"], ["Saída", "Estado", "output_state", "output.state", "Estado da saída", "CHAR", ""], ["Saída", "Tensão de saída", "output_voltage", "output.voltage", "Tensão de saída", "FLOAT", "V"], ["Saída", "Carga do nobreak", "output_load", "output.load", "Carga do nobreak", "FLOAT", "%"], ["Bateria", "Estado", "battery_state", "battery.state", "Estado da bateria", "CHAR", ""], ["Bateria", "Tensão da bateria", "battery_voltage", "battery.voltage", "Tensão da bateria", "FLOAT", "V"]];
+                  // Parser restrito às tabelas de leitura do NHS Nobreak Monitor 3.1.
+                  // O HTTP agent entrega o corpo convertido para UTF-8; não executar scripts do HTML.
+                  var result = {ok: 0, error: '', data: {}};
+                  function text(s) {
+                      var entities = {nbsp:' ', amp:'&', lt:'<', gt:'>', quot:'"', apos:"'",
+                          aacute:'á', eacute:'é', iacute:'í', oacute:'ó', uacute:'ú',
+                          agrave:'à', acirc:'â', ecirc:'ê', ocirc:'ô', atilde:'ã', otilde:'õ', ccedil:'ç'};
+                      return s.replace(/<[^>]*>/g, ' ').replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi,
+                          function(all, name) {
+                              if (name.charAt(0) === '#') {
+                                  var n = name.charAt(1).toLowerCase() === 'x' ?
+                                      parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+                                  return n > 0 && n <= 65535 ? String.fromCharCode(n) : all;
+                              }
+                              return Object.prototype.hasOwnProperty.call(entities, name.toLowerCase()) ?
+                                  entities[name.toLowerCase()] : all;
+                          }).replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+                  }
+                  function normalized(s) {
+                      return text(s).toLowerCase().replace(/[áàâãä]/g,'a').replace(/[éèêë]/g,'e')
+                          .replace(/[íìîï]/g,'i').replace(/[óòôõö]/g,'o').replace(/[úùûü]/g,'u')
+                          .replace(/ç/g,'c').replace(/\s*:\s*$/,'');
+                  }
+                  function fail(message) { throw {nhsParserError: message}; }
+                  try {
+                      var html = value.replace(/<!--[\s\S]*?-->/g, '')
+                          .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
+                      if (!/NHS\s+Nobreak\s+Monitor\s+3\.1\s*-/i.test(text(html)))
+                          fail('Versão incompatível ou identificação ausente: requer NHS Nobreak Monitor 3.1.');
+                      var content = /<div\b[^>]*\bid\s*=\s*["']content["'][^>]*>([\s\S]*?)<\/div\s*>/i.exec(html);
+                      if (!content) fail('Bloco de conteúdo NHS ausente.');
+                      var title = /<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/i.exec(content[1]);
+                      if (!title || normalized(title[1]) !== normalized(pageTitle))
+                          fail('Página recebida não corresponde à página de leitura esperada.');
+                      var tables = {}, tableRe = /<table\b[^>]*>([\s\S]*?)<\/table\s*>/gi, match;
+                      while ((match = tableRe.exec(content[1])) !== null) {
+                          var header = /<thead\b[^>]*>([\s\S]*?)<\/thead\s*>/i.exec(match[1]);
+                          var body = /<tbody\b[^>]*>([\s\S]*?)<\/tbody\s*>/i.exec(match[1]);
+                          if (!header || !body) continue;
+                          var section = normalized(header[1]);
+                          if (Object.prototype.hasOwnProperty.call(tables, section))
+                              fail('Seção duplicada na página NHS.');
+                          tables[section] = {};
+                          var rowRe = /<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/gi, row;
+                          while ((row = rowRe.exec(body[1])) !== null) {
+                              var cellRe = /<td\b[^>]*>([\s\S]*?)<\/td\s*>/gi, cells = [], cell;
+                              while ((cell = cellRe.exec(row[1])) !== null) cells.push(cell[1]);
+                              if (cells.length !== 2) continue;
+                              var label = normalized(cells[0]);
+                              if (Object.prototype.hasOwnProperty.call(tables[section], label))
+                                  fail('Rótulo duplicado na página NHS.');
+                              tables[section][label] = text(cells[1]);
+                          }
+                      }
+                      var data = {};
+                      for (var i = 0; i < fields.length; i++) {
+                          var f = fields[i], sec = normalized(f[0]), lab = normalized(f[1]);
+                          if (!Object.prototype.hasOwnProperty.call(tables, sec) ||
+                              !Object.prototype.hasOwnProperty.call(tables[sec], lab))
+                              fail('Campo ausente: ' + f[0] + ' / ' + f[1] + '.');
+                          var raw = tables[sec][lab];
+                          if (!raw || raw.length > 255) fail('Campo vazio ou inválido: ' + f[1] + '.');
+                          if (f[5] === 'CHAR') {
+                              data[f[2]] = raw;
+                          } else {
+                              var number = /^([+-]?\d+(?:[.,]\d+)?)\s*(V|%)?$/.exec(raw);
+                              if (!number || (number[2] || '') !== f[6])
+                                  fail('Número ou unidade inválidos: ' + f[1] + '.');
+                              var n = Number(number[1].replace(',', '.'));
+                              if (!isFinite(n) || n < 0 || (f[5] === 'UNSIGNED' && Math.floor(n) !== n))
+                                  fail('Valor numérico inválido: ' + f[1] + '.');
+                              data[f[2]] = n;
+                          }
+                      }
+                      result.data = data;
+                      result.ok = 1;
+                  } catch (e) {
+                      // Somente diagnósticos definidos pelo parser, sem HTML ou exceções externas.
+                      result.error = e && typeof e.nhsParserError === 'string' ?
+                          e.nhsParserError : 'Falha de interpretação da página NHS.';
+                  }
+                  return JSON.stringify(result);
+          triggers:
+            - uuid: 06a231458d6f402a8418d4f3e5e7eb0e
+              expression: nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.get,{$NHS.HTTP.NODATA})=1
+              name: 'NHS HTTP: Página /status sem coleta HTTP'
+              priority: DISASTER
+              tags:
+                - tag: component
+                  value: ups
+        - uuid: 90f7b3dc956446d8933ef6af56f4ac62
+          name: 'NHS HTTP: Página interpretada - Status atual'
+          type: DEPENDENT
+          key: nhs.http.status.ok
+          delay: '0'
+          history: 7d
+          trends: '0'
+          value_type: UNSIGNED
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.ok
+          tags:
+            - tag: component
+              value: collector
+          valuemap:
+            name: 'NHS HTTP: Interpretação da página'
+          description: 1 = todos os campos esperados interpretados; 0 = layout/campo inválido. Não representa a
+            comunicação física com o nobreak.
+        - uuid: 982df8afb3d64ee9b0fb92f7465236f8
+          name: 'NHS HTTP: Diagnóstico - Status atual'
+          type: DEPENDENT
+          key: nhs.http.status.error
+          delay: '0'
+          history: 7d
+          trends: '0'
+          value_type: TEXT
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.error
+          tags:
+            - tag: component
+              value: collector
+          description: Mensagem do parser; vazio quando a página é válida. Falhas de rede/código HTTP aparecem no
+            mestre e no alerta de ausência de coleta.
+          triggers:
+            - uuid: 738049af2d1e427cb26f4f86a7d90d12
+              expression: last(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.error)<>"" and nodata(/Template
+                Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.error,{$NHS.HTTP.NODATA})=0
+              name: 'NHS HTTP: Falha ao interpretar Status atual'
+              priority: AVERAGE
+              tags:
+                - tag: component
+                  value: ups
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: last(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.error)="" and nodata(/Template
+                Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.error,{$NHS.HTTP.NODATA})=0
+              opdata: '{ITEM.LASTVALUE1}'
+        - uuid: 80379f347a85409687e97aea53d9ab20
+          name: 'NHS HTTP: Estado da entrada'
+          type: DEPENDENT
+          key: nhs.http.input.state
+          delay: '0'
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          description: Campo Entrada / Estado, obtido de /status. Texto preservado como informado pelo Monitor;
+            estados não observados não são convertidos em rede/bateria/bypass.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'input_state') || obj.data.input_state === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.input_state;
+          tags:
+            - tag: component
+              value: input
+        - uuid: fe2941044d594d6288d42a87315be17d
+          name: 'NHS HTTP: Tensão de entrada'
+          type: DEPENDENT
+          key: nhs.http.input.voltage
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Entrada / Tensão de entrada, obtido de /status.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'input_voltage') || obj.data.input_voltage === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.input_voltage;
+          tags:
+            - tag: component
+              value: input
+          units: V
+        - uuid: ab139cd2260240cea4e7b40df5b9e86d
+          name: 'NHS HTTP: Tensão de entrada mínima registrada'
+          type: DEPENDENT
+          key: nhs.http.input.voltage.min
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Entrada / Tensão de entrada mínima, obtido de /status. Extremo registrado pelo software;
+            não é o limite nominal de configuração nem uma média por intervalo.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'input_min') || obj.data.input_min === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.input_min;
+          tags:
+            - tag: component
+              value: input
+          units: V
+        - uuid: eba3158b3cfd45d28f3a888e2b38328f
+          name: 'NHS HTTP: Tensão de entrada máxima registrada'
+          type: DEPENDENT
+          key: nhs.http.input.voltage.max
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Entrada / Tensão de entrada máxima, obtido de /status. Extremo registrado pelo software;
+            não é o limite nominal de configuração nem uma média por intervalo.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'input_max') || obj.data.input_max === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.input_max;
+          tags:
+            - tag: component
+              value: input
+          units: V
+        - uuid: 52fcdfaa45e84a05b400f2e5546ad92e
+          name: 'NHS HTTP: Estado da saída'
+          type: DEPENDENT
+          key: nhs.http.output.state
+          delay: '0'
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          description: Campo Saída / Estado, obtido de /status. Texto preservado como informado pelo Monitor; estados
+            não observados não são convertidos em rede/bateria/bypass.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'output_state') || obj.data.output_state === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.output_state;
+          tags:
+            - tag: component
+              value: output
+        - uuid: e18e46c0e9a14a7784bffe9564eebb1f
+          name: 'NHS HTTP: Tensão de saída'
+          type: DEPENDENT
+          key: nhs.http.output.voltage
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Saída / Tensão de saída, obtido de /status.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'output_voltage') || obj.data.output_voltage === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.output_voltage;
+          tags:
+            - tag: component
+              value: output
+          units: V
+        - uuid: 059dfaa6b2634faab0cc3f8920cb8f8b
+          name: 'NHS HTTP: Carga do nobreak'
+          type: DEPENDENT
+          key: nhs.http.output.load
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Saída / Carga do nobreak, obtido de /status. Percentual de carga informado pelo Monitor;
+            não converter em W ou VA sem medição própria. Valores acima de 100% são preservados.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'output_load') || obj.data.output_load === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.output_load;
+          tags:
+            - tag: component
+              value: output
+          units: '%'
+        - uuid: d88adc8d0d3140f3baf27233a74ea540
+          name: 'NHS HTTP: Estado da bateria'
+          type: DEPENDENT
+          key: nhs.http.battery.state
+          delay: '0'
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          description: Campo Bateria / Estado, obtido de /status. Texto preservado como informado pelo Monitor;
+            estados não observados não são convertidos em rede/bateria/bypass.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'battery_state') || obj.data.battery_state === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.battery_state;
+          tags:
+            - tag: component
+              value: battery
+        - uuid: 79e088dfbb7f4bc9900c90e6bd1c3d1c
+          name: 'NHS HTTP: Tensão da bateria'
+          type: DEPENDENT
+          key: nhs.http.battery.voltage
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Bateria / Tensão da bateria, obtido de /status. Tensão DC do banco de baterias em volts;
+            não é percentual de carga nem autonomia.
+          master_item:
+            key: nhs.http.status.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'battery_voltage') || obj.data.battery_voltage === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.battery_voltage;
+          tags:
+            - tag: component
+              value: battery
+          units: V
+        - uuid: 39acce9c22924295ab24bc7c4a5dc54d
+          name: 'NHS HTTP: Coleta Equipamento'
+          type: HTTP_AGENT
+          key: nhs.http.equipment.get
+          delay: '{$NHS.HTTP.EQUIPMENT.INTERVAL}'
+          history: 1d
+          value_type: TEXT
+          trends: '0'
+          description: GET /equipamento; converte as tabelas em JSON. Erros de layout ficam nos diagnósticos dependentes.
+            Falhas HTTP tornam o item não suportado. Resposta HTTP recente não comprova comunicação serial/USB recente
+            do nobreak.
+          url: '{$NHS.HTTP.URL}/equipamento'
+          timeout: '{$NHS.HTTP.TIMEOUT}'
+          status_codes: '200'
+          follow_redirects: 'NO'
+          retrieve_mode: BODY
+          request_method: GET
+          verify_peer: 'YES'
+          verify_host: 'YES'
+          tags:
+            - tag: component
+              value: collector
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var pageTitle = "Equipamento";
+                  var fields = [["Equipamento Atual", "Modelo", "model", "device.model", "Modelo", "CHAR", ""], ["Equipamento Atual", "Versão da placa", "board", "device.board", "Versão da placa", "CHAR", ""], ["Equipamento Atual", "Versão de firmware", "firmware", "device.firmware", "Versão de firmware", "CHAR", ""], ["Baterias", "Tipo de bateria", "battery_type", "battery.type", "Tipo de bateria", "CHAR", ""], ["Baterias", "Quantidade de baterias", "battery_count", "battery.count", "Quantidade de baterias", "UNSIGNED", ""], ["Baterias", "Tensão nominal", "battery_nominal", "battery.voltage.nominal", "Tensão nominal do banco de baterias", "FLOAT", "V"], ["Entrada", "Tensão de entrada nominal", "input_nominal", "input.voltage.nominal", "Tensão de entrada nominal", "FLOAT", "V"], ["Entrada", "Subtensão", "input_low", "input.voltage.low", "Limite de subtensão configurado", "FLOAT", "V"], ["Entrada", "Sobretensão", "input_high", "input.voltage.high", "Limite de sobretensão configurado", "FLOAT", "V"], ["Saída", "Tensão de saída nominal", "output_nominal", "output.voltage.nominal", "Tensão de saída nominal", "FLOAT", "V"]];
+                  // Parser restrito às tabelas de leitura do NHS Nobreak Monitor 3.1.
+                  // O HTTP agent entrega o corpo convertido para UTF-8; não executar scripts do HTML.
+                  var result = {ok: 0, error: '', data: {}};
+                  function text(s) {
+                      var entities = {nbsp:' ', amp:'&', lt:'<', gt:'>', quot:'"', apos:"'",
+                          aacute:'á', eacute:'é', iacute:'í', oacute:'ó', uacute:'ú',
+                          agrave:'à', acirc:'â', ecirc:'ê', ocirc:'ô', atilde:'ã', otilde:'õ', ccedil:'ç'};
+                      return s.replace(/<[^>]*>/g, ' ').replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi,
+                          function(all, name) {
+                              if (name.charAt(0) === '#') {
+                                  var n = name.charAt(1).toLowerCase() === 'x' ?
+                                      parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+                                  return n > 0 && n <= 65535 ? String.fromCharCode(n) : all;
+                              }
+                              return Object.prototype.hasOwnProperty.call(entities, name.toLowerCase()) ?
+                                  entities[name.toLowerCase()] : all;
+                          }).replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+                  }
+                  function normalized(s) {
+                      return text(s).toLowerCase().replace(/[áàâãä]/g,'a').replace(/[éèêë]/g,'e')
+                          .replace(/[íìîï]/g,'i').replace(/[óòôõö]/g,'o').replace(/[úùûü]/g,'u')
+                          .replace(/ç/g,'c').replace(/\s*:\s*$/,'');
+                  }
+                  function fail(message) { throw {nhsParserError: message}; }
+                  try {
+                      var html = value.replace(/<!--[\s\S]*?-->/g, '')
+                          .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
+                      if (!/NHS\s+Nobreak\s+Monitor\s+3\.1\s*-/i.test(text(html)))
+                          fail('Versão incompatível ou identificação ausente: requer NHS Nobreak Monitor 3.1.');
+                      var content = /<div\b[^>]*\bid\s*=\s*["']content["'][^>]*>([\s\S]*?)<\/div\s*>/i.exec(html);
+                      if (!content) fail('Bloco de conteúdo NHS ausente.');
+                      var title = /<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/i.exec(content[1]);
+                      if (!title || normalized(title[1]) !== normalized(pageTitle))
+                          fail('Página recebida não corresponde à página de leitura esperada.');
+                      var tables = {}, tableRe = /<table\b[^>]*>([\s\S]*?)<\/table\s*>/gi, match;
+                      while ((match = tableRe.exec(content[1])) !== null) {
+                          var header = /<thead\b[^>]*>([\s\S]*?)<\/thead\s*>/i.exec(match[1]);
+                          var body = /<tbody\b[^>]*>([\s\S]*?)<\/tbody\s*>/i.exec(match[1]);
+                          if (!header || !body) continue;
+                          var section = normalized(header[1]);
+                          if (Object.prototype.hasOwnProperty.call(tables, section))
+                              fail('Seção duplicada na página NHS.');
+                          tables[section] = {};
+                          var rowRe = /<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/gi, row;
+                          while ((row = rowRe.exec(body[1])) !== null) {
+                              var cellRe = /<td\b[^>]*>([\s\S]*?)<\/td\s*>/gi, cells = [], cell;
+                              while ((cell = cellRe.exec(row[1])) !== null) cells.push(cell[1]);
+                              if (cells.length !== 2) continue;
+                              var label = normalized(cells[0]);
+                              if (Object.prototype.hasOwnProperty.call(tables[section], label))
+                                  fail('Rótulo duplicado na página NHS.');
+                              tables[section][label] = text(cells[1]);
+                          }
+                      }
+                      var data = {};
+                      for (var i = 0; i < fields.length; i++) {
+                          var f = fields[i], sec = normalized(f[0]), lab = normalized(f[1]);
+                          if (!Object.prototype.hasOwnProperty.call(tables, sec) ||
+                              !Object.prototype.hasOwnProperty.call(tables[sec], lab))
+                              fail('Campo ausente: ' + f[0] + ' / ' + f[1] + '.');
+                          var raw = tables[sec][lab];
+                          if (!raw || raw.length > 255) fail('Campo vazio ou inválido: ' + f[1] + '.');
+                          if (f[5] === 'CHAR') {
+                              data[f[2]] = raw;
+                          } else {
+                              var number = /^([+-]?\d+(?:[.,]\d+)?)\s*(V|%)?$/.exec(raw);
+                              if (!number || (number[2] || '') !== f[6])
+                                  fail('Número ou unidade inválidos: ' + f[1] + '.');
+                              var n = Number(number[1].replace(',', '.'));
+                              if (!isFinite(n) || n < 0 || (f[5] === 'UNSIGNED' && Math.floor(n) !== n))
+                                  fail('Valor numérico inválido: ' + f[1] + '.');
+                              data[f[2]] = n;
+                          }
+                      }
+                      result.data = data;
+                      result.ok = 1;
+                  } catch (e) {
+                      // Somente diagnósticos definidos pelo parser, sem HTML ou exceções externas.
+                      result.error = e && typeof e.nhsParserError === 'string' ?
+                          e.nhsParserError : 'Falha de interpretação da página NHS.';
+                  }
+                  return JSON.stringify(result);
+          triggers:
+            - uuid: 46450fb4e2064891ac42390723f94498
+              expression: nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.equipment.get,{$NHS.HTTP.EQUIPMENT.NODATA})=1
+              name: 'NHS HTTP: Página /equipamento sem coleta HTTP'
+              priority: WARNING
+              tags:
+                - tag: component
+                  value: ups
+        - uuid: c8b5f49d91a04187b9cba42a03d5f1f1
+          name: 'NHS HTTP: Página interpretada - Equipamento'
+          type: DEPENDENT
+          key: nhs.http.equipment.ok
+          delay: '0'
+          history: 7d
+          trends: '0'
+          value_type: UNSIGNED
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.ok
+          tags:
+            - tag: component
+              value: collector
+          valuemap:
+            name: 'NHS HTTP: Interpretação da página'
+          description: 1 = todos os campos esperados interpretados; 0 = layout/campo inválido. Não representa a
+            comunicação física com o nobreak.
+        - uuid: 7e86e6f163174328bd7bc11f4f1eb637
+          name: 'NHS HTTP: Diagnóstico - Equipamento'
+          type: DEPENDENT
+          key: nhs.http.equipment.error
+          delay: '0'
+          history: 7d
+          trends: '0'
+          value_type: TEXT
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.error
+          tags:
+            - tag: component
+              value: collector
+          description: Mensagem do parser; vazio quando a página é válida. Falhas de rede/código HTTP aparecem no
+            mestre e no alerta de ausência de coleta.
+          triggers:
+            - uuid: e7328762516b45d086f1d8b5adb81313
+              expression: last(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.equipment.error)<>"" and nodata(/Template
+                Nobreak NHS Monitor 3.1 HTTP/nhs.http.equipment.error,{$NHS.HTTP.EQUIPMENT.NODATA})=0
+              name: 'NHS HTTP: Falha ao interpretar Equipamento'
+              priority: AVERAGE
+              tags:
+                - tag: component
+                  value: ups
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: last(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.equipment.error)="" and
+                nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.equipment.error,{$NHS.HTTP.EQUIPMENT.NODATA})=0
+              opdata: '{ITEM.LASTVALUE1}'
+        - uuid: 8d032ac6d69b4dee8752d428ed968706
+          name: 'NHS HTTP: Modelo'
+          type: DEPENDENT
+          key: nhs.http.device.model
+          delay: '0'
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          description: Campo Equipamento Atual / Modelo, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'model') || obj.data.model === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.model;
+          tags:
+            - tag: component
+              value: device
+        - uuid: 6e4215f435034ed88888878911b0a0d2
+          name: 'NHS HTTP: Versão da placa'
+          type: DEPENDENT
+          key: nhs.http.device.board
+          delay: '0'
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          description: Campo Equipamento Atual / Versão da placa, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'board') || obj.data.board === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.board;
+          tags:
+            - tag: component
+              value: device
+        - uuid: 35b4ef0601d94a4997adac7cee0f93d0
+          name: 'NHS HTTP: Versão de firmware'
+          type: DEPENDENT
+          key: nhs.http.device.firmware
+          delay: '0'
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          description: Campo Equipamento Atual / Versão de firmware, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'firmware') || obj.data.firmware === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.firmware;
+          tags:
+            - tag: component
+              value: device
+        - uuid: 455b3a15cd33488caf6f867f5a32bc3b
+          name: 'NHS HTTP: Tipo de bateria'
+          type: DEPENDENT
+          key: nhs.http.battery.type
+          delay: '0'
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          description: Campo Baterias / Tipo de bateria, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'battery_type') || obj.data.battery_type === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.battery_type;
+          tags:
+            - tag: component
+              value: device
+        - uuid: 8f4733a11aa1446ea1409da11b17f4e4
+          name: 'NHS HTTP: Quantidade de baterias'
+          type: DEPENDENT
+          key: nhs.http.battery.count
+          delay: '0'
+          history: 30d
+          value_type: UNSIGNED
+          trends: 365d
+          description: Campo Baterias / Quantidade de baterias, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'battery_count') || obj.data.battery_count === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.battery_count;
+          tags:
+            - tag: component
+              value: device
+        - uuid: 25616446b3cd4363bab244fae13493d6
+          name: 'NHS HTTP: Tensão nominal do banco de baterias'
+          type: DEPENDENT
+          key: nhs.http.battery.voltage.nominal
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Baterias / Tensão nominal, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'battery_nominal') || obj.data.battery_nominal === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.battery_nominal;
+          tags:
+            - tag: component
+              value: device
+          units: V
+        - uuid: f86f37234aba4c829a5b00bb15eab57f
+          name: 'NHS HTTP: Tensão de entrada nominal'
+          type: DEPENDENT
+          key: nhs.http.input.voltage.nominal
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Entrada / Tensão de entrada nominal, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'input_nominal') || obj.data.input_nominal === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.input_nominal;
+          tags:
+            - tag: component
+              value: device
+          units: V
+        - uuid: da77ed9ce5ac43129b9e7eb42305da36
+          name: 'NHS HTTP: Limite de subtensão configurado'
+          type: DEPENDENT
+          key: nhs.http.input.voltage.low
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Entrada / Subtensão, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'input_low') || obj.data.input_low === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.input_low;
+          tags:
+            - tag: component
+              value: device
+          units: V
+        - uuid: 33470fcc595e44a39dad3042ab78f275
+          name: 'NHS HTTP: Limite de sobretensão configurado'
+          type: DEPENDENT
+          key: nhs.http.input.voltage.high
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Entrada / Sobretensão, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'input_high') || obj.data.input_high === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.input_high;
+          tags:
+            - tag: component
+              value: device
+          units: V
+        - uuid: 63c9d9e99cd345aba8916e1c47ce3621
+          name: 'NHS HTTP: Tensão de saída nominal'
+          type: DEPENDENT
+          key: nhs.http.output.voltage.nominal
+          delay: '0'
+          history: 30d
+          value_type: FLOAT
+          trends: 365d
+          description: Campo Saída / Tensão de saída nominal, obtido de /equipamento.
+          master_item:
+            key: nhs.http.equipment.get
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |-
+                  var obj = JSON.parse(value);
+                  if (obj.ok !== 1 || !obj.data || !Object.prototype.hasOwnProperty.call(obj.data, 'output_nominal') || obj.data.output_nominal === null) throw 'Página NHS inválida ou campo ausente.';
+                  return obj.data.output_nominal;
+          tags:
+            - tag: component
+              value: device
+          units: V
+      macros:
+        - macro: '{$NHS.HTTP.URL}'
+          value: http://127.0.0.1:2001
+          description: URL literal do computador do Monitor vista pelo servidor/proxy Zabbix, incluindo protocolo e porta, sem barra final ou caminho. Configurar no host para o endereço remoto. O padrão de loopback refere-se ao próprio coletor.
+        - macro: '{$NHS.HTTP.INTERVAL}'
+          value: 1m
+          description: Intervalo de GET /status. Manter menor que NHS.HTTP.NODATA.
+        - macro: '{$NHS.HTTP.EQUIPMENT.INTERVAL}'
+          value: 30m
+          description: Intervalo de GET /equipamento.
+        - macro: '{$NHS.HTTP.TIMEOUT}'
+          value: 10s
+          description: Tempo máximo de cada consulta HTTP.
+        - macro: '{$NHS.HTTP.NODATA}'
+          value: 5m
+          description: Prazo de ausência de coleta /status e frescor dos alertas de medições.
+        - macro: '{$NHS.HTTP.EQUIPMENT.NODATA}'
+          value: 2h
+          description: Prazo de ausência de coleta /equipamento. Manter maior que EQUIPMENT.INTERVAL.
+        - macro: '{$NHS.HTTP.PROBLEM.WINDOW}'
+          value: 2m
+          description: Janela de min/max para alertas de carga. Com intervalo 1m, representa as amostras existentes
+            nessa janela, sem exigir uma contagem mínima.
+        - macro: '{$NHS.HTTP.LOAD.WARN}'
+          value: '85'
+          description: Limiar de carga elevada em %. Deve ser menor que LOAD.CRIT.
+        - macro: '{$NHS.HTTP.LOAD.CRIT}'
+          value: '95'
+          description: Limiar de carga crítica em %.
+        - macro: '{$NHS.HTTP.LOAD.HYST}'
+          value: '5'
+          description: Histerese em pontos percentuais; recuperação elevada abaixo de WARN-HYST e crítica abaixo
+            de CRIT-HYST.
+        - macro: '{$NHS.HTTP.INPUT.OK.MATCHES}'
+          value: (?i)^OK$
+          description: Regex de estados de entrada aceitáveis. Padrão corresponde ao texto observado OK.
+        - macro: '{$NHS.HTTP.OUTPUT.OK.MATCHES}'
+          value: (?i)^Normal$
+          description: Regex de estados de saída aceitáveis. Padrão corresponde ao texto observado Normal.
+        - macro: '{$NHS.HTTP.BATTERY.OK.MATCHES}'
+          value: (?i)^Carregada$
+          description: Regex de estados de bateria aceitáveis. Padrão corresponde ao texto observado Carregada;
+            outros estados geram aviso genérico até ajuste explícito.
+      valuemaps:
+        - uuid: fe489c887a1943c5b0d73ea7e0eda057
+          name: 'NHS HTTP: Interpretação da página'
+          mappings:
+            - value: '0'
+              newvalue: Página inválida
+            - value: '1'
+              newvalue: Página válida
+  triggers:
+    - uuid: 79e11617dd684dfe83f139eec03ce318
+      expression: find(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.input.state,,"regexp","{$NHS.HTTP.INPUT.OK.MATCHES}")=0
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.input.state,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      name: 'NHS HTTP: Estado da entrada diferente do esperado'
+      priority: WARNING
+      tags:
+        - tag: component
+          value: ups
+      recovery_mode: RECOVERY_EXPRESSION
+      recovery_expression: find(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.input.state,,"regexp","{$NHS.HTTP.INPUT.OK.MATCHES}")=1
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.input.state,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      opdata: '{ITEM.LASTVALUE1}'
+    - uuid: c163b5b6432143058c7361aeca50535a
+      expression: find(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.state,,"regexp","{$NHS.HTTP.OUTPUT.OK.MATCHES}")=0
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.state,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      name: 'NHS HTTP: Estado da saída diferente do esperado'
+      priority: AVERAGE
+      tags:
+        - tag: component
+          value: ups
+      recovery_mode: RECOVERY_EXPRESSION
+      recovery_expression: find(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.state,,"regexp","{$NHS.HTTP.OUTPUT.OK.MATCHES}")=1
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.state,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      opdata: '{ITEM.LASTVALUE1}'
+    - uuid: b93c724dd965471ab10c7603e3941135
+      expression: find(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.battery.state,,"regexp","{$NHS.HTTP.BATTERY.OK.MATCHES}")=0
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.battery.state,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      name: 'NHS HTTP: Estado da bateria diferente do esperado'
+      priority: WARNING
+      tags:
+        - tag: component
+          value: ups
+      recovery_mode: RECOVERY_EXPRESSION
+      recovery_expression: find(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.battery.state,,"regexp","{$NHS.HTTP.BATTERY.OK.MATCHES}")=1
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.battery.state,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      opdata: '{ITEM.LASTVALUE1}'
+    - uuid: 147f58fb28ec4f9ba465a93894fd32dd
+      expression: min(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.PROBLEM.WINDOW})>={$NHS.HTTP.LOAD.CRIT}
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      name: 'NHS HTTP: Carga crítica do nobreak'
+      priority: HIGH
+      tags:
+        - tag: component
+          value: ups
+      recovery_mode: RECOVERY_EXPRESSION
+      recovery_expression: max(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.PROBLEM.WINDOW})<({$NHS.HTTP.LOAD.CRIT}-{$NHS.HTTP.LOAD.HYST})
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      opdata: '{ITEM.LASTVALUE1}'
+    - uuid: 874cdae066424675b33cb7e23c81a1ab
+      expression: min(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.PROBLEM.WINDOW})>{$NHS.HTTP.LOAD.WARN}
+        and max(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.PROBLEM.WINDOW})<{$NHS.HTTP.LOAD.CRIT}
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      name: 'NHS HTTP: Carga elevada do nobreak'
+      priority: WARNING
+      tags:
+        - tag: component
+          value: ups
+      recovery_mode: RECOVERY_EXPRESSION
+      recovery_expression: (max(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.PROBLEM.WINDOW})<({$NHS.HTTP.LOAD.WARN}-{$NHS.HTTP.LOAD.HYST})
+        or min(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.PROBLEM.WINDOW})>={$NHS.HTTP.LOAD.CRIT})
+        and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+        Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+        3.1 HTTP/nhs.http.status.ok)=1
+      opdata: '{ITEM.LASTVALUE1}'
+      dependencies:
+        - name: 'NHS HTTP: Carga crítica do nobreak'
+          expression: min(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.PROBLEM.WINDOW})>={$NHS.HTTP.LOAD.CRIT}
+            and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+            Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS
+            Monitor 3.1 HTTP/nhs.http.status.ok)=1
+          recovery_expression: max(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.PROBLEM.WINDOW})<({$NHS.HTTP.LOAD.CRIT}-{$NHS.HTTP.LOAD.HYST})
+            and nodata(/Template Nobreak NHS Monitor 3.1 HTTP/nhs.http.output.load,{$NHS.HTTP.NODATA})=0 and nodata(/Template
+            Nobreak NHS Monitor 3.1 HTTP/nhs.http.status.ok,{$NHS.HTTP.NODATA})=0 and last(/Template Nobreak NHS Monitor
+            3.1 HTTP/nhs.http.status.ok)=1
+  graphs:
+    - uuid: 3924a6ad1d6b4dde8beb6d79ffaa693b
+      name: 'NHS HTTP: Tensões de entrada e saída'
+      width: '900'
+      height: '200'
+      graph_items:
+        - sortorder: '0'
+          color: 1E88E5
+          item:
+            host: Template Nobreak NHS Monitor 3.1 HTTP
+            key: nhs.http.input.voltage
+        - sortorder: '1'
+          color: 0000CC
+          item:
+            host: Template Nobreak NHS Monitor 3.1 HTTP
+            key: nhs.http.output.voltage
+    - uuid: ddca671c91964b42aafbc9828fdee2f2
+      name: 'NHS HTTP: Tensão de entrada e extremos registrados'
+      width: '900'
+      height: '200'
+      graph_items:
+        - sortorder: '0'
+          color: 1E88E5
+          item:
+            host: Template Nobreak NHS Monitor 3.1 HTTP
+            key: nhs.http.input.voltage
+        - sortorder: '1'
+          color: 4CAF50
+          item:
+            host: Template Nobreak NHS Monitor 3.1 HTTP
+            key: nhs.http.input.voltage.min
+        - sortorder: '2'
+          color: CC0000
+          item:
+            host: Template Nobreak NHS Monitor 3.1 HTTP
+            key: nhs.http.input.voltage.max
+    - uuid: 98215216cf544a26972c01d8e721aaae
+      name: 'NHS HTTP: Tensão do banco de baterias'
+      width: '900'
+      height: '200'
+      graph_items:
+        - sortorder: '0'
+          color: 4CAF50
+          item:
+            host: Template Nobreak NHS Monitor 3.1 HTTP
+            key: nhs.http.battery.voltage
+        - sortorder: '1'
+          color: 1E88E5
+          item:
+            host: Template Nobreak NHS Monitor 3.1 HTTP
+            key: nhs.http.battery.voltage.nominal
+    - uuid: cc84cf18b3d74f79883aa8362114b7e1
+      name: 'NHS HTTP: Carga do nobreak'
+      width: '900'
+      height: '200'
+      graph_items:
+        - sortorder: '0'
+          color: CC0000
+          item:
+            host: Template Nobreak NHS Monitor 3.1 HTTP
+            key: nhs.http.output.load
+      ymin_type_1: FIXED
+      yaxismin: '0'

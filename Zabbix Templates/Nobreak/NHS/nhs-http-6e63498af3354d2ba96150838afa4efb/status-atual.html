@@ -1,0 +1,257 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="pt-BR" xml:lang="pt-BR" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=EmulateIE7" />
+<!--<meta charset="iso-8859-1" content="text/html" http-equiv="Content-Type" />  -->
+<!--<meta charset="utf-8" content="text/html" http-equiv="Content-Type" /> -->
+
+<meta charset="iso-8859-1" content="text/html" http-equiv="Content-Type" />
+
+<!-- <meta charset="CP1252" content="text/html" http-equiv="Content-Type" />  -->
+
+
+<title>NHS UPS</title>
+<script src="/public/javascript/jquery.js" language="javascript" type="text/javascript"></script>
+<script src="/public/javascript/jquery.timers.js" language="javascript" type="text/javascript"></script>
+<script src="/public/javascript/status.js" language="javascript" type="text/javascript"></script>
+
+
+<link rel="stylesheet" href="/public/stylesheet/stylenhs.css" type="text/css"> 
+ 
+
+
+</head>
+<body>
+<div id="container">
+<div id="header">
+<img src="/public/images/bluestripe.jpg">
+</div>
+
+<div id="wrapper">
+<div id="content">
+<h1>Status atual</h1>
+
+<form id="form_intervalo" action="status" method="post">
+<p style=" color:blue;  ">   <!--marcio cor/tamanho de fonte  font-size: 12px ; -->
+<label for="intervalo">Atualizar a cada :</label>
+<select id="intervalo" name="intervalo">
+<option value="2">2 segundos</option>
+<option value="5">5 segundos</option>
+<option value="10" selected="selected">10 segundos</option>
+<option value="30">30 segundos</option>
+<option value="60">1 minuto</option>
+
+</select>
+</form>
+
+<br />
+
+<table border="10">
+<thead>
+<tr>
+<td colspan="2">
+Entrada
+</td>
+</tr>
+</thead>
+<tbody>
+<tr><td class="field_label"><strong>Estado:</strong></td><td class="field_estado">OK</td></tr>
+<tr><td><strong>Tensão de entrada:</strong></td><td>226,2 V</td></tr>
+<tr><td><strong>Tensão de entrada mínima:</strong></td><td>0,0 V</td></tr>
+<tr><td><strong>Tensão de entrada máxima:</strong></td><td>235,0 V</td></tr>
+
+</tbody>
+</table>
+
+<br />
+
+<table border="10">
+<thead>
+<tr>
+<td colspan="2">
+Saída
+</td>
+</tr>
+</thead>
+<tbody>
+<tr><td class="field_label"><strong>Estado:</strong></td><td class="field_estado">Normal</td></tr>
+<tr><td><strong>Tensão de saída:</strong></td><td>118,0 V</td></tr>
+<tr><td><strong>Carga do nobreak:</strong></td><td>0,0 %</td></tr>
+
+</tbody>
+</table>
+
+<br />
+
+<table border="10">
+<thead>
+<tr>
+<td colspan="2">
+Bateria
+</td>
+</tr>
+</thead>
+<tbody>
+<tr><td class="field_label"><strong>Estado:</strong></td><td class="field_estado">Carregada</td></tr>
+<tr><td><strong>Tensão da bateria:</strong></td><td>27,2 V</td></tr>
+
+</tbody>
+</table>
+
+
+</div>
+</div>
+
+<!-- Adicionado efeito a todos os botões   ( class="botao3d")  *************marcio **** botões móveis*BRILHANTE********-->
+
+<div id="navigation">
+<div id="menu">
+
+<div class="menu_title" style=" color: ;font-size: 16px ; font-weight: bold">Informação</div>
+<div class="menu_item">
+<!--<a href="/equipamento" class="botao3d" ><img alt="Equipamento" title="Equipamento" src="/public/images/BOTON1.jpg"  ></a> -->
+ <td><a href="/equipamento" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Equipamento','/public/images/BOTON1.jpg',1)" onMouseOver="MM_nbGroup('over','Equipamento','/public/images/BOTON1_OVER.jpg','/public/images/BOTON1_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON1.jpg" alt="Equipamento" name="Equipamento" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!-- <a href="/status" class="botao3d"><img alt="Status atual" title="Status atual" src="/public/images/BOTON2.jpg"></a> -->
+ <td><a href="/status" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Status atual','/public/images/BOTON2.jpg',1)" onMouseOver="MM_nbGroup('over','Status atual','/public/images/BOTON2_OVER.jpg','/public/images/BOTON2_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON2.jpg" alt="Status atual" name="Status atual" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!-- <a href="/graficos" class="botao3d"><img alt="Histogramas" title="Histogramas" src="/public/images/BOTON3.jpg"></a> -->
+ <td><a href="/graficos" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Histogramas','/public/images/BOTON3.jpg',1)" onMouseOver="MM_nbGroup('over','Histogramas','/public/images/BOTON3_OVER.jpg','/public/images/BOTON3_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON3.jpg" alt="Histogramas" name="Histogramas" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/graficos_gauge" class="botao3d"><img alt="Mostradores" title="Mostradores" src="/public/images/BOTON4.jpg"></a> -->
+ <td><a href="/graficos_gauge" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Mostradores','/public/images/BOTON4.jpg',1)" onMouseOver="MM_nbGroup('over','Mostradores','/public/images/BOTON4_OVER.jpg','/public/images/BOTON4_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON4.jpg" alt="Mostradores" name="Mostradores" width="100" height="18" border="0" onload=""></a></td>
+</div>
+
+<div class="menu_title" style=" color: ;font-size: 16px ; font-weight: bold">Configuração</div>
+<div class="menu_item">
+<!--<a href="/configuracao" class="botao3d"><img alt="Nobreak" title="Nobreak" src="/public/images/BOTON5.jpg"></a> -->
+ <td><a href="/configuracao" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Nobreak','/public/images/BOTON5.jpg',1)" onMouseOver="MM_nbGroup('over','Nobreak','/public/images/BOTON5_OVER.jpg','/public/images/BOTON5_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON5.jpg" alt="Nobreak" name="Nobreak" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/configuracao_email" class="botao3d"><img alt="Notificações" title="Notificações" src="/public/images/BOTON6.jpg"></a>-->
+ <td><a href="/configuracao_email" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Notificações','/public/images/BOTON6.jpg',1)" onMouseOver="MM_nbGroup('over','Notificações','/public/images/BOTON6_OVER.jpg','/public/images/BOTON6_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON6.jpg" alt="Notificações" name="Notificações" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/configuracao_timeouts" class="botao3d"><img alt="Timeouts" title="Timeouts" src="/public/images/BOTON7.jpg"></a> -->
+ <td><a href="/configuracao_timeouts" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Timeouts','/public/images/BOTON7.jpg',1)" onMouseOver="MM_nbGroup('over','Timeouts','/public/images/BOTON7_OVER.jpg','/public/images/BOTON7_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON7.jpg" alt="Timeouts" name="Timeouts" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/envio_comandos" class="botao3d"><img alt="Comandos" title="Comandos" src="/public/images/BOTON8.jpg"></a>-->
+ <td><a href="/envio_comandos" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Comandos','/public/images/BOTON8.jpg',1)" onMouseOver="MM_nbGroup('over','Comandos','/public/images/BOTON8_OVER.jpg','/public/images/BOTON8_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON8.jpg" alt="Comandos" name="Comandos" width="100" height="18" border="0" onload=""></a></td>
+</div>
+
+<div class="menu_title" style=" color: ;font-size: 16px ; font-weight: bold">Cadastro</div>
+<div class="menu_item">
+<!--<a href="/cadastro_email" class="botao3d"><img alt="Destinos" title="Destinos" src="/public/images/BOTON9.jpg"></a>-->
+ <td><a href="/cadastro_email" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Destinos','/public/images/BOTON9.jpg',1)" onMouseOver="MM_nbGroup('over','Destinos','/public/images/BOTON9_OVER.jpg','/public/images/BOTON9_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON9.jpg" alt="Destinos" name="Destinos" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/cadastro_cliente" class="botao3d"><img alt="Clientes" title="Clientes" src="/public/images/BOTON10.jpg"></a> -->
+ <td><a href="/cadastro_cliente" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Clientes','/public/images/BOTON10.jpg',1)" onMouseOver="MM_nbGroup('over','Clientes','/public/images/BOTON10_OVER.jpg','/public/images/BOTON10_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON10.jpg" alt="Clientes" name="Clientes" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/cadastro_script" class="botao3d"><img alt="Scripts" title="Scripts" src="/public/images/BOTON11.jpg"></a> -->
+ <td><a href="/cadastro_script" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Scripts','/public/images/BOTON11.jpg',1)" onMouseOver="MM_nbGroup('over','Scripts','/public/images/BOTON11_OVER.jpg','/public/images/BOTON11_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON11.jpg" alt="Scripts" name="Scripts" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/cadastro_usuario" class="botao3d"><img alt="Usuários" title="Usuários" src="/public/images/BOTON16.jpg"></a> -->
+ <td><a href="/cadastro_usuario" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Usuários','/public/images/BOTON16.jpg',1)" onMouseOver="MM_nbGroup('over','Usuários','/public/images/BOTON16_OVER.jpg','/public/images/BOTON16_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON16.jpg" alt="Usuários" name="Usuários" width="100" height="18" border="0" onload=""></a></td>
+</div>
+
+<div class="menu_title" style=" color: ;font-size: 16px ; font-weight: bold">Histórico</div>
+<div class="menu_item">
+<!--<a href="/eventos" class="botao3d"><img alt="Eventos" title="Eventos" src="/public/images/BOTON12.jpg"></a>-->
+ <td><a href="/eventos" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Eventos','/public/images/BOTON12.jpg',1)" onMouseOver="MM_nbGroup('over','Eventos','/public/images/BOTON12_OVER.jpg','/public/images/BOTON12_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON12.jpg" alt="Eventos" name="Eventos" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/dados" class="botao3d"><img alt="Dados" title="Dados" src="/public/images/BOTON13.jpg"></a> -->
+ <td><a href="/dados" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Dados','/public/images/BOTON13.jpg',1)" onMouseOver="MM_nbGroup('over','Dados','/public/images/BOTON13_OVER.jpg','/public/images/BOTON13_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON13.jpg" alt="Dados" name="Dados" width="100" height="18" border="0" onload=""></a></td>
+</div>
+<div class="menu_item">
+<!--<a href="/log" class="botao3d" ><img alt="Log" title="Log" src="/public/images/BOTON14.jpg"></a>-->
+ <td><a href="/log" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Log','/public/images/BOTON14.jpg',1)" onMouseOver="MM_nbGroup('over','Log','/public/images/BOTON14_OVER.jpg','/public/images/BOTON14_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON14.jpg" alt="Log" name="Log" width="100" height="18" border="0" onload=""></a></td>
+</div>
+
+<div class="menu_title" style="height: 16px;"></div>
+<div class="menu_item">
+<!--<a href="/" class="botao3d"><img alt="Sobre" title="Sobre" src="/public/images/BOTON15.jpg"></a>    MARCIO ANTIGO-->
+ <td><a href="/" href="javascript:;" class="botao3d" target="_top" onClick="MM_nbGroup('down','group1','Sobre','/public/images/BOTON15.jpg',1)" onMouseOver="MM_nbGroup('over','Sobre','/public/images/BOTON15_OVER.jpg','/public/images/BOTON15_OVER.jpg',1)" onMouseOut="MM_nbGroup('out')"><img src="/public/images/BOTON15.jpg" alt="Sobre" name="Sobre" width="100" height="18" border="0" onload=""></a></td>
+</div>
+
+</div>
+</div>
+
+<div id="footer">
+<div>
+<p style=" color:blue; font-size: 11px ; font-weight: bold">  <!--cor e tamnaho de fonte de copy-->
+<br> NHS Nobreak Monitor 3.1 - Sistema de Monitoramento de Nobreaks <br> 
+&copy; 1988-2018 NHS Sistemas Eletrônicos LTDA  <br> 
+
+<a HREF="http://www.nhs.com.br" TARGET="_blank" title="Clique aqui para acessar o site da NHS e conheça um pouco mais sobre a empresa." > www.nhs.com.br </a>  <!--link para site nhs -->
+
+  
+
+</div>
+</div>
+</div>
+
+</body>
+</html>
+
+
+<!--********************efeito botão*******marcio**************************************************************************-->
+
+<script language="JavaScript" type="text/JavaScript">
+<!--
+function MM_preloadImages() { //v3.0
+  var d=document; if(d.images){ if(!d.MM_p) d.MM_p=new Array();
+    var i,j=d.MM_p.length,a=MM_preloadImages.arguments; for(i=0; i<a.length; i++)
+    if (a[i].indexOf("#")!=0){ d.MM_p[j]=new Image; d.MM_p[j++].src=a[i];}}
+}
+
+function MM_findObj(n, d) { //v4.01
+  var p,i,x;  if(!d) d=document; if((p=n.indexOf("?"))>0&&parent.frames.length) {
+    d=parent.frames[n.substring(p+1)].document; n=n.substring(0,p);}
+  if(!(x=d[n])&&d.all) x=d.all[n]; for (i=0;!x&&i<d.forms.length;i++) x=d.forms[i][n];
+  for(i=0;!x&&d.layers&&i<d.layers.length;i++) x=MM_findObj(n,d.layers[i].document);
+  if(!x && d.getElementById) x=d.getElementById(n); return x;
+}
+
+function MM_nbGroup(event, grpName) { //v6.0
+  var i,img,nbArr,args=MM_nbGroup.arguments;
+  if (event == "init" && args.length > 2) {
+    if ((img = MM_findObj(args[2])) != null && !img.MM_init) {
+      img.MM_init = true; img.MM_up = args[3]; img.MM_dn = img.src;
+      if ((nbArr = document[grpName]) == null) nbArr = document[grpName] = new Array();
+      nbArr[nbArr.length] = img;
+      for (i=4; i < args.length-1; i+=2) if ((img = MM_findObj(args[i])) != null) {
+        if (!img.MM_up) img.MM_up = img.src;
+        img.src = img.MM_dn = args[i+1];
+        nbArr[nbArr.length] = img;
+    } }
+  } else if (event == "over") {
+    document.MM_nbOver = nbArr = new Array();
+    for (i=1; i < args.length-1; i+=3) if ((img = MM_findObj(args[i])) != null) {
+      if (!img.MM_up) img.MM_up = img.src;
+      img.src = (img.MM_dn && args[i+2]) ? args[i+2] : ((args[i+1])? args[i+1] : img.MM_up);
+      nbArr[nbArr.length] = img;
+    }
+  } else if (event == "out" ) {
+    for (i=0; i < document.MM_nbOver.length; i++) {
+      img = document.MM_nbOver[i]; img.src = (img.MM_dn) ? img.MM_dn : img.MM_up; }
+  } else if (event == "down") {
+    nbArr = document[grpName];
+    if (nbArr)
+      for (i=0; i < nbArr.length; i++) { img=nbArr[i]; img.src = img.MM_up; img.MM_dn = 0; }
+    document[grpName] = nbArr = new Array();
+    for (i=2; i < args.length-1; i+=2) if ((img = MM_findObj(args[i])) != null) {
+      if (!img.MM_up) img.MM_up = img.src;
+      img.src = img.MM_dn = (args[i+1])? args[i+1] : img.MM_up;
+      nbArr[nbArr.length] = img;
+  } }
+}
+//-->
+</script>

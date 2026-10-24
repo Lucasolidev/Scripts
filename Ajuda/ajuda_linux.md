@@ -1,0 +1,1109 @@
+# 🐧 Cheat Sheet - Administração Linux (Ubuntu Server)
+
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat&logo=ubuntu&logoColor=white)
+![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white)
+![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white)
+![Bash](https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white)
+
+---
+
+## 🖥️ 1. Informações do Sistema
+
+### Verificar o sistema operacional e versão detalhada
+```bash
+cat /etc/os-release
+```
+
+### Exibir a versão do Kernel do Linux
+```bash
+uname -a
+```
+
+### Verificar hostname, versão do OS e arquitetura de forma geral
+```bash
+hostnamectl
+```
+
+---
+
+## 📁 2. Manipulação de Arquivos & Diretórios
+
+### Criar Diretórios (`mkdir`)
+* **Criar pastas alinhadas (estrutura recursiva/pais):** Cria todas as pastas intermediárias caso não existam.
+  ```bash
+  mkdir -p /caminho/da/pasta/nova
+  ```
+* **Modo detalhado (Verbose):** Mostra uma mensagem para cada diretório criado.
+  ```bash
+  mkdir -pv pasta1/pasta2
+  ```
+
+### Copiar Arquivos e Pastas (`cp`)
+* **Copiar pasta inteira recursivamente:**
+  ```bash
+  cp -r /origem/pasta /destino/pasta
+  ```
+* **Preservar atributos (permissões, datas de modificação e dono):**
+  ```bash
+  cp -p arquivo.txt /destino/
+  ```
+* **Copiar de forma interativa (pede confirmação antes de sobrescrever):**
+  ```bash
+  cp -i arquivo.txt /destino/
+  ```
+* **Copiar apenas arquivos mais novos (Update):**
+  ```bash
+  cp -u arquivo.txt /destino/
+  ```
+
+### Remover Arquivos e Pastas (`rm`) — Dicas de Segurança ⚠️
+* **Remover pastas e subpastas recursivamente:**
+  ```bash
+  rm -rf /caminho/da/pasta
+  ```
+* **💡 Como remover com Segurança:**
+  * **Confirmação Interativa (`-i` ou `-I`):** 
+    Use `-i` para pedir confirmação em cada arquivo ou `-I` para confirmar uma única vez antes de apagar mais de 3 arquivos ou pastas recursivamente.
+    ```bash
+    rm -rI /caminho/da/pasta
+    ```
+  * **Visualizar antes de apagar (Regra de Ouro):** 
+    Substitua o `rm` por `ls` antes para ter certeza do que será apagado:
+    ```bash
+    # Primeiro liste para confirmar:
+    ls -la /caminho/pasta/*.log
+    # Se estiver correto, execute a remoção:
+    rm /caminho/pasta/*.log
+    ```
+  * **Cuidado com caminhos relativos:** Evite usar `rm -rf .*` (pode tentar apagar o diretório pai `..`). Dê preferência a caminhos absolutos completos.
+
+### Buscar Arquivos e Pastas (`find`)
+O utilitário `find` é extremamente poderoso para localizar itens com base em regras:
+* **Buscar por nome (Ignorando maiúsculas/minúsculas - Case Insensitive):**
+  ```bash
+  find /diretorio/de/busca -iname "nome_do_arquivo.txt"
+  ```
+* **Buscar apenas arquivos (`-type f`) ou apenas pastas (`-type d`):**
+  ```bash
+  find /diretorio/de/busca -type f -name "*.log"
+  find /diretorio/de/busca -type d -name "backup*"
+  ```
+* **Buscar arquivos por tamanho (ex: maiores que 100MB):**
+  ```bash
+  find /diretorio/de/busca -type f -size +100M
+  ```
+* **Buscar arquivos modificados nos últimos X dias (ex: últimos 7 dias):**
+  ```bash
+  find /diretorio/de/busca -type f -mtime -7
+  ```
+* **Buscar e executar uma ação (ex: buscar todos os `.tmp` e excluí-los):**
+  ```bash
+  find /diretorio/de/busca -type f -name "*.tmp" -exec rm -f {} \;
+  ```
+
+### Buscar Texto Dentro de Arquivos (`grep`)
+O comando `grep` localiza strings e padrões de texto dentro de arquivos:
+* **Busca simples (Diferencia maiúsculas/minúsculas):**
+  ```bash
+  grep "termo_de_busca" arquivo.txt
+  ```
+* **Busca ignorando maiúsculas/minúsculas (`-i`):**
+  ```bash
+  grep -i "termo_de_busca" arquivo.txt
+  ```
+* **Busca recursiva em pastas (`-r`) exibindo o número da linha do resultado (`-n`):**
+  ```bash
+  grep -rn "termo_de_busca" /caminho/da/pasta/
+  ```
+* **Inverter a busca (exibir linhas que NÃO contêm o termo — `-v`):**
+  ```bash
+  grep -v "ignorar_isto" arquivo.txt
+  ```
+* **Buscar múltiplos termos usando lógica OR/Regex (`-E`):**
+  ```bash
+  grep -E "erro|falha|critico" arquivo.txt
+  ```
+* **Exibir contexto ao redor do resultado (linhas antes/depois):**
+  ```bash
+  grep -A 3 "erro" arquivo.txt      # Exibe o erro e 3 linhas DEPOIS (After)
+  grep -B 3 "erro" arquivo.txt      # Exibe o erro e 3 linhas ANTES (Before)
+  grep -C 3 "erro" arquivo.txt      # Exibe o erro e 3 linhas ao redor (Context)
+  ```
+
+### Alterar Proprietário e Grupo (`chown`)
+O comando `chown` (change owner) altera o dono e/ou o grupo de arquivos e diretórios:
+* **Alterar apenas o proprietário (dono) do arquivo:**
+  ```bash
+  sudo chown usuario arquivo.txt
+  ```
+* **Alterar apenas o grupo do arquivo:**
+  ```bash
+  sudo chown :grupo arquivo.txt
+  ```
+* **Alterar o proprietário E o grupo simultaneamente (Mais comum):**
+  ```bash
+  sudo chown usuario:grupo arquivo.txt
+  ```
+* **Alterar de forma recursiva (aplica para a pasta e tudo dentro dela):**
+  ```bash
+  sudo chown -R usuario:grupo /caminho/da/pasta
+  ```
+
+### Alterar Permissões de Acesso (`chmod`)
+O comando `chmod` (change mode) define quem pode ler (`r`), escrever (`w`) ou executar (`x`) arquivos e pastas:
+
+* **Tabela rápida de valores octais (Mais comuns):**
+  * **`7`** (`rwx`) — Leitura, escrita e execução (controle total).
+  * **`6`** (`rw-`) — Leitura e escrita.
+  * **`5`** (`r-x`) — Leitura e execução (comum para diretórios e scripts).
+  * **`4`** (`r--`) — Apenas leitura.
+
+* **Exemplos práticos usando números (Octal):**
+  ```bash
+  chmod 755 script.sh      # Dono: total | Grupo e Outros: ler e executar (padrão para scripts)
+  chmod 644 arquivo.txt    # Dono: ler/escrever | Grupo e Outros: apenas ler (padrão de arquivos)
+  chmod 600 id_ed25519     # Apenas o dono lê e escreve (obrigatório para chaves SSH privadas)
+  chmod -R 755 /pasta      # Aplica as permissões de forma recursiva em todo o conteúdo
+  ```
+
+* **Exemplos práticos usando letras (Simbólico):**
+  ```bash
+  chmod +x script.sh       # Torna o script executável para qualquer usuário
+  chmod -x script.sh       # Remove a permissão de execução de todos
+  chmod u+w arquivo.txt    # Adiciona permissão de escrita apenas para o dono (user)
+  chmod g-r arquivo.txt    # Remove permissão de leitura do grupo (group)
+  ```
+
+### Permissões Avançadas e Compartilhamento com POSIX ACLs (`setfacl` e `getfacl`)
+
+O modelo tradicional de permissões do Linux (`chmod`) só permite **um dono**, **um grupo** e os **outros**. Quando você tem múltiplos usuários ou serviços diferentes que precisam colaborar na mesma pasta (por exemplo: time de desenvolvimento `DEV`, administradores `administrador` e `suporte`, banco de dados `mysql` e servidor Web `www-data`), as permissões clássicas tornam-se limitadas. 
+
+O **POSIX ACL (Access Control Lists)** resolve isso permitindo conceder permissões sob medida para **quantos usuários e grupos forem necessários** em um mesmo diretório, com suporte a herança automática para novos arquivos.
+
+> 💡 **Pré-requisito:** Em sistemas Ubuntu Server minimalistas ou limpos, certifique-se de que o pacote `acl` está instalado:
+> ```bash
+> sudo apt update && sudo apt install -y acl
+> ```
+
+#### 1. Consultar Permissões Detalhadas (`getfacl`)
+Substitui o `ls -l` quando o arquivo possui um símbolo `+` no final das permissões (ex: `drwxrwxr-x+`):
+```bash
+getfacl /caminho/do/diretorio
+```
+*Exemplo de saída com ACLs ativas:*
+```text
+# file: arquivos
+# owner: root
+# group: root
+user::rwx
+user:administrador:rwx
+user:suporte:rwx
+group::r-x
+group:DEV:rwx
+group:sudo:rwx
+mask::rwx
+other::r-x
+default:user::rwx
+default:user:administrador:rwx
+default:user:suporte:rwx
+default:group::r-x
+default:group:DEV:rwx
+default:group:sudo:rwx
+default:mask::rwx
+default:other::r-x
+```
+
+#### 2. Conceder Permissões para Usuários e Grupos (`-m`)
+* **Liberar para usuários específicos (para gravarem diretamente sem precisar de `sudo`):**
+  ```bash
+  sudo setfacl -R -m u:administrador:rwx,u:suporte:rwx /arquivos
+  ```
+* **Liberar para um grupo inteiro (ex: time de desenvolvimento `DEV` e administradores `sudo`):**
+  ```bash
+  sudo setfacl -R -m g:DEV:rwx,g:sudo:rwx /arquivos
+  ```
+* **Liberar para serviços do sistema (Banco de Dados e Servidor Web):**
+  ```bash
+  sudo setfacl -R -m u:mysql:rwx,u:www-data:rwx /arquivos
+  ```
+
+#### 3. Herança Automática para Novos Arquivos e Subpastas (`-d` / Default)
+> ⚠️ **Atenção:** Se você aplicar apenas o `-m`, novos arquivos criados posteriormente por outros usuários não herdarão essas permissões! Para garantir que **qualquer novo arquivo ou pasta** criado no futuro herde automaticamente o acesso de todos, utilize sempre a flag **`-d` (Default)**:
+
+```bash
+# Define a herança automática (Default) em cascata para novos arquivos e subpastas:
+sudo setfacl -R -d -m u:administrador:rwx,u:suporte:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx /arquivos
+```
+
+#### 4. Remover Permissões de ACL (`-x` e `-b`)
+* **Remover o acesso de um usuário ou grupo específico:**
+  ```bash
+  sudo setfacl -R -x u:usuario_antigo /arquivos
+  sudo setfacl -R -d -x u:usuario_antigo /arquivos
+  ```
+* **Limpar todas as regras de ACL e voltar ao padrão clássico do chmod:**
+  ```bash
+  sudo setfacl -R -b /arquivos
+  ```
+
+#### 5. Resumo Comparativo: chmod vs SGID vs ACL
+| Método | Como funciona | Melhor Uso |
+| :--- | :--- | :--- |
+| **`chmod 775`** | 1 dono e 1 grupo apenas. | Arquivos pessoais ou pastas simples sem compartilhamento cruzado. |
+| **`chmod 2775 (SGID)`** | Novos arquivos herdam automaticamente o grupo da pasta pai. | Compartilhamento simples restrito a **apenas 1 grupo**. |
+| **`setfacl (POSIX ACL)`** | Múltiplos usuários e múltiplos grupos na mesma pasta com herança. | **Ambientes corporativos reais**: colaboração entre Devs, Admins, Banco e Web. |
+
+---
+
+### ⚠️ Redirecionamento com Sudo (`>` vs `tee`) — A Pegadinha do "Permissão Negada"
+
+Um erro clássico no Linux ao tentar gravar em arquivos protegidos do sistema (como em `/sys/`, `/proc/` ou `/etc/`) é executar:
+
+```bash
+# ❌ ERRO TÍPICO:
+sudo echo 1 > /sys/class/block/sda/device/rescan
+# Retorno imediato do terminal:
+# -bash: /sys/class/block/sda/device/rescan: Permissão negada
+```
+
+#### ❓ Por que esse comando dá "Permissão negada" mesmo usando `sudo`?
+O erro de permissão ocorre porque o operador de redirecionamento (`>`) é **interpretado e executado pelo seu terminal (shell do usuário comum)** antes mesmo de o comando `sudo` ser chamado!
+
+1. O shell divide a linha em duas etapas:
+   - Ele tenta abrir `/sys/class/block/sda/device/rescan` para escrita usando as permissões do seu **usuário atual** (sem privilégios).
+   - Como esse arquivo exige privilégios de `root`, o shell é barrado imediatamente com **Permissão negada**.
+2. O `sudo echo 1` **nem chega a rodar**!
+
+---
+
+#### ✅ Como executar corretamente com privilégios de root:
+
+* **1. Método Padrão e Recomendado (Usando `tee` via Pipe):**
+  O `echo 1` roda no usuário comum e envia a saída via pipe (`|`) para o `tee`, que está rodando como root via `sudo` e consegue gravar no arquivo:
+  ```bash
+  # Sobrescrever o arquivo (equivalente a >):
+  echo 1 | sudo tee /sys/class/block/sda/device/rescan
+
+  # Anexar ao final do arquivo sem apagar o anterior (equivalente a >>):
+  echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
+
+  # Dica: Para não poluir a tela com a saída duplicada do tee, descarte para /dev/null:
+  echo 1 | sudo tee /sys/class/block/sda/device/rescan > /dev/null
+  ```
+
+* **2. Método Alternativo com Subshell (`sh -c` ou `bash -c`):**
+  Ao abrir uma nova instância de shell via `sudo`, todo o processo de redirecionamento roda sob o usuário root:
+  ```bash
+  sudo sh -c 'echo 1 > /sys/class/block/sda/device/rescan'
+  ```
+
+* **3. Gravar blocos inteiros de configuração com HereDoc elevado:**
+  ```bash
+  sudo bash -c 'cat <<EOF > /etc/exemplo.conf
+  parametro1=ativo
+  parametro2=100
+  EOF'
+  ```
+
+---
+
+### Compactação & Descompactação (`tar`, `zip`, `unzip`, `gzip`, `bzip2`)
+Guia rápido para empacotar, compactar e extrair arquivos:
+
+* **Compactar pasta em `.tar.gz` (Gzip — Rápido e muito comum):**
+  ```bash
+  tar -czvf arquivo.tar.gz /caminho/da/pasta
+  ```
+  *(Parâmetros: `-c` cria, `-z` compacta com gzip, `-v` verbose, `-f` define o arquivo destino)*
+
+* **Descompactar um arquivo `.tar.gz`:**
+  ```bash
+  tar -xzvf arquivo.tar.gz -C /diretorio/destino
+  ```
+
+* **Compactar pasta em `.tar.bz2` (Bzip2 — Maior compactação, mais lento):**
+  ```bash
+  tar -cjvf arquivo.tar.bz2 /caminho/da/pasta
+  ```
+  *(Parâmetros: `-j` compacta com bzip2)*
+
+* **Descompactar um arquivo `.tar.bz2`:**
+  ```bash
+  tar -xjvf arquivo.tar.bz2 -C /diretorio/destino
+  ```
+
+* **Compactar pasta em `.zip` (Compatível com Windows):**
+  ```bash
+  zip -r arquivo.zip /caminho/da/pasta
+  ```
+
+* **Descompactar um arquivo `.zip`:**
+  ```bash
+  unzip arquivo.zip -d /diretorio/destino
+  ```
+
+* **Compactar um único arquivo diretamente com `gzip` ou `bzip2`:**
+  ```bash
+  gzip arquivo.txt         # Gera arquivo.txt.gz e APAGA o original
+  gzip -k arquivo.txt      # Gera arquivo.txt.gz e MANTÉM o original (-k)
+  
+  bzip2 arquivo.txt        # Gera arquivo.txt.bz2 (compactação mais forte que gzip)
+  bzip2 -k arquivo.txt     # Gera arquivo.txt.bz2 e MANTÉM o original
+  ```
+
+* **Descompactar arquivos `.gz` ou `.bz2` diretamente:**
+  ```bash
+  gunzip arquivo.txt.gz    # Ou: gzip -d arquivo.txt.gz
+  bunzip2 arquivo.txt.bz2  # Ou: bzip2 -d arquivo.txt.bz2
+  ```
+
+* **Visualizar o conteúdo de um `.tar.gz` sem extrair:**
+  ```bash
+  tar -tzf arquivo.tar.gz
+  ```
+
+### Transferência Remota de Arquivos (`scp` & `rsync`)
+
+#### Copiar arquivos via SSH com `scp` (Secure Copy Protocol)
+O `scp` é ideal para cópias simples de arquivos e diretórios entre a máquina local e servidores remotos usando o protocolo SSH.
+
+* **Enviar arquivo da máquina local para o servidor remoto:**
+  ```bash
+  scp arquivo.txt usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Enviar pasta inteira recursivamente (`-r`):**
+  ```bash
+  scp -r /caminho/pasta_local usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Baixar arquivo do servidor remoto para a máquina local:**
+  ```bash
+  scp usuario@ip_do_servidor:/caminho/remoto/arquivo.txt /caminho/local/
+  ```
+
+* **Baixar pasta inteira do servidor remoto:**
+  ```bash
+  scp -r usuario@ip_do_servidor:/caminho/remoto/pasta /caminho/local/
+  ```
+
+* **Especificar uma porta SSH diferente (`-P` maiúsculo):**
+  ```bash
+  scp -P 2222 arquivo.txt usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Usar uma chave SSH privada específica (`-i`):**
+  ```bash
+  scp -i ~/.ssh/id_ed25519 arquivo.txt usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Preservar data de modificação, acesso e permissões (`-p` minúsculo):**
+  ```bash
+  scp -p arquivo.txt usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+#### Sincronização Inteligente de Arquivos com `rsync` (Remote Sync)
+O `rsync` é mais rápido e eficiente que o `scp` para pastas grandes ou atualizações frequentes, pois transfere apenas as diferenças entre os arquivos (delta transfer), suporta exclusão de arquivos, exibe progresso e permite resumir uploads/downloads interrompidos.
+
+* **Principais opções do `rsync`:**
+  * **`-a`** (*archive*): Preserva permissões, datas, links simbólicos, dono e grupo.
+  * **`-v`** (*verbose*): Exibe detalhes da transferência.
+  * **`-z`** (*compress*): Compacta os dados durante a transferência para economizar banda.
+  * **`-P`** (*progress/partial*): Mostra barra de progresso e permite retomar transferências interrompidas.
+  * **`--delete`**: Apaga no destino os arquivos que foram removidos na origem (espelhamento).
+
+* **Enviar pasta local para servidor remoto (Sincronização padrão recomendada `-avzP`):**
+  ```bash
+  rsync -avzP /caminho/pasta_local/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+  > 💡 **Atenção com a barra `/` no final da pasta de origem:**
+  > * `/caminho/pasta_local/` (com `/`): Copia o **CONTEÚDO** da pasta.
+  > * `/caminho/pasta_local` (sem `/`): Copia a **PASTA EM SI**.
+
+* **Baixar pasta do servidor remoto para a máquina local:**
+  ```bash
+  rsync -avzP usuario@ip_do_servidor:/caminho/remoto/pasta/ /caminho/local/
+  ```
+
+* **Especificar porta SSH customizada ou chave privada no `rsync` (`-e`):**
+  ```bash
+  # Com porta SSH customizada (ex: 2222):
+  rsync -avzP -e "ssh -p 2222" /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
+
+  # Com chave SSH específica:
+  rsync -avzP -e "ssh -i ~/.ssh/id_ed25519" /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Sincronizar e remover arquivos no destino que foram excluídos da origem (`--delete`):**
+  ```bash
+  rsync -avzP --delete /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Excluir pastas ou arquivos específicos da transferência (`--exclude`):**
+  ```bash
+  rsync -avzP --exclude 'node_modules' --exclude '*.log' /caminho/projeto/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+* **Simular a transferência antes de executar (Dry Run `-n`):**
+  ```bash
+  rsync -avzP -n /caminho/local/ usuario@ip_do_servidor:/caminho/destino/
+  ```
+
+---
+
+## 👤 3. Gerenciamento de Usuários e Grupos
+
+### Listar todos os usuários do sistema
+```bash
+cut -d: -f1 /etc/passwd
+```
+
+### Listar usuários com acesso sudo
+```bash
+getent group sudo
+```
+
+### 💡 Diferença entre `useradd` vs `adduser`
+
+* **`useradd` (Baixo nível / Binário nativo):** 
+  Comando padrão do Linux. É mais direto e não interativo. Por padrão em distribuições como Ubuntu/Debian, **NÃO cria** o diretório `/home` e **NÃO define** senha a menos que sejam passados os parâmetros corretos (como a flag `-m`).
+
+* **`adduser` (Alto nível / Script amigável - Recomendado no Debian/Ubuntu):**
+  Um script Perl interativo baseado no `useradd`. Ele **cria a pasta home automaticamente**, copia os arquivos esqueleto (`/etc/skel`), pede a senha e preenche as informações do usuário interativamente.
+
+```bash
+# Forma recomendada no Ubuntu/Debian (interativa e com Home automática):
+sudo adduser administrador
+
+# Criar usuário do jeito completo com useradd (baixo nível):
+sudo useradd -m -s /bin/bash administrador
+sudo passwd administrador
+
+# Se for usar useradd, lembre-se da flag -m (Make Home):
+sudo useradd -m -s /bin/bash administrador
+
+# Corrigir usuário criado sem Home (caso tenha usado useradd sem -m):
+sudo mkhomedir_helper administrador
+sudo usermod -d /home/administrador -s /bin/bash administrador
+sudo chown -R administrador:administrador /home/administrador
+```
+
+### Adicionar usuário existente ao grupo sudo
+```bash
+sudo usermod -aG sudo nome_usuario
+```
+
+### Bloquear login por senha para um usuário específico
+```bash
+sudo usermod -L nome_usuario
+```
+
+### Verificar usuários ativos no sistema (w, who, whoami)
+* **`who`** — Mostra uma lista direta dos usuários conectados, indicando o terminal (TTY), data/hora de login e IP de origem.
+  ```bash
+  who
+  ```
+* **`w`** — Mais completo. Além de listar quem está logado, mostra o uptime/carga do sistema, tempo ocioso de cada terminal e **o que** cada usuário está executando no momento.
+  ```bash
+  w
+  ```
+* **`whoami`** — Exibe o nome do usuário atual com o qual você está logado na sessão do terminal.
+  ```bash
+  whoami
+  ```
+
+---
+
+## 📦 4. Gerenciamento de Pacotes (dpkg & APT)
+
+### Principais comandos do `dpkg` (Gerenciador local de pacotes `.deb`)
+* **Instalar um pacote `.deb` local:**
+  ```bash
+  sudo dpkg -i pacote.deb
+  ```
+* **Remover um pacote (mantendo arquivos de configuração):**
+  ```bash
+  sudo dpkg -r nome_do_pacote
+  ```
+* **Remover completamente (Purge — remove pacotes e arquivos de configuração):**
+  ```bash
+  sudo dpkg -P nome_do_pacote
+  ```
+* **Listar todos os pacotes instalados no sistema (ou filtrar por nome):**
+  ```bash
+  dpkg -l
+  dpkg -l | grep nome_do_pacote
+  ```
+* **Listar os arquivos instalados no sistema por um pacote específico:**
+  ```bash
+  dpkg -L nome_do_pacote
+  ```
+* **Identificar a qual pacote pertence um arquivo específico no sistema:**
+  ```bash
+  dpkg -S /caminho/do/arquivo
+  ```
+* **Ver informações detalhadas de um pacote `.deb` antes de instalá-lo:**
+  ```bash
+  dpkg -I pacote.deb
+  ```
+
+---
+
+## 🔐 5. SSH & Segurança
+
+### Gerar novas chaves SSH (Par de chaves Pública/Privada)
+* **Recomendado (Algoritmo ED25519 — mais seguro e rápido):**
+  ```bash
+  ssh-keygen -t ed25519 -C "seu_email@exemplo.com"
+  ```
+* **Legado/Compatibilidade (Algoritmo RSA de 4096 bits):**
+  ```bash
+  ssh-keygen -t rsa -b 4096 -C "seu_email@exemplo.com"
+  ```
+
+### Copiar a chave pública para o servidor (Autorizar o acesso)
+Para conseguir se conectar sem senha, você precisa registrar a sua **chave pública** (arquivo `.pub`) dentro do arquivo `authorized_keys` no servidor de destino.
+
+* **Método Automático via ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black) / ![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white) / ![Git Bash](https://img.shields.io/badge/Git_Bash-4EAA25?style=flat&logo=gnu-bash&logoColor=white) (`ssh-copy-id`):**
+  ```bash
+  ssh-copy-id -i ~/.ssh/id_ed25519.pub usuario@ip_do_servidor
+  ```
+
+* **Método Automático via ![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white):**
+  No ![PowerShell](https://img.shields.io/badge/Windows_PowerShell-0078D4?style=flat&logo=powershell&logoColor=white), como o `ssh-copy-id` não está disponível por padrão, você pode ler e enviar a chave pública diretamente em um único comando:
+  ```powershell
+  # Gerar chave no PowerShell (caso ainda não tenha):
+  ssh-keygen -t ed25519 -C "seu_email@exemplo.com"
+
+  # Enviar a chave pública diretamente para o servidor Linux:
+  Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh usuario@ip_do_servidor "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+  ```
+
+* **Método Manual Detalhado (Direto no servidor para um usuário específico, ex: administrador):**
+  ```bash
+  # 1. Cria a pasta .ssh do administrador
+  sudo -u administrador mkdir -p /home/administrador/.ssh
+  sudo chmod 700 /home/administrador/.ssh
+
+  # 2. Cria o arquivo authorized_keys com permissão 600
+  sudo -u administrador touch /home/administrador/.ssh/authorized_keys
+  sudo chmod 600 /home/administrador/.ssh/authorized_keys
+
+  # 3. Cole a chave pública do administrador lá dentro
+  sudo nano /home/administrador/.ssh/authorized_keys
+  ```
+
+### Ajustar permissões rígidas da pasta e chaves SSH no servidor de destino
+```bash
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+```
+
+### Testar alterações no sshd_config antes de reiniciar
+```bash
+sudo sshd -t
+```
+
+### Reiniciar o serviço SSH com segurança
+```bash
+sudo systemctl restart ssh
+```
+
+### Ativar o firewall local UFW
+```bash
+sudo ufw enable
+```
+
+### Liberar porta no UFW (com comentário identificador)
+```bash
+sudo ufw allow 22/tcp comment 'Acesso SSH principal'
+```
+
+### Excluir uma regra ativa no UFW
+* **Método 1 — Excluir especificando a regra original:**
+  ```bash
+  sudo ufw delete allow 22/tcp
+  ```
+* **Método 2 — Excluir pelo número da regra (Recomendado/Mais prático):**
+  1. Liste todas as regras ativas numeradas:
+     ```bash
+     sudo ufw status numbered
+     ```
+  2. Apague a regra desejada informando o número correspondente (ex: regra 2):
+     ```bash
+     sudo ufw delete 2
+     ```
+
+### Ver status do UFW com detalhes
+```bash
+sudo ufw status verbose
+```
+
+---
+
+## 💽 6. Inicialização, Particionamento e Montagem de Novo Disco (EXT4 / FSTAB)
+
+Guia passo a passo para inicializar, particionar, formatar e configurar montagem automática persistente de um novo disco rígido / SSD adicionado ao servidor (ex: `/dev/sdb` montado em `/arquivos`):
+
+### 1. Identificar o novo disco e status atual
+```bash
+# Lista discos, partições, sistemas de arquivo e pontos de montagem
+lsblk -f
+
+# Exibe árvore básica com tamanho e tipo
+lsblk
+
+# Exibe relatório completo customizado com colunas essenciais para diagnóstico
+lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINTS,UUID,LABEL,MODEL
+```
+> 💡 *Dica sobre a flag `-o` (`--output`): Ela permite escolher exatamente as colunas que você quer ver. Se usada sem argumentos ela dará erro. Para listar todas as colunas disponíveis execute `lsblk --help`.*
+
+---
+
+### 2. Criar a Tabela de Partição (GPT) e Partição Primária (`parted`)
+A tabela de partição **GPT** suporta discos superiores a 2TB e maior resiliência de dados:
+```bash
+# Cria tabela GPT e cria a partição 1 ocupando 100% do disco
+sudo parted /dev/sdb --script mklabel gpt mkpart primary ext4 0% 100%
+
+# Atualiza a tabela de partições no Kernel imediatamente
+sudo partprobe /dev/sdb
+```
+
+---
+
+### 3. Formatar a Nova Partição em EXT4 (`mkfs.ext4`)
+```bash
+# Formata a partição /dev/sdb1 com o sistema de arquivos ext4
+sudo mkfs.ext4 -F /dev/sdb1
+```
+> 💡 *Dica de Otimização: Em discos muito grandes dedicados a arquivos (ex: > 500GB), você pode usar `mkfs.ext4 -m 1 /dev/sdb1` para reduzir o espaço reservado para o root de 5% padrão para apenas 1%, liberando dezenas de gigabytes.*
+
+---
+
+### 4. Obter o UUID Único da Nova Partição (`blkid`)
+Sempre monte discos no Linux usando o **UUID** (identificador único universal) em vez de `/dev/sdb1`, pois os nomes de dispositivos (`sdb`, `sdc`) podem mudar de ordem após uma reinicialização física ou troca de portas SAS/SATA:
+```bash
+# Exibe o UUID gerado para a partição
+sudo blkid /dev/sdb1
+# Exemplo de saída: /dev/sdb1: UUID="7a538120-d763-4af0-8b9b-a353b0fa9efc" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="primary"
+```
+
+---
+
+### 5. Criar o Diretório Ponto de Montagem
+```bash
+# Cria o diretório onde o disco será acessado (ex: /arquivos)
+sudo mkdir -p /arquivos
+```
+
+---
+
+### 6. Configurar Montagem Persistente no `/etc/fstab` (com proteção contra travamento no boot)
+Adicione a linha no `/etc/fstab` com a flag de segurança **`nofail`** (evita que o servidor trave em modo de recuperação se o disco secundário falhar ou for removido):
+
+```bash
+# Opção A: Inserir automaticamente via comando no terminal (Substitua o UUID):
+UUID_VALOR=$(sudo blkid -s UUID -o value /dev/sdb1)
+echo "UUID=${UUID_VALOR}  /arquivos  ext4  defaults,nofail  0  2" | sudo tee -a /etc/fstab
+
+# Opção B: Editar manualmente via nano:
+# sudo nano /etc/fstab
+# Adicione ao final:
+# UUID=7a538120-d763-4af0-8b9b-a353b0fa9efc  /arquivos  ext4  defaults,nofail  0  2
+```
+
+---
+
+### 7. Testar a Montagem sem Reiniciar e Validar
+```bash
+# Monta todas as entradas configuradas no fstab
+sudo mount -a
+
+# Valida se a montagem foi realizada com sucesso e confira o espaço
+df -h /arquivos
+lsblk -f
+```
+
+---
+
+### 8. Aplicar Permissões e Compartilhamento no Novo Disco (ACLs vs Chmod)
+
+Por padrão, um disco recém-formatado pertence ao usuário `root:root` com permissão `755` (`drwxr-xr-x`), permitindo apenas leitura para os outros usuários. Para liberar a criação e edição de arquivos, escolha a abordagem ideal:
+
+#### 🌟 Opção A: Compartilhamento Completo via POSIX ACLs (Recomendado para Ambientes com Devs, Admins e Banco)
+Permite que o grupo de desenvolvedores (`DEV`), administradores (`administrador`, `suporte`), banco de dados (`mysql`) e servidor Web (`www-data`) criem e alterem arquivos diretamente **sem precisar de `sudo`**, com **herança automática** para novos arquivos:
+
+```bash
+# 1. Garante que o utilitário de ACLs está instalado:
+sudo apt update && sudo apt install -y acl
+
+# 2. Concede permissão de leitura, escrita e navegação (rwx) nos arquivos/pastas existentes:
+sudo setfacl -R -m u:administrador:rwx,u:suporte:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx,u:www-data:rwx /arquivos 2>/dev/null || \
+sudo setfacl -R -m u:administrador:rwx,g:DEV:rwx,g:sudo:rwx /arquivos
+
+# 3. Define a herança automática (Default) para que QUALQUER novo arquivo ou subpasta herde o acesso:
+sudo setfacl -R -d -m u:administrador:rwx,u:suporte:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx,u:www-data:rwx /arquivos 2>/dev/null || \
+sudo setfacl -R -d -m u:administrador:rwx,g:DEV:rwx,g:sudo:rwx /arquivos
+
+# 4. Validar as regras aplicadas:
+getfacl /arquivos
+```
+
+#### 📁 Opção B: Compartilhamento Simples por Grupo com SGID (`2775`)
+Indicado se apenas um grupo específico (ex: `DEV`) utilizará a pasta:
+```bash
+# Define o dono como administrador e o grupo como DEV:
+sudo chown -R administrador:DEV /arquivos
+
+# Concede rwx para dono e grupo com SGID (o bit 2 força novos arquivos a herdarem o grupo DEV):
+sudo chmod -R 2775 /arquivos
+```
+
+#### 👥 Opção C: Liberar para Todos os Usuários do Sistema (Grupo `users` com SGID)
+Como todo usuário comum no Ubuntu pertence ao grupo `users` (GID 100):
+```bash
+sudo chown -R root:users /arquivos
+sudo chmod -R 2775 /arquivos
+```
+
+---
+
+## 💾 7. Gerenciamento e Aumento de Armazenamento - Partição Simples (EXT4)
+
+> 💡 **Novo Disco vs. Expansão de Armazenamento:**
+> * **Adicionar novo disco do zero:** Se você adicionou um novo disco rígido ou virtual (ex: `/dev/sdb` de 80G cru) e precisa criar partição, formatar em EXT4 e mapear em `/arquivos`, siga o **[Cenário A](#-cenário-a-adicionar-novo-disco-e-montar-ex-devsdb-em-arquivos)** abaixo (ou consulte a **[Seção 6](#-6-inicialização-particionamento-e-montagem-de-novo-disco-ext4--fstab)** para configurações detalhadas de POSIX ACLs).
+> * **Aumentar partição existente:** Se o disco já está montado e foi expandido no hipervisor/cloud (ex: Proxmox, VMware, AWS), siga o **[Cenário B](#-cenário-b-aumentar--expandir-capacidade-de-partição-existente-ext4)** para expandir online sem reiniciar o servidor.
+
+---
+
+### 🟢 Cenário A: Adicionar Novo Disco e Montar (Ex: /dev/sdb em /arquivos)
+
+Utilize este fluxo quando um novo disco rígido ou virtual (vDisk) foi adicionado à máquina e ainda não possui partições formatadas (`lsblk` exibe apenas o disco cru, ex: `sdb`).
+
+#### 1. Identificar o novo disco e status atual
+```bash
+lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINTS,TYPE
+```
+
+#### 2. Criar a Tabela de Partições (GPT) e Partição Primária (`parted`)
+A tabela GPT suporta discos superiores a 2TB e possui maior tolerância a falhas que a MBR:
+```bash
+sudo parted /dev/sdb --script mklabel gpt mkpart primary ext4 0% 100%
+```
+
+```bash
+# Atualizar a tabela de partições no Kernel imediatamente
+sudo partprobe /dev/sdb
+```
+
+#### 3. Formatar a Partição em EXT4 (`mkfs.ext4`)
+```bash
+# Otimização (-m 1): reduz o espaço reservado do root de 5% para 1%, liberando mais gigabytes para uso
+sudo mkfs.ext4 -m 1 -F /dev/sdb1
+```
+
+#### 4. Criar o Diretório Ponto de Montagem
+```bash
+sudo mkdir -p /arquivos
+```
+
+#### 5. Configurar Montagem Persistente no `/etc/fstab` (via UUID com proteção nofail)
+> ⚠️ **Atenção:** Sempre utilize o **UUID** em vez do caminho `/dev/sdb1` (as letras `sdb`, `sdc` podem mudar após reinicializações). O parâmetro `nofail` impede que o servidor entre em modo de emergência caso o disco secundário esteja ausente no boot.
+
+```bash
+# Capturar o UUID e anexar a linha ao /etc/fstab automaticamente:
+UUID_SDB=$(sudo blkid -s UUID -o value /dev/sdb1)
+echo "UUID=${UUID_SDB}  /arquivos  ext4  defaults,nofail  0  2" | sudo tee -a /etc/fstab
+```
+
+#### 6. Testar a Montagem sem Reiniciar e Validar
+```bash
+# Monta todas as entradas configuradas no fstab
+sudo mount -a
+```
+
+```bash
+# Valida se montou corretamente e confere o tamanho
+df -h /arquivos
+```
+
+#### 7. Ajustar Proprietário e Permissões Iniciais
+
+* **Opção 1: Permissões simples de operador (Chmod):**
+  ```bash
+  # Ajusta o proprietário e define permissão 775 (dono e grupo):
+  sudo chown -R administrador:administrador /arquivos
+  sudo chmod 775 /arquivos
+  ```
+
+* **Opção 2: Compartilhamento avançado para múltiplos grupos e serviços (POSIX ACLs - Recomendado):**
+  ```bash
+  # Garante pacote acl instalado e aplica herança para Devs, Admins e Banco:
+  sudo apt update && sudo apt install -y acl
+  sudo setfacl -R -m u:administrador:rwx,u:suporte:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx /arquivos 2>/dev/null || \
+  sudo setfacl -R -m u:administrador:rwx,g:DEV:rwx,g:sudo:rwx /arquivos
+
+  sudo setfacl -R -d -m u:administrador:rwx,u:suporte:rwx,g:DEV:rwx,g:sudo:rwx,u:mysql:rwx /arquivos 2>/dev/null || \
+  sudo setfacl -R -d -m u:administrador:rwx,g:DEV:rwx,g:sudo:rwx /arquivos
+
+  # Validar:
+  getfacl /arquivos
+  ```
+
+---
+
+### 🔵 Cenário B: Aumentar / Expandir Capacidade de Partição Existente (EXT4)
+
+Utilize este fluxo quando o disco (ex: `sda`, `sdb` ou `sdc`) já estava montado e teve seu tamanho aumentado no hipervisor (Proxmox, VMware, VirtualBox) ou provedor de nuvem (AWS, GCP, Azure).
+
+#### 1. Verificar montagens e tamanho atual
+```bash
+df -hT
+```
+
+#### 2. Forçar o Kernel a reconhecer o novo tamanho do disco (Rescan SCSI sem reboot)
+> ⚠️ **Atenção:** Nunca use `sudo echo 1 > ...`, pois o shell do usuário comum avalia o `>` antes de chamar o `sudo`, gerando o erro `-bash: ...: Permissão negada`. Utilize o utilitário `tee`:
+
+```bash
+# Rescan em um disco específico (ex: sdb):
+echo 1 | sudo tee /sys/class/block/sdb/device/rescan
+```
+
+```bash
+# Dica: Forçar o rescan de TODOS os discos e controladoras SCSI de uma só vez:
+echo "- - -" | sudo tee /sys/class/scsi_host/host*/scan
+```
+
+#### 3. Confirmar se o disco principal cresceu no `lsblk`
+```bash
+lsblk
+```
+
+#### 4. Instalar ferramenta de expansão de partição (se ainda não tiver)
+```bash
+sudo apt update && sudo apt install -y cloud-guest-utils
+```
+
+#### 5. Expandir a partição no disco target (Substitua sdX pelo seu disco)
+```bash
+sudo growpart /dev/sdb 1
+```
+
+#### 6. Redimensionar o sistema de arquivos EXT4 online (sem desmontar)
+```bash
+sudo resize2fs /dev/sdb1
+```
+
+#### 7. Confirmar o novo espaço disponível
+```bash
+df -hT /arquivos
+```
+
+---
+
+## 📦 8. Aumento de Armazenamento - Volume Lógico (LVM)
+
+### Expandir o Logical Volume (LV) + Sistema de Arquivos em um único comando
+```bash
+lvextend -r -l +100%FREE /dev/mapper/ubuntu--vg-ubuntu--lv
+```
+
+### Caso a partição física (PV) precise ser re-escaneada antes
+```bash
+pvresize /dev/sdX1
+```
+
+---
+
+## 📊 9. Diagnóstico de Rede & Portas
+
+### Ver conexões ativas, aplicações e portas escutando (substituto moderno do netstat)
+```bash
+ss -tulpn
+```
+
+### Portas Mais Usadas
+
+| Porta Padrão | Serviço Típico | Nome do Processo Comum |
+| :--- | :--- | :--- |
+| 80 / 443 | Servidor Web | `nginx`, `apache2`, `httpd` |
+| 8080 / 8443 | Web Alternativo / Proxy | `tomcat`, `nginx`, `node` |
+| 3306 / 33060 | Banco de Dados | `mysqld` (MySQL/MariaDB) |
+| 5432 | Banco de Dados | `postgres` (PostgreSQL) |
+| 1433 | Banco de Dados | `sqlservr` (SQL Server) |
+| 27017 | Banco de Dados | `mongod` (MongoDB) |
+| 6379 | Banco de Cache | `redis-server` |
+| 22 | Acesso Remoto (SSH) | `sshd` |
+| 3389 | Acesso Remoto (RDP) | `xrdp` |
+| 53 | Servidor DNS | `bind9`, `systemd-resolved` |
+| 21 | Servidor FTP | `vsftpd`, `proftpd` |
+| 25 / 587 | Servidor de E-mail (SMTP) | `postfix`, `exim4` |
+| 1194 | Servidor VPN | `openvpn` |
+| 5672 / 15672 | Fila de Mensagens | `rabbitmq-server` |
+
+### Testar se uma porta remota está aberta (ex: teste de NAT/Firewall)
+```bash
+nc -zv 187.32.48.193 35222
+```
+
+### Testar conectividade básica e latência (`ping`)
+```bash
+ping -c 4 google.com
+```
+
+### Testar requisições web, APIs ou ler cabeçalhos HTTP (`curl`)
+```bash
+curl -I https://google.com
+```
+
+### Consultar registros DNS de um domínio (`dig`)
+```bash
+dig +short google.com
+```
+
+### Mapear serviços e portas abertas em uma máquina remota (`nmap`)
+```bash
+nmap -p- 192.168.1.10
+```
+
+### Analisar pacotes passando pela interface de rede (Sniffer / `tcpdump`)
+```bash
+sudo tcpdump -i eth0 port 80
+```
+
+### Mapear a rota dos pacotes até o destino (`traceroute` / `tracepath`)
+```bash
+tracepath google.com
+```
+
+### Ver IP local das interfaces
+```bash
+ip a
+```
+
+---
+
+## 🧹 10. Limpeza & Espaço em Disco
+
+### Ver quais arquivos/pastas estão consumindo mais espaço no diretório atual
+```bash
+du -h --max-depth=1 | sort -hr
+```
+
+### Limpar cache de pacotes antigos do APT
+```bash
+sudo apt autoremove --purge && sudo apt clean
+```
+
+### Ver logs do sistema ocupando espaço e limpar logs antigos
+```bash
+journalctl --disk-usage
+sudo journalctl --vacuum-time=3d
+```
+---
+
+## 🔍 11. Análise de Logs & Erros (tail & journalctl)
+
+### Principais arquivos de log no Ubuntu Server
+* `/var/log/syslog` — Registro geral de eventos do sistema.
+* `/var/log/auth.log` — Log de autenticação, acessos SSH, tentativas de login e uso do `sudo`.
+* `/var/log/kern.log` — Mensagens do Kernel, avisos de hardware e problemas com dispositivos.
+* `/var/log/dpkg.log` — Histórico de instalação, atualização e remoção de pacotes via APT.
+
+### Monitorar o log do sistema em tempo real
+```bash
+tail -f /var/log/syslog
+```
+
+### Ver as últimas 100 linhas de um log
+```bash
+tail -n 100 /var/log/syslog
+```
+
+### Mostrar as últimas 50 linhas e continuar acompanhando em tempo real
+```bash
+tail -n 50 -f /var/log/syslog
+```
+
+### Filtrar apenas erros ou falhas em tempo real
+```bash
+tail -f /var/log/syslog | grep -i -E "error|fail|warning"
+```
+
+### Monitorar múltiplos logs simultaneamente (syslog e auth.log)
+```bash
+tail -f /var/log/syslog /var/log/auth.log
+```
+
+### Filtrar erros e buscar problemas com journalctl
+* **Ver apenas erros/falhas do boot atual:**
+  ```bash
+  sudo journalctl -p err -b
+  ```
+* **Ver logs do boot anterior (útil após travamentos):**
+  ```bash
+  sudo journalctl -b -1
+  ```
+* **Ver logs de um serviço específico em tempo real (ex: SSH, Apache, Nginx):**
+  ```bash
+  sudo journalctl -u ssh -f
+  ```
+* **Filtrar logs por tempo (ex: última 1 hora, ou período específico):**
+  ```bash
+  sudo journalctl --since "1 hour ago"
+  sudo journalctl --since "2026-07-20 14:00:00" --until "2026-07-20 16:00:00"
+  ```
+* **Ver logs apenas relacionados ao Kernel (equivalente ao dmesg):**
+  ```bash
+  sudo journalctl -k
+  ```
+* **Acompanhar todos os logs do sistema em tempo real:**
+  ```bash
+  sudo journalctl -f
+  ```
+
+---
+
+## 🚀 12. Processos & Monitoramento
+
+### Monitor interativo de CPU e RAM
+```bash
+htop
+```
+
+### Listar todos os processos ativos no sistema
+```bash
+ps aux
+```
+
+### Encontrar um processo específico pelo nome
+```bash
+ps aux | grep nome_do_processo
+```
+
+### Matar um processo de forma forçada usando o PID
+```bash
+kill -9 PID
+```
+
+### Matar processos pelo nome
+```bash
+killall nome_do_processo
+```
+
+### Verificar uso de memória RAM e Swap de forma legível
+```bash
+free -h
+```
+
+### Identificar qual processo está ocupando uma porta específica (ex: 80)
+```bash
+sudo lsof -i :80
+```
+
+### Exibir o uptime (tempo online) e as médias de carga do processador (load average)
+```bash
+uptime
+```
