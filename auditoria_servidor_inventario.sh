@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.4
+# Version: 2.5
 # ------------------------------------------------
-VERSION="2.4"
+VERSION="2.5"
 # ==============================================================================
 # AUDITORIA, VARREDURA E INVENTÁRIO 360° DO SERVIDOR LINUX (MULTI-DISTRO)
 # ==============================================================================
@@ -411,9 +411,9 @@ APT_SIM=""
 
 if command -v apt-get >/dev/null 2>&1; then
     APT_SIM=$(apt-get -s upgrade 2>/dev/null || true)
-    PENDING_UPDATES_COUNT=$(echo "$APT_SIM" | grep -c "^Inst " || true)
+    PENDING_UPDATES_COUNT=$(echo "$APT_SIM" | awk '/^Inst / {c++} END {print c+0}')
     PENDING_LIST_DETAILS=$(echo "$APT_SIM" | awk '/^Inst / {print $2 " " $3 " -> " $4}' || true)
-    CRITICAL_PKGS_PENDING=$(echo "$APT_SIM" | awk '/^Inst / {print $2}' | grep -E '^(php|libapache2-mod-php|apache2|nginx|mariadb|mysql|postgresql|openssh|openssl|linux-image|docker|samba|bind9|sudo)' | xargs || true)
+    CRITICAL_PKGS_PENDING=$( (echo "$APT_SIM" | awk '/^Inst / {print $2}' | grep -E '^(php|libapache2-mod-php|apache2|nginx|mariadb|mysql|postgresql|openssh|openssl|linux-image|docker|samba|bind9|sudo|cloudflared)' || true) | xargs || true )
 elif command -v dnf >/dev/null 2>&1; then
     DNF_SIM=$(dnf check-update -q --cacheonly 2>/dev/null || true)
     PENDING_UPDATES_COUNT=$(echo "$DNF_SIM" | awk 'NF>=3 && $1 !~ /^(Last|Obsoleting|Security:)/ {count++} END {print count+0}')
@@ -526,8 +526,9 @@ while IFS=: read -r u_name _ u_uid _ _ u_home u_shell; do
         fi
         SSH_KEYS_INFO="Nenhuma"
         if [[ -r "${u_home}/.ssh/authorized_keys" ]]; then
-            K_COUNT=$(grep -cE "^(ssh-|ecdsa-)" "${u_home}/.ssh/authorized_keys" 2>/dev/null || echo 0)
-            (( K_COUNT > 0 )) && SSH_KEYS_INFO="${FG_GREEN}${K_COUNT} chave(s) SSH autorizada(s)${NC}"
+            K_COUNT=$(awk '/^(ssh-|ecdsa-)/ {c++} END {print c+0}' "${u_home}/.ssh/authorized_keys" 2>/dev/null || echo 0)
+            K_COUNT="${K_COUNT%%[^0-9]*}"
+            (( ${K_COUNT:-0} > 0 )) && SSH_KEYS_INFO="${FG_GREEN}${K_COUNT} chave(s) SSH autorizada(s)${NC}"
         fi
         echo -e "    • Usuário: ${FG_CYAN}${BOLD}${u_name}${NC} (UID: ${u_uid}) | Status: ${PASS_STATE} | Home: ${u_home} | Shell: ${DIM}${u_shell}${NC}"
         echo -e "      ├─ ${BOLD}Grupos a que pertence:${NC} ${FG_YELLOW}${U_GROUPS}${NC}"
@@ -1256,11 +1257,45 @@ for base_dir in "${SCAN_DIRS[@]}"; do
                 add_alert "Ferramenta de banco web encontrada no disco (${special_marker}) — verificar restrição de acesso."
                 FOUND_APPS=$((FOUND_APPS + 1))
                 ;;
+            *ampache.cfg.php*)
+                APP_DIR=$(dirname "$(dirname "$special_marker")")
+                AMP_VER=""
+                if [[ -f "${APP_DIR}/composer.json" ]]; then
+                    AMP_VER=$(grep -E '"version"\s*:' "${APP_DIR}/composer.json" 2>/dev/null | head -n 1 | cut -d'"' -f4 || true)
+                fi
+                if [[ -z "$AMP_VER" && -f "${APP_DIR}/src/Config/Init/InitializationHandler.php" ]]; then
+                    AMP_VER=$(grep -oE "BUILD_VERSION\s*=\s*'[^']+'" "${APP_DIR}/src/Config/Init/InitializationHandler.php" 2>/dev/null | cut -d"'" -f2 || true)
+                fi
+                AMP_DB=$(awk -F'=' '/^\s*database_name\s*=/ {gsub(/["'\'' \t\r]/,"",$2); print $2}' "$special_marker" 2>/dev/null | head -n 1 || true)
+                echo -e "    • ${FG_GREEN}${BOLD}Ampache Music Streaming ${AMP_VER:+v${AMP_VER}}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${AMP_DB:+ (Banco: ${FG_YELLOW}${AMP_DB}${NC})}"
+                add_role "Servidor Streaming (Ampache${AMP_VER:+ v$AMP_VER})"
+                add_unique_item RESUMO_APPS_VERSOES "Ampache:${AMP_VER:-Instalado}"
+                add_unique_item RESUMO_SITES_DETECTADOS "Ampache ${AMP_VER:-Web}: ${APP_DIR}"
+                FOUND_APPS=$((FOUND_APPS + 1))
+                ;;
         esac
-    done < <(find "$base_dir" -maxdepth 4 -type f \( -path "*/inc/define.php" -o -name "zabbix.php" -o -path "*/core/lib/Drupal.php" -o -name "version.php" -o -iname "adminer*.php" \) 2>/dev/null)
+    done < <(find "$base_dir" -maxdepth 4 -type f \( -path "*/inc/define.php" -o -name "zabbix.php" -o -path "*/core/lib/Drupal.php" -o -name "version.php" -o -iname "adminer*.php" -o -path "*/config/ampache.cfg.php*" \) 2>/dev/null | sort -u)
+
+    # Descoberta universal de projetos PHP (composer.json) e Node (package.json) em /var/www e /srv
+    if [[ "$base_dir" == "/var/www" || "$base_dir" == "/srv" ]]; then
+        while IFS= read -r comp_file; do
+            [[ -f "$comp_file" ]] || continue
+            APP_DIR=$(dirname "$comp_file")
+            [[ -f "${APP_DIR}/artisan" || -f "${APP_DIR}/wp-config.php" || -f "${APP_DIR}/configuration.php" || -f "${APP_DIR}/config/ampache.cfg.php" || -f "${APP_DIR}/config/ampache.cfg.php.dist" ]] && continue
+            PKG_NAME=$(grep -m 1 -E '"name"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
+            PKG_VER=$(grep -m 1 -E '"version"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
+            if [[ -n "$PKG_NAME" ]]; then
+                echo -e "    • ${FG_GREEN}${BOLD}Aplicação PHP/Composer (${PKG_NAME}${PKG_VER:+ v$PKG_VER})${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                add_role "Aplicação Web (${PKG_NAME}${PKG_VER:+ v$PKG_VER})"
+                add_unique_item RESUMO_APPS_VERSOES "${PKG_NAME}:${PKG_VER:-Composer}"
+                add_unique_item RESUMO_SITES_DETECTADOS "${PKG_NAME}${PKG_VER:+ v$PKG_VER}: ${APP_DIR}"
+                FOUND_APPS=$((FOUND_APPS + 1))
+            fi
+        done < <(find "$base_dir" -maxdepth 3 -type f -name "composer.json" ! -path "*/vendor/*" 2>/dev/null)
+    fi
 done
 
-(( FOUND_APPS == 0 )) && echo -e "    • Nenhum CMS padrão (Joomla/WordPress/Laravel/GLPI/Moodle/Nextcloud/Drupal/Zabbix) detectado em /var/www, /srv, /opt ou /home."
+(( FOUND_APPS == 0 )) && echo -e "    • Nenhum CMS/Aplicação web conhecida detectada em /var/www, /srv, /opt ou /home."
 
 if [[ -d /var/www ]]; then
     echo -e "\n    ${BOLD}Diretórios Existentes em /var/www:${NC}"
@@ -1407,24 +1442,74 @@ fi
 # 4.6 - Papéis de Infraestrutura e Todos os Daemons Ativos no Systemd
 echo -e "\n  ${BOLD}4.6 Outros Serviços de Infraestrutura, Agentes e Daemons em Execução:${NC}"
 INFRA_FOUND=0
+
+get_daemon_version() {
+    local svc="$1" ver=""
+    case "$svc" in
+        cloudflared)
+            ver=$(cloudflared --version 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="version") {print $(i+1); exit}}' || true)
+            ;;
+        postfix)
+            ver=$(postconf -h mail_version 2>/dev/null || true)
+            ;;
+        fail2ban|fail2ban-server)
+            ver=$(fail2ban-client --version 2>/dev/null | head -n 1 | awk '{print $NF}' || true)
+            ;;
+        named|bind9)
+            ver=$(named -v 2>/dev/null | awk '{print $2}' || true)
+            ;;
+        dnsmasq)
+            ver=$(dnsmasq -v 2>/dev/null | head -n 1 | awk '{print $3}' || true)
+            ;;
+        dovecot)
+            ver=$(dovecot --version 2>/dev/null | awk '{print $1}' || true)
+            ;;
+        tailscaled)
+            ver=$(tailscale --version 2>/dev/null | head -n 1 || true)
+            ;;
+        openvpn)
+            ver=$(openvpn --version 2>/dev/null | head -n 1 | awk '{print $2}' || true)
+            ;;
+    esac
+    if [[ -z "$ver" ]] && command -v dpkg-query >/dev/null 2>&1; then
+        ver=$(dpkg-query -W -f='${Version}\n' "$svc" 2>/dev/null | head -n 1 | sed 's/^[0-9]*://; s/-.*//' || true)
+    fi
+    if [[ -z "$ver" ]] && command -v rpm >/dev/null 2>&1; then
+        ver=$(rpm -q --qf '%{VERSION}\n' "$svc" 2>/dev/null | grep -v "not installed" | head -n 1 || true)
+    fi
+    if [[ -z "$ver" ]] && command -v "$svc" >/dev/null 2>&1; then
+        ver=$(timeout 2 "$svc" --version 2>/dev/null | head -n 1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_-]+)?' | head -n 1 || true)
+    fi
+    printf '%s' "${ver:-}"
+}
+
 check_infra_service() {
     local svc="$1" label="$2" role_tag="$3"
     if [[ "$(get_service_status_plain "$svc")" != "Não instalado" ]] || pgrep -x "$svc" >/dev/null 2>&1; then
         INFRA_FOUND=$((INFRA_FOUND + 1))
-        local st
+        local st d_ver
         st=$(get_service_status "$svc")
-        echo -e "    • ${BOLD}${label}${NC} (${svc}): [${st}]"
+        d_ver=$(get_daemon_version "$svc")
+        echo -e "    • ${BOLD}${label}${NC} (${svc}${d_ver:+ v${d_ver}}): [${st}]"
         if [[ "$(get_service_status_plain "$svc")" == "Ativo" ]] || pgrep -x "$svc" >/dev/null 2>&1; then
-            add_role "$role_tag"
-            add_unique_item RESUMO_APPS_VERSOES "${svc}:Ativo"
+            add_role "${role_tag}${d_ver:+ (${d_ver})}"
+            add_unique_item RESUMO_APPS_VERSOES "${svc}:${d_ver:-Ativo}"
         fi
     fi
 }
 
+check_infra_service "cloudflared"          "Conector Cloudflare Tunnel (cloudflared)"   "Conector Cloudflare Tunnel"
+check_infra_service "ngrok"                "Túnel Reverso Ngrok"                        "Túnel Ngrok"
+check_infra_service "frpc"                 "Cliente Proxy Reverso FRP (frpc)"           "Túnel FRP Client"
+check_infra_service "frps"                 "Servidor Proxy Reverso FRP (frps)"          "Servidor FRP"
+check_infra_service "zerotier-one"         "Rede SD-WAN ZeroTier"                       "VPN ZeroTier"
+check_infra_service "netbird"              "Rede Mesh VPN NetBird"                      "VPN NetBird"
 check_infra_service "named"                "Servidor DNS BIND9 (named)"                 "Servidor DNS (BIND9)"
 check_infra_service "bind9"                "Servidor DNS BIND9"                         "Servidor DNS (BIND9)"
 check_infra_service "unbound"              "Servidor DNS Unbound"                       "Servidor DNS (Unbound)"
 check_infra_service "dnsmasq"              "Servidor DNS/DHCP Dnsmasq"                  "DNS/DHCP (Dnsmasq)"
+check_infra_service "pihole-FTL"           "Servidor DNS / Bloqueador Pi-hole"          "Servidor DNS (Pi-hole)"
+check_infra_service "AdGuardHome"          "Servidor DNS / Filtro AdGuard Home"         "Servidor DNS (AdGuardHome)"
 check_infra_service "isc-dhcp-server"      "Servidor DHCP (Debian/Ubuntu)"              "Servidor DHCP"
 check_infra_service "dhcpd"                "Servidor DHCP (RHEL/CentOS)"                "Servidor DHCP"
 check_infra_service "kea-dhcp4-server"     "Servidor DHCP ISC Kea"                      "Servidor DHCP (Kea)"
@@ -1441,6 +1526,7 @@ check_infra_service "snmpd"                "Agente SNMP (snmpd)"                
 check_infra_service "prometheus"           "Servidor de Métricas Prometheus"            "Monitoramento (Prometheus)"
 check_infra_service "grafana-server"       "Painel de Observabilidade Grafana"          "Dashboards (Grafana)"
 check_infra_service "wazuh-agent"          "Agente SIEM/EDR Wazuh"                      "Monitorado (Wazuh Agent)"
+check_infra_service "crowdsec"             "Motor IPS Colaborativo CrowdSec"            "IPS CrowdSec"
 check_infra_service "glpi-agent"           "Agente de Inventário GLPI Agent"            "Inventariado (GLPI Agent)"
 check_infra_service "veeamservice"         "Agente de Backup Veeam (Linux Agent)"       "Backup Veeam Agent"
 check_infra_service "bacula-fd"            "Agente de Backup Bacula File Daemon"        "Backup Bacula Client"
@@ -1454,7 +1540,12 @@ check_infra_service "proftpd"              "Servidor FTP (ProFTPD)"             
 check_infra_service "asterisk"             "Central PABX IP / VoIP (Asterisk)"          "PABX VoIP (Asterisk)"
 check_infra_service "unifi"                "Controladora Wi-Fi Ubiquiti UniFi"          "Controladora UniFi"
 check_infra_service "gitlab-runsvdir"      "Servidor DevOps GitLab Omnibus"             "Servidor GitLab"
+check_infra_service "gitea"                "Servidor Git Gitea"                         "Servidor Git (Gitea)"
 check_infra_service "jenkins"              "Servidor CI/CD Jenkins"                     "Servidor CI/CD (Jenkins)"
+check_infra_service "syncthing"            "Sincronização de Arquivos Syncthing"        "Sincronização (Syncthing)"
+check_infra_service "minio"                "Object Storage S3 MinIO"                    "Storage S3 (MinIO)"
+check_infra_service "plexmediaserver"      "Servidor de Mídia Plex"                     "Media Server (Plex)"
+check_infra_service "jellyfin"             "Servidor de Mídia Jellyfin"                 "Media Server (Jellyfin)"
 check_infra_service "pve-cluster"          "Hypervisor Proxmox VE"                      "Hypervisor Proxmox VE"
 check_infra_service "libvirtd"             "Virtualização KVM / Libvirt"                "Hypervisor KVM/Libvirt"
 check_infra_service "cups"                 "Servidor de Impressão CUPS"                 "Print Server (CUPS)"
@@ -1467,12 +1558,19 @@ fi
 
 if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
     echo -e "\n    ${BOLD}Todos os Serviços (Daemons) em Execução Agora no Systemd (Não-Nativos do SO):${NC}"
-    while IFS= read -r svc_line; do
-        [[ -z "$svc_line" ]] && continue
-        SVC_UNIT=$(echo "$svc_line" | awk '{print $1}')
-        SVC_DESC=$(echo "$svc_line" | cut -d' ' -f5-)
-        echo -e "      • ${FG_GREEN}${SVC_UNIT}${NC} — ${DIM}${SVC_DESC}${NC}"
-    done < <(systemctl list-units --type=service --state=running --no-legend --plain 2>/dev/null | grep -vE "^(systemd-|user@|user-runtime-dir@|getty@|serial-getty@|console-getty|dbus\.service|polkit\.service|rsyslog\.service|syslog\.service|cron\.service|crond\.service|udev|kmod|multipathd|accounts-daemon|udisks2|upower|networkd-dispatcher|ModemManager|wpa_supplicant|avahi-daemon|bluetooth|colord|rtkit-daemon|switcheroo-control|thermald|power-profiles-daemon|irqbalance|packagekit|unattended-upgrades|wsl-pro)" || true)
+    while IFS='|' read -r svc_unit svc_desc; do
+        [[ -z "$svc_unit" ]] && continue
+        svc_base="${svc_unit%.service}"
+        svc_ver=$(get_daemon_version "$svc_base")
+        echo -e "      • ${FG_GREEN}${BOLD}${svc_unit}${NC}${svc_ver:+ (${FG_YELLOW}v${svc_ver}${NC})} — ${DIM}${svc_desc}${NC}"
+        if [[ ! "$svc_base" =~ ^(ssh|sshd|apache2|httpd|nginx|mariadb|mysql|mysqld|postgresql|redis|redis-server|docker|containerd|ufw|firewalld|nftables)$ ]]; then
+            add_unique_item RESUMO_APPS_VERSOES "${svc_base}:${svc_ver:-Ativo}"
+        fi
+    done < <(systemctl list-units --type=service --state=running --no-legend --plain 2>/dev/null | grep -vE "^(systemd-|user@|user-runtime-dir@|getty@|serial-getty@|container-getty@|console-getty|dbus\.service|polkit\.service|rsyslog\.service|syslog\.service|cron\.service|crond\.service|udev|kmod|multipathd|accounts-daemon|udisks2|upower|networkd-dispatcher|ModemManager|wpa_supplicant|avahi-daemon|bluetooth|colord|rtkit-daemon|switcheroo-control|thermald|power-profiles-daemon|irqbalance|packagekit|unattended-upgrades|wsl-pro|networking\.service|ifup@)" | awk '{
+        unit=$1; $1=""; $2=""; $3=""; $4="";
+        sub(/^[ \t]+/, "", $0);
+        print unit "|" $0
+    }' || true)
 fi
 
 # ==============================================================================
@@ -1487,7 +1585,11 @@ if command -v mariadb >/dev/null 2>&1 || command -v mysql >/dev/null 2>&1 || [[ 
     DB_ANY_FOUND=1
     DB_BIN=$(command -v mariadb || command -v mysql || echo "")
     DB_VER="Instalado"
-    [[ -n "$DB_BIN" ]] && DB_VER=$($DB_BIN --version 2>/dev/null || echo "Instalado")
+    DB_SHORT_VER="Instalado"
+    if [[ -n "$DB_BIN" ]]; then
+        DB_VER=$($DB_BIN --version 2>/dev/null || echo "Instalado")
+        DB_SHORT_VER=$(echo "$DB_VER" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-MariaDB)?' | head -n 1 || echo "$DB_VER")
+    fi
     DB_SVC="mariadb"
     for cand_svc in mariadb mysql mysqld; do
         if [[ "$(get_service_status_plain "$cand_svc")" == "Ativo" ]]; then
@@ -1501,15 +1603,16 @@ if command -v mariadb >/dev/null 2>&1 || command -v mysql >/dev/null 2>&1 || [[ 
     MYSQL_DATADIR="/var/lib/mysql"
     MYSQL_SIZE="N/A"
     [[ -d "$MYSQL_DATADIR" ]] && MYSQL_SIZE=$(du -sh "$MYSQL_DATADIR" 2>/dev/null | awk '{print $1}' || echo "N/A")
-    MYSQL_BIND=$(grep -RhE "^\s*bind-address\s*=" /etc/mysql/ /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null | tail -n 1 | cut -d'=' -f2 | xargs || echo "Padrão (127.0.0.1)")
+    MYSQL_BIND=$( (grep -RhE "^\s*bind-address\s*=" /etc/mysql/ /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null || true) | tail -n 1 | cut -d'=' -f2 | xargs || true )
+    [[ -z "$MYSQL_BIND" ]] && MYSQL_BIND="Padrão (127.0.0.1)"
 
-    log_success "MySQL / MariaDB (${DB_SVC}): ${BOLD}${DB_VER}${NC} [$(get_service_status "$DB_SVC")]"
+    log_success "MySQL / MariaDB (${DB_SVC}): ${BOLD}${DB_SHORT_VER}${NC} ${DIM}(${DB_VER})${NC} [$(get_service_status "$DB_SVC")]"
     echo -e "    • ${BOLD}Configuração:${NC} Bind-Address: ${FG_CYAN}${MYSQL_BIND}${NC} | Datadir: ${MYSQL_DATADIR} (Tamanho em disco: ${FG_YELLOW}${MYSQL_SIZE}${NC})"
-    add_unique_item RESUMO_APPS_VERSOES "${DB_SVC}:${DB_VER}"
+    add_unique_item RESUMO_APPS_VERSOES "${DB_SVC}:${DB_SHORT_VER}"
 
     if [[ "$(get_service_status_plain "$DB_SVC")" == "Ativo" ]]; then
-        add_role "Banco de Dados (${DB_SVC})"
-        add_unique_item RESUMO_BANCOS_ATIVOS "Host-${DB_SVC} (${MYSQL_SIZE})"
+        add_role "Banco de Dados (${DB_SVC} ${DB_SHORT_VER})"
+        add_unique_item RESUMO_BANCOS_ATIVOS "Host-${DB_SVC} ${DB_SHORT_VER} (${MYSQL_SIZE})"
     fi
 
     if (( IS_ROOT == 1 )) && [[ -n "$DB_BIN" ]] && [[ "$(get_service_status_plain "$DB_SVC")" == "Ativo" ]]; then
@@ -1676,7 +1779,12 @@ if command -v nft >/dev/null 2>&1 && (( IS_ROOT == 1 )); then
     if [[ -n "$NFT_TABLES" ]]; then
         NFT_COUNT=$(echo "$NFT_TABLES" | wc -l)
         echo -e "    • ${BOLD}NFTables:${NC} ${FG_CYAN}${NFT_COUNT} tabela(s) carregada(s) no kernel${NC} (${DIM}$(echo "$NFT_TABLES" | tr '\n' '; ' | sed 's/; $//')${NC})"
-        if [[ "$(get_service_status_plain nftables)" == "Ativo" ]]; then
+        NFT_RULESET=$(nft list ruleset 2>/dev/null | grep -vE "^\s*$" || true)
+        if [[ -n "$NFT_RULESET" ]]; then
+            echo -e "      ${BOLD}Regras Configuradas no NFTables (Top 25 linhas):${NC}"
+            echo "$NFT_RULESET" | head -n 25 | sed 's/^/        /'
+        fi
+        if [[ "$(get_service_status_plain nftables)" == "Ativo" ]] || echo "$NFT_RULESET" | grep -qiE "policy drop|drop|reject"; then
             FW_ACTIVE_ANY=1
             [[ "$FIREWALL_SUMMARY_STATE" == "INATIVO"* ]] && FIREWALL_SUMMARY_STATE="ATIVO (NFTables)"
         fi
@@ -1940,7 +2048,7 @@ print_header "RESUMO DA INSTALAÇÃO E DIAGNÓSTICO DO SERVIDOR"
 
 ROLES_STR="Servidor Linux Genérico / Sem Serviços de Rede Ativos"
 if (( ${#PAPEIS_DETECTADOS[@]} > 0 )); then
-    ROLES_STR=$(IFS=' + '; echo "${PAPEIS_DETECTADOS[*]}")
+    ROLES_STR=$(printf '%s + ' "${PAPEIS_DETECTADOS[@]}" | sed 's/ + $//')
 fi
 
 APPS_SUMMARY_STR="Nenhuma aplicação principal detectada"
