@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.5
+# Version: 2.6
 # ------------------------------------------------
-VERSION="2.5"
+VERSION="2.6"
 # ==============================================================================
 # AUDITORIA, VARREDURA E INVENTÁRIO 360° DO SERVIDOR LINUX (MULTI-DISTRO)
 # ==============================================================================
@@ -141,6 +141,7 @@ RESUMO_CONTAINERS_ATIVOS=()
 RESUMO_USUARIOS_SUDO=()
 RESUMO_GRUPOS_SUDO=()
 RESUMO_STORAGE_REDE=()
+RESUMO_CERTBOT_STATUS="Não instalado / Sem certificados Let's Encrypt"
 PACOTES_INSTALADOS=()
 
 add_role() {
@@ -930,27 +931,158 @@ done
 
 (( WEB_FOUND == 0 )) && log_info "Nenhum servidor web tradicional (Apache/Nginx/Caddy/HAProxy) instalado diretamente no host."
 
+# 4.1.1 - Auditoria Completa do Certbot, Renovação Automática e Certificados SSL/TLS
+echo -e "\n  ${BOLD}4.1.1 Auditoria do Certbot, Renovação Automática e Certificados SSL/TLS:${NC}"
+CERTBOT_BIN=""
+for cb_cand in "$(command -v certbot 2>/dev/null || true)" /snap/bin/certbot /usr/bin/certbot /usr/local/bin/certbot /opt/certbot/bin/certbot; do
+    if [[ -n "$cb_cand" && -x "$cb_cand" ]]; then
+        CERTBOT_BIN="$cb_cand"
+        break
+    fi
+done
+
+CERTBOT_VER=""
+CERTBOT_ORIGIN=""
+if [[ -n "$CERTBOT_BIN" ]]; then
+    CERTBOT_REAL=$(readlink -f "$CERTBOT_BIN" 2>/dev/null || echo "$CERTBOT_BIN")
+    CERTBOT_VER=$("$CERTBOT_BIN" --version 2>&1 | head -n 1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n 1 || "$CERTBOT_BIN" --version 2>&1 | head -n 1 || echo "Instalado")
+    if [[ "$CERTBOT_BIN" == /snap/* || "$CERTBOT_REAL" == *snap* ]]; then
+        CERTBOT_ORIGIN="Pacote Snap (${CERTBOT_BIN})"
+    elif [[ "$CERTBOT_BIN" == /opt/* ]]; then
+        CERTBOT_ORIGIN="Virtualenv / PIP (${CERTBOT_BIN})"
+    else
+        CERTBOT_ORIGIN="Pacote do Sistema (${CERTBOT_BIN})"
+    fi
+    log_success "Certbot Detectado: ${BOLD}v${CERTBOT_VER}${NC} — Origem: ${FG_CYAN}${CERTBOT_ORIGIN}${NC}"
+    add_unique_item RESUMO_APPS_VERSOES "Certbot:${CERTBOT_VER}"
+else
+    echo -e "    • ${BOLD}Aplicação Certbot:${NC} ${DIM}Não instalado no host${NC}"
+fi
+
+# Verificação de Renovação Automática do Certbot (Systemd Timers + Cron)
+RENEW_ACTIVE=0
+RENEW_MECHANISMS=()
+
+if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+    for cb_timer in certbot.timer snap.certbot.renew.timer certbot-renew.timer; do
+        if systemctl is-active --quiet "$cb_timer" 2>/dev/null; then
+            RENEW_ACTIVE=1
+            T_NEXT=$(systemctl show "$cb_timer" -p NextElapseUSecRealtime --value 2>/dev/null || true)
+            T_LAST=$(systemctl show "$cb_timer" -p LastTriggerUSec --value 2>/dev/null || true)
+            RENEW_MECHANISMS+=("Systemd Timer ATIVO: ${cb_timer} (Última: ${T_LAST:-N/A} | Próxima: ${T_NEXT:-N/A})")
+        elif systemctl is-enabled --quiet "$cb_timer" 2>/dev/null; then
+            RENEW_MECHANISMS+=("Systemd Timer HABILITADO (porém inativo agora): ${cb_timer}")
+        fi
+    done
+fi
+
+if [[ -f /etc/cron.d/certbot ]]; then
+    CRON_CB_LINE=$(grep -vE "^\s*#|^\s*$|^(SHELL|PATH|MAILTO)=" /etc/cron.d/certbot 2>/dev/null | head -n 1 || true)
+    if [[ -n "$CRON_CB_LINE" ]]; then
+        if [[ -d /run/systemd/system ]] && echo "$CRON_CB_LINE" | grep -q "test -d /run/systemd/system"; then
+            RENEW_MECHANISMS+=("Cron (/etc/cron.d/certbot): Presente (delega ao systemd timer quando systemd está ativo)")
+        else
+            RENEW_ACTIVE=1
+            RENEW_MECHANISMS+=("Cron Ativo (/etc/cron.d/certbot): ${CRON_CB_LINE}")
+        fi
+    fi
+fi
+
+for cron_cb_script in /etc/cron.daily/certbot /etc/cron.weekly/certbot; do
+    if [[ -x "$cron_cb_script" ]]; then
+        RENEW_ACTIVE=1
+        RENEW_MECHANISMS+=("Script Cron Periódico: ${cron_cb_script}")
+    fi
+done
+
+USER_CRON_CB=$(grep -RhsE "certbot\s+renew|letsencrypt\s+renew|acme\.sh\s+--cron" /etc/crontab /etc/cron.d/* /var/spool/cron/crontabs/* /var/spool/cron/* 2>/dev/null | grep -vE "^\s*#" | grep -v "test -d /run/systemd/system" | head -n 3 || true)
+if [[ -n "$USER_CRON_CB" ]]; then
+    RENEW_ACTIVE=1
+    while IFS= read -r ucb; do
+        [[ -n "$ucb" ]] && RENEW_MECHANISMS+=("Crontab Customizado: ${ucb}")
+    done <<< "$USER_CRON_CB"
+fi
+
+if [[ -n "$CERTBOT_BIN" || -d /etc/letsencrypt/live ]]; then
+    if (( RENEW_ACTIVE == 1 )); then
+        echo -e "    • ${BOLD}Renovação Automática:${NC} ${FG_GREEN}${BOLD}ATIVA${NC}"
+        for rm_item in "${RENEW_MECHANISMS[@]}"; do
+            echo -e "      ├─ ${FG_CYAN}${rm_item}${NC}"
+        done
+    else
+        echo -e "    • ${BOLD}Renovação Automática:${NC} ${FG_RED}${BOLD}INATIVA / NÃO CONFIGURADA${NC}"
+        for rm_item in "${RENEW_MECHANISMS[@]:-}"; do
+            [[ -n "$rm_item" ]] && echo -e "      ├─ ${FG_YELLOW}${rm_item}${NC}"
+        done
+        if [[ -d /etc/letsencrypt/live ]]; then
+            add_alert "Certbot possui diretório /etc/letsencrypt/live, mas a renovação automática (Timer/Cron) está INATIVA!"
+        fi
+    fi
+
+    # Hooks globais de renovação
+    if [[ -d /etc/letsencrypt/renewal-hooks ]]; then
+        HOOK_FILES=$(find /etc/letsencrypt/renewal-hooks -type f 2>/dev/null | tr '\n' ' ' | sed 's/ $//' || true)
+        [[ -n "$HOOK_FILES" ]] && echo -e "    • ${BOLD}Hooks Globais (/etc/letsencrypt/renewal-hooks):${NC} ${DIM}${HOOK_FILES}${NC}"
+    fi
+fi
+
+# Inventário detalhado de todos os certificados em /etc/letsencrypt/live
+CERT_COUNT=0
 if [[ -d /etc/letsencrypt/live ]] && command -v openssl >/dev/null 2>&1; then
-    CERT_COUNT=0
     for cert_pem in /etc/letsencrypt/live/*/cert.pem; do
         [[ -f "$cert_pem" ]] || continue
         CERT_COUNT=$((CERT_COUNT + 1))
-        (( CERT_COUNT == 1 )) && echo -e "\n    ${BOLD}Certificados SSL/TLS (Let's Encrypt):${NC}"
-        CERT_DOMAIN=$(basename "$(dirname "$cert_pem")")
+        (( CERT_COUNT == 1 )) && echo -e "\n    ${BOLD}Certificados Gerenciados em /etc/letsencrypt/live (Local, Validade e Renovação):${NC}"
+
+        CERT_DIR=$(dirname "$cert_pem")
+        CERT_DOMAIN=$(basename "$CERT_DIR")
+        FULLCHAIN_PATH="${CERT_DIR}/fullchain.pem"
+        PRIVKEY_PATH="${CERT_DIR}/privkey.pem"
+        REAL_ARCHIVE=$(readlink -f "$FULLCHAIN_PATH" 2>/dev/null || echo "$FULLCHAIN_PATH")
+        RENEWAL_CONF="/etc/letsencrypt/renewal/${CERT_DOMAIN}.conf"
+
+        START_DATE=$(openssl x509 -startdate -noout -in "$cert_pem" 2>/dev/null | cut -d'=' -f2 || true)
         END_DATE=$(openssl x509 -enddate -noout -in "$cert_pem" 2>/dev/null | cut -d'=' -f2 || true)
+        ISSUER_STR=$(openssl x509 -issuer -noout -in "$cert_pem" 2>/dev/null | sed 's/^issuer=//' | xargs || true)
+        SAN_DOMAINS=$(openssl x509 -noout -ext subjectAltName -in "$cert_pem" 2>/dev/null | grep -oE 'DNS:[^, ]+' | sed 's/DNS://g' | xargs || true)
+
         END_EPOCH=$(date -d "$END_DATE" +%s 2>/dev/null || echo 0)
         NOW_EPOCH=$(date +%s)
         DAYS_LEFT=$(( (END_EPOCH - NOW_EPOCH) / 86400 ))
+
+        VAL_STATUS_STR=""
         if (( DAYS_LEFT < 0 )); then
-            echo -e "      • ${BOLD}${CERT_DOMAIN}:${NC} ${FG_RED}EXPIRADO há $(( -DAYS_LEFT )) dia(s) (${END_DATE})${NC}"
-            add_alert "Certificado SSL do domínio ${CERT_DOMAIN} está EXPIRADO!"
+            VAL_STATUS_STR="${FG_RED}${BOLD}EXPIRADO há $(( -DAYS_LEFT )) dia(s)${NC} (Expirou em: ${END_DATE})"
+            add_alert "Certificado SSL '${CERT_DOMAIN}' está EXPIRADO desde ${END_DATE}!"
         elif (( DAYS_LEFT < 15 )); then
-            echo -e "      • ${BOLD}${CERT_DOMAIN}:${NC} ${FG_YELLOW}Expira em ${DAYS_LEFT} dia(s) (${END_DATE})${NC}"
-            add_alert "Certificado SSL do domínio ${CERT_DOMAIN} expira em ${DAYS_LEFT} dias."
+            VAL_STATUS_STR="${FG_YELLOW}${BOLD}EXPIRA EM BREVE (${DAYS_LEFT} dia(s) restantes)${NC} (Expira em: ${END_DATE})"
+            add_alert "Certificado SSL '${CERT_DOMAIN}' expira em ${DAYS_LEFT} dias (${END_DATE})."
         else
-            echo -e "      • ${BOLD}${CERT_DOMAIN}:${NC} ${FG_GREEN}Válido por ${DAYS_LEFT} dias${NC} ${DIM}(Expira: ${END_DATE})${NC}"
+            VAL_STATUS_STR="${FG_GREEN}${BOLD}VÁLIDO (${DAYS_LEFT} dias restantes)${NC} — Emissão: ${START_DATE} | Expira: ${END_DATE}"
+        fi
+
+        echo -e "      • ${FG_CYAN}${BOLD}Certificado [${CERT_DOMAIN}]${NC} — Status: ${VAL_STATUS_STR}"
+        echo -e "        ├─ ${BOLD}Domínios Cobertos (SAN):${NC} ${FG_YELLOW}${SAN_DOMAINS:-$CERT_DOMAIN}${NC}"
+        echo -e "        ├─ ${BOLD}Emissor (Autoridade):${NC}    ${DIM}${ISSUER_STR:-Lets Encrypt}${NC}"
+        echo -e "        ├─ ${BOLD}Local do Certificado:${NC}    ${FG_GREEN}${FULLCHAIN_PATH}${NC} ${DIM}(-> ${REAL_ARCHIVE})${NC}"
+        echo -e "        ├─ ${BOLD}Local da Chave Privada:${NC}  ${FG_CYAN}${PRIVKEY_PATH}${NC}"
+
+        if [[ -r "$RENEWAL_CONF" ]]; then
+            CB_AUTH=$(awk -F'=' '/^\s*authenticator\s*=/ {gsub(/[ \t]/,"",$2); print $2}' "$RENEWAL_CONF" 2>/dev/null | head -n 1 || true)
+            CB_INST=$(awk -F'=' '/^\s*installer\s*=/ {gsub(/[ \t]/,"",$2); print $2}' "$RENEWAL_CONF" 2>/dev/null | head -n 1 || true)
+            CB_WEBROOT=$(awk -F'=' '/^\s*webroot_path\s*=/ {gsub(/[ \t,]/,"",$2); print $2}' "$RENEWAL_CONF" 2>/dev/null | head -n 1 || true)
+            CB_HOOK=$(awk -F'=' '/^\s*(renew_hook|post_hook|deploy_hook)\s*=/ {sub(/^[^=]+=\s*/,""); print $0}' "$RENEWAL_CONF" 2>/dev/null | head -n 1 || true)
+            echo -e "        └─ ${BOLD}Config de Renovação:${NC}     ${RENEWAL_CONF} (Plugin Auth: ${FG_YELLOW}${CB_AUTH:-N/A}${NC} | Installer: ${CB_INST:-None}${CB_WEBROOT:+ | Webroot: $CB_WEBROOT}${CB_HOOK:+ | Hook: $CB_HOOK})"
+        else
+            echo -e "        └─ ${BOLD}Config de Renovação:${NC}     ${FG_YELLOW}Arquivo ${RENEWAL_CONF} não encontrado${NC}"
         fi
     done
+fi
+
+if [[ -n "$CERTBOT_BIN" || "$CERT_COUNT" -gt 0 ]]; then
+    RENEW_TAG="INATIVA"
+    (( RENEW_ACTIVE == 1 )) && RENEW_TAG="ATIVA"
+    RESUMO_CERTBOT_STATUS="Certbot v${CERTBOT_VER:-N/A} | ${CERT_COUNT} certificado(s) em /etc/letsencrypt/live | Auto-Renew: ${RENEW_TAG}"
 fi
 
 # 4.2 - Diagnóstico Profundo do PHP no Host (Versões, FPM, CGI, mod_php, php.ini e EOL)
@@ -1140,8 +1272,112 @@ fi
 
 # 4.4 - Aplicações Web, CMSs e Sistemas Instalados no Disco (Quais e Versões)
 echo -e "\n  ${BOLD}4.4 Aplicações Web, CMSs e Sistemas Identificados no Disco (Quais e Versões):${NC}"
-SCAN_DIRS=("/var/www" "/srv" "/home" "/opt" "/usr/share/zabbix" "/usr/share/glpi" "/usr/share/roundcube")
+SCAN_DIRS=("/var/www" "/srv" "/home" "/opt" "/usr/share/nextcloud" "/usr/share/zabbix" "/usr/share/glpi" "/usr/share/roundcube")
 FOUND_APPS=0
+
+audit_nextcloud_dir() {
+    local app_dir="$1" ver_file="$2" cfg_file="$3" install_type="${4:-Diretório Web Host}"
+    local nc_ver nc_chan nc_datadir nc_dbtype nc_dbname nc_dbhost nc_dbuser nc_url nc_maint nc_mem_local nc_mem_lock nc_domains nc_proxies
+
+    nc_ver=$(grep "\$OC_VersionString" "$ver_file" 2>/dev/null | cut -d"'" -f2 || echo "Detectado")
+    nc_chan=$(grep "\$OC_Channel" "$ver_file" 2>/dev/null | cut -d"'" -f2 || true)
+
+    nc_datadir=""
+    nc_dbtype=""
+    nc_dbname=""
+    nc_dbhost=""
+    nc_dbuser=""
+    nc_url=""
+    nc_maint="false"
+    nc_mem_local=""
+    nc_mem_lock=""
+    nc_domains=""
+    nc_proxies=""
+
+    if [[ -r "$cfg_file" ]]; then
+        nc_datadir=$(awk -F"=>" '/['"'"'"]datadirectory['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+        nc_dbtype=$(awk -F"=>" '/['"'"'"]dbtype['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+        nc_dbname=$(awk -F"=>" '/['"'"'"]dbname['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+        nc_dbhost=$(awk -F"=>" '/['"'"'"]dbhost['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+        nc_dbuser=$(awk -F"=>" '/['"'"'"]dbuser['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+        nc_url=$(awk -F"=>" '/['"'"'"]overwrite\.cli\.url['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+        nc_maint=$(awk -F"=>" '/['"'"'"]maintenance['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print tolower(val); exit}' "$cfg_file" 2>/dev/null || true)
+        nc_mem_local=$(awk -F"=>" '/['"'"'"]memcache\.local['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); gsub(/\\\\/, "\\", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+        nc_mem_lock=$(awk -F"=>" '/['"'"'"]memcache\.locking['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); gsub(/\\\\/, "\\", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+
+        nc_domains=$(awk '
+            /['"'"'"]trusted_domains['"'"'"]\s*=>/ { in_td=1; next }
+            in_td && /\)/ { in_td=0 }
+            in_td && /=>/ {
+                split($0, a, "=>")
+                v=a[2]; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", v)
+                if (v != "") printf "%s, ", v
+            }
+        ' "$cfg_file" 2>/dev/null | sed 's/, $//' || true)
+
+        nc_proxies=$(awk '
+            /['"'"'"]trusted_proxies['"'"'"]\s*=>/ { in_tp=1; next }
+            in_tp && /\)/ { in_tp=0 }
+            in_tp && /=>/ {
+                split($0, a, "=>")
+                v=a[2]; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", v)
+                if (v != "") printf "%s, ", v
+            }
+        ' "$cfg_file" 2>/dev/null | sed 's/, $//' || true)
+    fi
+
+    echo -e "    • ${FG_GREEN}${BOLD}Nextcloud v${nc_ver}${NC}${nc_chan:+ (Canal: ${nc_chan})} — Tipo: ${FG_CYAN}${install_type}${NC}"
+    echo -e "      ├─ ${BOLD}Caminho da Aplicação:${NC}  ${FG_CYAN}${app_dir}${NC} (Config: ${cfg_file})"
+
+    if [[ "$nc_maint" == "true" || "$nc_maint" == "1" ]]; then
+        echo -e "      ├─ ${BOLD}Modo de Manutenção:${NC}    ${FG_RED}${BOLD}ATIVO (maintenance => true — Sistema bloqueado para usuários!)${NC}"
+        add_alert "Nextcloud em ${app_dir} está com Modo de Manutenção ATIVO (maintenance => true)."
+    else
+        echo -e "      ├─ ${BOLD}Modo de Manutenção:${NC}    ${FG_GREEN}Desativado (Operacional)${NC}"
+    fi
+
+    if [[ -n "$nc_datadir" ]]; then
+        local dd_info=""
+        if [[ -d "$nc_datadir" ]]; then
+            local dd_size dd_df
+            dd_size=$(timeout 3 du -sh "$nc_datadir" 2>/dev/null | awk '{print $1}' || true)
+            dd_df=$(df -h "$nc_datadir" 2>/dev/null | awk 'NR==2 {print "Partição " $6 ": " $3 " usados de " $2 " (" $5 " cheio, Livre: " $4 ")"}' || true)
+            dd_info="${dd_size:+ — Tamanho Dados: ${FG_YELLOW}${dd_size}${NC}}${dd_df:+ | ${DIM}${dd_df}${NC}}"
+        else
+            dd_info=" ${FG_RED}(Diretório não encontrado ou desmontado!)${NC}"
+            add_alert "Diretório de dados do Nextcloud (${nc_datadir}) não foi encontrado ou está desmontado!"
+        fi
+        echo -e "      ├─ ${BOLD}Diretório de Dados:${NC}    ${FG_GREEN}${nc_datadir}${NC}${dd_info}"
+    fi
+
+    [[ -n "$nc_domains" || -n "$nc_url" ]] && echo -e "      ├─ ${BOLD}Domínios Confiáveis:${NC}   ${FG_YELLOW}${nc_domains:-N/A}${NC}${nc_url:+ (URL CLI: ${FG_CYAN}${nc_url}${NC})}"
+    [[ -n "$nc_proxies" ]] && echo -e "      ├─ ${BOLD}Trusted Proxies:${NC}       ${FG_CYAN}${nc_proxies}${NC}"
+    [[ -n "$nc_dbtype" || -n "$nc_dbname" ]] && echo -e "      ├─ ${BOLD}Banco Configurado:${NC}     Tipo: ${FG_YELLOW}${nc_dbtype:-N/A}${NC} | Base: ${FG_CYAN}${nc_dbname:-N/A}${NC} | Host: ${nc_dbhost:-localhost} | Usuário: ${nc_dbuser:-N/A}"
+    [[ -n "$nc_mem_local" || -n "$nc_mem_lock" ]] && echo -e "      ├─ ${BOLD}Cache / Memcache:${NC}      Local: ${FG_CYAN}${nc_mem_local:-Não configurado}${NC} | Locking: ${FG_CYAN}${nc_mem_lock:-Não configurado}${NC}"
+
+    # Verifica Cron / Background Job do Nextcloud
+    local nc_cron_status="${FG_YELLOW}Não identificado em crontabs/timers (pode estar em modo AJAX)${NC}"
+    if grep -Rqs "cron\.php" /var/spool/cron/crontabs/ /var/spool/cron/ /etc/crontab /etc/cron.d/ 2>/dev/null; then
+        nc_cron_status="${FG_GREEN}Ativo via Crontab (cron.php)${NC}"
+    elif command -v systemctl >/dev/null 2>&1 && systemctl list-timers --all 2>/dev/null | grep -qiE "nextcloud"; then
+        nc_cron_status="${FG_GREEN}Ativo via Systemd Timer${NC}"
+    fi
+    echo -e "      └─ ${BOLD}Background Jobs (Cron):${NC} ${nc_cron_status}"
+
+    add_role "Storage Nuvem (Nextcloud ${nc_ver})"
+    add_unique_item RESUMO_APPS_VERSOES "Nextcloud:${nc_ver}"
+    add_unique_item RESUMO_SITES_DETECTADOS "Nextcloud v${nc_ver}: ${app_dir}${nc_domains:+ (Domínios: $nc_domains)}${nc_datadir:+ [Dados: $nc_datadir]}"
+}
+
+# Verifica instalação do Nextcloud via Pacote SNAP (/var/snap/nextcloud)
+if [[ -d /var/snap/nextcloud/current ]] || [[ -f /snap/nextcloud/current/htdocs/version.php ]]; then
+    SNAP_NC_VER_FILE="/snap/nextcloud/current/htdocs/version.php"
+    SNAP_NC_CFG_FILE="/var/snap/nextcloud/current/nextcloud/config/config.php"
+    if [[ -f "$SNAP_NC_VER_FILE" ]]; then
+        audit_nextcloud_dir "/snap/nextcloud/current/htdocs" "$SNAP_NC_VER_FILE" "$SNAP_NC_CFG_FILE" "Pacote Snap (nextcloud)"
+        FOUND_APPS=$((FOUND_APPS + 1))
+    fi
+fi
 
 for base_dir in "${SCAN_DIRS[@]}"; do
     [[ -d "$base_dir" ]] || continue
@@ -1236,11 +1472,7 @@ for base_dir in "${SCAN_DIRS[@]}"; do
             */version.php)
                 if grep -q "\$OC_VersionString" "$special_marker" 2>/dev/null; then
                     APP_DIR=$(dirname "$special_marker")
-                    NC_V=$(grep "\$OC_VersionString" "$special_marker" 2>/dev/null | cut -d"'" -f2 || echo "Detectado")
-                    echo -e "    • ${FG_GREEN}${BOLD}Nextcloud / ownCloud v${NC_V}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
-                    add_role "Storage Nuvem (Nextcloud ${NC_V})"
-                    add_unique_item RESUMO_APPS_VERSOES "Nextcloud:${NC_V}"
-                    add_unique_item RESUMO_SITES_DETECTADOS "Nextcloud ${NC_V}: ${APP_DIR}"
+                    audit_nextcloud_dir "$APP_DIR" "$special_marker" "${APP_DIR}/config/config.php" "Diretório Web Host"
                     FOUND_APPS=$((FOUND_APPS + 1))
                 elif grep -q "MOODLE_INTERNAL" "$special_marker" 2>/dev/null && [[ -f "$(dirname "$special_marker")/config.php" ]]; then
                     APP_DIR=$(dirname "$special_marker")
@@ -1392,6 +1624,17 @@ if [[ -n "$CONTAINER_ENGINE" ]]; then
                     done
                     for art in "$wdir"/artisan "$wdir"/*/artisan; do
                         [ -f "$art" ] && echo "APP|Laravel|$(dirname "$art")"
+                    done
+                    for ncv in "$wdir"/version.php "$wdir"/*/version.php; do
+                        if [ -f "$ncv" ] && grep -q "\$OC_VersionString" "$ncv" 2>/dev/null; then
+                            nc_d=$(dirname "$ncv")
+                            nc_ver_s=$(grep "\$OC_VersionString" "$ncv" 2>/dev/null | awk -F"=" "{print \$2}" | tr -d " ;\"\047")
+                            nc_dd=""
+                            if [ -r "${nc_d}/config/config.php" ]; then
+                                nc_dd=$(grep "datadirectory" "${nc_d}/config/config.php" 2>/dev/null | awk -F"=>" "{print \$2}" | tr -d " ,;\"\047")
+                            fi
+                            echo "APP|Nextcloud v${nc_ver_s:-Detectado}|${nc_d}${nc_dd:+ (Dados: $nc_dd)}"
+                        fi
                     done
                 done
             ' </dev/null 2>/dev/null || true)
@@ -2108,6 +2351,7 @@ print_summary "   Grupos com Sudo:"         "${SUDO_GROUPS_STR}" "$FG_CYAN"
 print_summary "3. NFS / Samba / LDAP:"      "${STORAGE_REDE_STR}" "$FG_CYAN"
 print_summary "4. Papel do Servidor:"       "${ROLES_STR}" "$FG_YELLOW"
 print_summary "   Aplicações e Versões:"    "${APPS_SUMMARY_STR}" "$FG_GREEN"
+print_summary "   Certbot / SSL:"           "${RESUMO_CERTBOT_STATUS}" "$FG_CYAN"
 print_summary "   PHP (Host + Containers):" "${PHP_SUMMARY_STR}" "$PHP_SUMMARY_COLOR"
 print_summary "   Containers em Execução:"  "${#RESUMO_CONTAINERS_ATIVOS[@]} ativo(s)" "$FG_CYAN"
 print_summary "5. Bancos de Dados:"         "${DB_SUMMARY_STR}" "$FG_CYAN"
