@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.6
+# Version: 2.7
 # ------------------------------------------------
-VERSION="2.6"
+VERSION="2.7"
 # ==============================================================================
 # AUDITORIA, VARREDURA E INVENTÁRIO 360° DO SERVIDOR LINUX (MULTI-DISTRO)
 # ==============================================================================
@@ -847,6 +847,26 @@ print_header "4. APLICAÇÕES, SERVIDORES WEB, PHP, RUNTIMES E CONTAINERS (QUAIS
 # 4.1 - Servidores Web, Proxies Reversos e Balanceadores (Quais e Versões)
 echo -e "  ${BOLD}4.1 Servidores Web, Proxies Reversos e Balanceadores (Quais e Versões):${NC}"
 WEB_FOUND=0
+DISCOVERED_WEB_ROOTS=()
+
+add_web_root() {
+    local raw_dir="${1:-}"
+    [[ -z "$raw_dir" ]] && return 0
+    raw_dir="${raw_dir%\"}"
+    raw_dir="${raw_dir#\"}"
+    raw_dir="${raw_dir%\'}"
+    raw_dir="${raw_dir#\'}"
+    raw_dir="${raw_dir%/}"
+    [[ -z "$raw_dir" || "$raw_dir" == "/" ]] && return 0
+    if [[ -d "$raw_dir" ]]; then
+        add_unique_item DISCOVERED_WEB_ROOTS "$raw_dir"
+        local parent_dir
+        parent_dir=$(dirname "$raw_dir")
+        if [[ -n "$parent_dir" && "$parent_dir" != "/" && "$parent_dir" != "/usr" && "$parent_dir" != "/usr/share" && -d "$parent_dir" ]]; then
+            add_unique_item DISCOVERED_WEB_ROOTS "$parent_dir"
+        fi
+    fi
+}
 
 if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
     WEB_FOUND=1
@@ -873,18 +893,92 @@ if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
     APACHE_SITES_COUNT=0
     for vhost_file in /etc/apache2/sites-enabled/* /etc/httpd/conf.d/*.conf /etc/apache2/vhosts.d/*.conf; do
         [[ -f "$vhost_file" ]] || continue
-        APACHE_SITES_COUNT=$((APACHE_SITES_COUNT + 1))
-        VH_NAME=$(grep -iE "^\s*ServerName\s+" "$vhost_file" 2>/dev/null | awk '{print $2}' | tr -d ';' | xargs || true)
-        VH_ALIAS=$(grep -iE "^\s*ServerAlias\s+" "$vhost_file" 2>/dev/null | sed -E 's/^\s*ServerAlias\s+//I' | xargs || true)
-        VH_ROOT=$(grep -iE "^\s*DocumentRoot\s+" "$vhost_file" 2>/dev/null | awk '{print $2}' | tr -d '"' | head -n 1 || true)
-        VH_PROXY=$(grep -iE "^\s*ProxyPass\s+" "$vhost_file" 2>/dev/null | grep -v "!" | awk '{print $2 " -> " $3}' | head -n 2 | xargs || true)
+        VH_BLOCKS=$(awk '
+            BEGIN { IGNORECASE=1; in_vh=0 }
+            /^[ \t]*#/ { next }
+            /<VirtualHost[^>]*>/ {
+                in_vh=1
+                vh_hdr=$0
+                sub(/.*<VirtualHost[ \t]+/, "", vh_hdr)
+                sub(/>.*/, "", vh_hdr)
+                gsub(/[ \t\r]+/, " ", vh_hdr)
+                sname=""; salias=""; docroot=""; proxy=""; sslcert=""
+                next
+            }
+            /<\/VirtualHost>/ {
+                if (in_vh) {
+                    print vh_hdr "|" sname "|" salias "|" docroot "|" proxy "|" sslcert
+                    in_vh=0
+                }
+                next
+            }
+            in_vh {
+                line=$0
+                sub(/^[ \t]+/, "", line)
+                sub(/[ \t\r]+$/, "", line)
+                if (tolower(line) ~ /^servername[ \t]+/) {
+                    sub(/^[Ss][Ee][Rr][Vv][Ee][Rr][Nn][Aa][Mm][Ee][ \t]+/, "", line)
+                    gsub(/[";]/, "", line)
+                    sname=line
+                } else if (tolower(line) ~ /^serveralias[ \t]+/) {
+                    sub(/^[Ss][Ee][Rr][Vv][Ee][Rr][Aa][Ll][Ii][Aa][Ss][ \t]+/, "", line)
+                    gsub(/[";]/, "", line)
+                    salias=(salias ? salias " " line : line)
+                } else if (tolower(line) ~ /^documentroot[ \t]+/) {
+                    sub(/^[Dd][Oo][Cc][Uu][Mm][Ee][Nn][Tt][Rr][Oo][Oo][Tt][ \t]+/, "", line)
+                    gsub(/[";]/, "", line)
+                    docroot=line
+                } else if (tolower(line) ~ /^proxypass[ \t]+/ && line !~ /!/) {
+                    sub(/^[Pp][Rr][Oo][Xx][Yy][Pp][Aa][Ss][Ss][ \t]+/, "", line)
+                    proxy=(proxy ? proxy "; " line : line)
+                } else if (tolower(line) ~ /^sslcertificatefile[ \t]+/) {
+                    sub(/^[Ss][Ss][Ll][Cc][Ee][Rr][Tt][Ii][Ff][Ii][Cc][Aa][Tt][Ee][Ff][Ii][Ll][Ee][ \t]+/, "", line)
+                    gsub(/[";]/, "", line)
+                    sslcert=line
+                }
+            }
+        ' "$vhost_file" 2>/dev/null || true)
+
         VH_PHP_FPM=$(grep -iE "SetHandler\s+.*proxy:(unix|fcgi):" "$vhost_file" 2>/dev/null | grep -oE "php[0-9.]*-?fpm|unix:[^|\"']+|fcgi://[^\"']+" | head -n 1 || true)
 
-        echo -e "      • Arquivo: ${FG_CYAN}$(basename "$vhost_file")${NC} | ServerName: ${FG_YELLOW}${VH_NAME:-Padrão/ Sem ServerName}${NC}${VH_ALIAS:+ (Alias: $VH_ALIAS)}"
-        [[ -n "$VH_ROOT" ]]    && echo -e "        ├─ DocumentRoot: ${FG_GREEN}${VH_ROOT}${NC}"
-        [[ -n "$VH_PROXY" ]]   && echo -e "        ├─ ProxyPass:    ${FG_CYAN}${VH_PROXY}${NC}"
-        [[ -n "$VH_PHP_FPM" ]] && echo -e "        └─ Handler PHP:  ${FG_YELLOW}${VH_PHP_FPM}${NC}"
-        add_unique_item RESUMO_SITES_DETECTADOS "Apache: ${VH_NAME:-$(basename "$vhost_file")} (${VH_ROOT:-${VH_PROXY:-N/A}})"
+        if [[ -n "$VH_BLOCKS" ]]; then
+            while IFS='|' read -r vh_hdr vh_name vh_alias vh_root vh_proxy vh_ssl; do
+                [[ -z "$vh_hdr" && -z "$vh_name" && -z "$vh_root" ]] && continue
+                APACHE_SITES_COUNT=$((APACHE_SITES_COUNT + 1))
+                echo -e "      • Arquivo: ${FG_CYAN}$(basename "$vhost_file")${NC} [${DIM}${vh_hdr:-*}${NC}] | ServerName: ${FG_YELLOW}${vh_name:-Padrão/Sem ServerName}${NC}${vh_alias:+ (Alias: $vh_alias)}"
+                if [[ -n "$vh_root" ]]; then
+                    echo -e "        ├─ DocumentRoot: ${FG_GREEN}${vh_root}${NC}"
+                    add_web_root "$vh_root"
+                fi
+                [[ -n "$vh_proxy" ]]   && echo -e "        ├─ ProxyPass:    ${FG_CYAN}${vh_proxy}${NC}"
+                [[ -n "$vh_ssl" ]]     && echo -e "        ├─ Cert SSL:     ${DIM}${vh_ssl}${NC}"
+                [[ -n "$VH_PHP_FPM" ]] && echo -e "        └─ Handler PHP:  ${FG_YELLOW}${VH_PHP_FPM}${NC}"
+                add_unique_item RESUMO_SITES_DETECTADOS "Apache: ${vh_name:-$(basename "$vhost_file")} (${vh_root:-${vh_proxy:-N/A}})"
+            done <<< "$VH_BLOCKS"
+        else
+            VH_NAME=$(grep -iE "^\s*ServerName\s+" "$vhost_file" 2>/dev/null | awk '{print $2}' | tr -d ';' | xargs || true)
+            VH_ROOT=$(grep -iE "^\s*DocumentRoot\s+" "$vhost_file" 2>/dev/null | awk '{print $2}' | tr -d '"' | head -n 1 || true)
+            if [[ -n "$VH_NAME" || -n "$VH_ROOT" ]]; then
+                APACHE_SITES_COUNT=$((APACHE_SITES_COUNT + 1))
+                echo -e "      • Arquivo: ${FG_CYAN}$(basename "$vhost_file")${NC} | ServerName: ${FG_YELLOW}${VH_NAME:-Padrão}${NC}"
+                if [[ -n "$VH_ROOT" ]]; then
+                    echo -e "        └─ DocumentRoot: ${FG_GREEN}${VH_ROOT}${NC}"
+                    add_web_root "$VH_ROOT"
+                fi
+                add_unique_item RESUMO_SITES_DETECTADOS "Apache: ${VH_NAME:-$(basename "$vhost_file")} (${VH_ROOT:-N/A})"
+            fi
+        fi
+
+        # Captura também diretivas Alias em arquivos do Apache (ex: Alias /nextcloud /arquivos/sistema/nextcloud)
+        while IFS= read -r alias_dir; do
+            [[ -n "$alias_dir" ]] && add_web_root "$alias_dir"
+        done < <(awk 'IGNORECASE=1; /^[ \t]*Alias[ \t]+/ {gsub(/["'\'';\r]/, "", $3); print $3}' "$vhost_file" 2>/dev/null || true)
+    done
+    for conf_en in /etc/apache2/conf-enabled/*.conf /etc/httpd/conf.d/*.conf; do
+        [[ -f "$conf_en" ]] || continue
+        while IFS= read -r alias_dir; do
+            [[ -n "$alias_dir" ]] && add_web_root "$alias_dir"
+        done < <(awk 'IGNORECASE=1; /^[ \t]*Alias[ \t]+/ {gsub(/["'\'';\r]/, "", $3); print $3}' "$conf_en" 2>/dev/null || true)
     done
     (( APACHE_SITES_COUNT == 0 )) && echo -e "      • Nenhum arquivo de VirtualHost dedicado encontrado."
     echo -e ""
@@ -905,9 +999,13 @@ if command -v nginx >/dev/null 2>&1; then
         [[ -f "$conf" ]] || continue
         NGINX_SITES_COUNT=$((NGINX_SITES_COUNT + 1))
         DOMAINS=$(grep -E "^\s*server_name\s+" "$conf" 2>/dev/null | sed -E 's/^\s*server_name\s+//; s/;//g' | xargs || true)
-        DOC_ROOT=$(grep -E "^\s*root\s+" "$conf" 2>/dev/null | sed -E 's/^\s*root\s+//; s/;//g' | head -n 1 | xargs || true)
+        DOC_ROOT=$(grep -E "^\s*root\s+" "$conf" 2>/dev/null | sed -E 's/^\s*root\s+//; s/;//g' | xargs || true)
         PROXY_PASS=$(grep -E "^\s*proxy_pass\s+" "$conf" 2>/dev/null | sed -E 's/^\s*proxy_pass\s+//; s/;//g' | head -n 2 | xargs || true)
         FASTCGI_PASS=$(grep -E "^\s*fastcgi_pass\s+" "$conf" 2>/dev/null | sed -E 's/^\s*fastcgi_pass\s+//; s/;//g' | head -n 1 | xargs || true)
+
+        while IFS= read -r ng_root; do
+            [[ -n "$ng_root" ]] && add_web_root "$ng_root"
+        done < <(grep -E "^\s*root\s+" "$conf" 2>/dev/null | sed -E 's/^\s*root\s+//; s/;//g' || true)
 
         echo -e "      • Arquivo: ${FG_CYAN}$(basename "$conf")${NC} | Domínios: ${FG_YELLOW}${DOMAINS:-_}${NC}"
         [[ -n "$DOC_ROOT" ]]     && echo -e "        ├─ Root:         ${FG_GREEN}${DOC_ROOT}${NC}"
@@ -1272,16 +1370,52 @@ fi
 
 # 4.4 - Aplicações Web, CMSs e Sistemas Instalados no Disco (Quais e Versões)
 echo -e "\n  ${BOLD}4.4 Aplicações Web, CMSs e Sistemas Identificados no Disco (Quais e Versões):${NC}"
-SCAN_DIRS=("/var/www" "/srv" "/home" "/opt" "/usr/share/nextcloud" "/usr/share/zabbix" "/usr/share/glpi" "/usr/share/roundcube")
+SCAN_DIRS=()
+for d_root in "${DISCOVERED_WEB_ROOTS[@]}"; do
+    [[ -d "$d_root" ]] && add_unique_item SCAN_DIRS "$d_root"
+done
+for std_dir in "/var/www" "/srv" "/home" "/opt" "/usr/share/nextcloud" "/usr/share/zabbix" "/usr/share/glpi" "/usr/share/roundcube"; do
+    [[ -d "$std_dir" ]] && add_unique_item SCAN_DIRS "$std_dir"
+done
+# Inclui diretórios customizados na raiz / (ex: /arquivos, /sistemas, /dados, /www, /app)
+for top_dir in /*; do
+    [[ -d "$top_dir" && ! -L "$top_dir" ]] || continue
+    top_base=$(basename "$top_dir")
+    case "$top_base" in
+        bin|boot|cdrom|dev|etc|home|lib|lib32|lib64|libx32|lost+found|media|mnt|opt|proc|root|run|sbin|snap|srv|sys|tmp|usr|var)
+            continue
+            ;;
+        *)
+            add_unique_item SCAN_DIRS "$top_dir"
+            ;;
+    esac
+done
+
 FOUND_APPS=0
+AUDITED_APP_DIRS=()
+
+mark_app_audited() {
+    local target_dir="$1" real_d item
+    real_d=$(readlink -f "$target_dir" 2>/dev/null || echo "${target_dir%/}")
+    for item in "${AUDITED_APP_DIRS[@]}"; do
+        [[ "$item" == "$real_d" ]] && return 1
+    done
+    AUDITED_APP_DIRS+=("$real_d")
+    return 0
+}
 
 audit_nextcloud_dir() {
     local app_dir="$1" ver_file="$2" cfg_file="$3" install_type="${4:-Diretório Web Host}"
-    local nc_ver nc_chan nc_datadir nc_dbtype nc_dbname nc_dbhost nc_dbuser nc_url nc_maint nc_mem_local nc_mem_lock nc_domains nc_proxies
+    mark_app_audited "$app_dir" || return 0
+
+    local nc_ver nc_build_ver nc_installed nc_inst_id nc_chan nc_datadir nc_dbtype nc_dbname nc_dbhost nc_dbuser nc_url nc_maint nc_mem_local nc_mem_lock nc_domains nc_proxies
 
     nc_ver=$(grep "\$OC_VersionString" "$ver_file" 2>/dev/null | cut -d"'" -f2 || echo "Detectado")
     nc_chan=$(grep "\$OC_Channel" "$ver_file" 2>/dev/null | cut -d"'" -f2 || true)
 
+    nc_build_ver=""
+    nc_installed=""
+    nc_inst_id=""
     nc_datadir=""
     nc_dbtype=""
     nc_dbname=""
@@ -1295,6 +1429,9 @@ audit_nextcloud_dir() {
     nc_proxies=""
 
     if [[ -r "$cfg_file" ]]; then
+        nc_build_ver=$(awk -F"=>" '/['"'"'"]version['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
+        nc_installed=$(awk -F"=>" '/['"'"'"]installed['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print tolower(val); exit}' "$cfg_file" 2>/dev/null || true)
+        nc_inst_id=$(awk -F"=>" '/['"'"'"]instanceid['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
         nc_datadir=$(awk -F"=>" '/['"'"'"]datadirectory['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
         nc_dbtype=$(awk -F"=>" '/['"'"'"]dbtype['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
         nc_dbname=$(awk -F"=>" '/['"'"'"]dbname['"'"'"]\s*=>/ {val=$2; gsub(/^[ \t'"'"'"]+|[ \t'"'"'",\r]+$/, "", val); print val; exit}' "$cfg_file" 2>/dev/null || true)
@@ -1326,8 +1463,11 @@ audit_nextcloud_dir() {
         ' "$cfg_file" 2>/dev/null | sed 's/, $//' || true)
     fi
 
-    echo -e "    • ${FG_GREEN}${BOLD}Nextcloud v${nc_ver}${NC}${nc_chan:+ (Canal: ${nc_chan})} — Tipo: ${FG_CYAN}${install_type}${NC}"
-    echo -e "      ├─ ${BOLD}Caminho da Aplicação:${NC}  ${FG_CYAN}${app_dir}${NC} (Config: ${cfg_file})"
+    echo -e "    • ${FG_GREEN}${BOLD}Nextcloud v${nc_ver}${NC}${nc_build_ver:+ (version: ${nc_build_ver})}${nc_chan:+ [Canal: ${nc_chan}]} — Tipo: ${FG_CYAN}${install_type}${NC}"
+    echo -e "      ├─ ${BOLD}Caminho da Aplicação:${NC}  ${FG_CYAN}${app_dir}${NC} (Config: ${cfg_file}${nc_inst_id:+ | InstanceID: ${nc_inst_id}})"
+    if [[ -f "${app_dir}/occ" ]]; then
+        echo -e "      ├─ ${BOLD}Console CLI (occ):${NC}     ${FG_GREEN}${app_dir}/occ${NC} (installed: ${nc_installed:-true})"
+    fi
 
     if [[ "$nc_maint" == "true" || "$nc_maint" == "1" ]]; then
         echo -e "      ├─ ${BOLD}Modo de Manutenção:${NC}    ${FG_RED}${BOLD}ATIVO (maintenance => true — Sistema bloqueado para usuários!)${NC}"
@@ -1364,9 +1504,15 @@ audit_nextcloud_dir() {
     fi
     echo -e "      └─ ${BOLD}Background Jobs (Cron):${NC} ${nc_cron_status}"
 
+    local nc_major="${nc_ver%%.*}"
+    if [[ "$nc_major" =~ ^[0-9]+$ ]] && (( nc_major < 28 )); then
+        add_alert "Nextcloud v${nc_ver} em ${app_dir} está em versão antiga/End-of-Life (Recomendado: >= 28)."
+    fi
+
     add_role "Storage Nuvem (Nextcloud ${nc_ver})"
     add_unique_item RESUMO_APPS_VERSOES "Nextcloud:${nc_ver}"
     add_unique_item RESUMO_SITES_DETECTADOS "Nextcloud v${nc_ver}: ${app_dir}${nc_domains:+ (Domínios: $nc_domains)}${nc_datadir:+ [Dados: $nc_datadir]}"
+    FOUND_APPS=$((FOUND_APPS + 1))
 }
 
 # Verifica instalação do Nextcloud via Pacote SNAP (/var/snap/nextcloud)
@@ -1375,7 +1521,6 @@ if [[ -d /var/snap/nextcloud/current ]] || [[ -f /snap/nextcloud/current/htdocs/
     SNAP_NC_CFG_FILE="/var/snap/nextcloud/current/nextcloud/config/config.php"
     if [[ -f "$SNAP_NC_VER_FILE" ]]; then
         audit_nextcloud_dir "/snap/nextcloud/current/htdocs" "$SNAP_NC_VER_FILE" "$SNAP_NC_CFG_FILE" "Pacote Snap (nextcloud)"
-        FOUND_APPS=$((FOUND_APPS + 1))
     fi
 fi
 
@@ -1390,6 +1535,7 @@ for base_dir in "${SCAN_DIRS[@]}"; do
         else
             APP_DIR=$(dirname "$(dirname "$joomla_ver_file")")
         fi
+        mark_app_audited "$APP_DIR" || continue
         J_VER_EXACT=""
         if command -v php >/dev/null 2>&1; then
             J_VER_EXACT=$(php -r "require_once '$joomla_ver_file'; if (class_exists('Joomla\CMS\Version')) { echo \Joomla\CMS\Version::MAJOR_VERSION . '.' . \Joomla\CMS\Version::MINOR_VERSION . '.' . \Joomla\CMS\Version::PATCH_VERSION; } elseif (class_exists('JVersion')) { \$v = new JVersion(); echo \$v->getShortVersion(); }" 2>/dev/null || true)
@@ -1413,6 +1559,7 @@ for base_dir in "${SCAN_DIRS[@]}"; do
     while IFS= read -r wp_ver_file; do
         [[ -f "$wp_ver_file" ]] || continue
         APP_DIR=$(dirname "$(dirname "$wp_ver_file")")
+        mark_app_audited "$APP_DIR" || continue
         WP_VER=$(grep "^\$wp_version\s*=" "$wp_ver_file" 2>/dev/null | cut -d"'" -f2 || true)
         WP_DB=""
         [[ -f "${APP_DIR}/wp-config.php" ]] && WP_DB=$(grep -E "define\(\s*'DB_NAME'" "${APP_DIR}/wp-config.php" 2>/dev/null | cut -d"'" -f4 || true)
@@ -1427,6 +1574,7 @@ for base_dir in "${SCAN_DIRS[@]}"; do
     while IFS= read -r artisan_file; do
         [[ -f "$artisan_file" ]] || continue
         APP_DIR=$(dirname "$artisan_file")
+        mark_app_audited "$APP_DIR" || continue
         APP_NAME_ENV=""
         DB_NAME_ENV=""
         if [[ -f "${APP_DIR}/.env" ]]; then
@@ -1438,15 +1586,16 @@ for base_dir in "${SCAN_DIRS[@]}"; do
         add_unique_item RESUMO_APPS_VERSOES "Laravel(${APP_NAME_ENV:-App})"
         add_unique_item RESUMO_SITES_DETECTADOS "Laravel (${APP_NAME_ENV:-App}): ${APP_DIR}"
         FOUND_APPS=$((FOUND_APPS + 1))
-    done < <(find "$base_dir" -maxdepth 4 -type f -name "artisan" 2>/dev/null)
+    done < <(find "$base_dir" -maxdepth 5 -type f -name "artisan" 2>/dev/null)
 
-    # GLPI, Zabbix, Drupal, Nextcloud, Moodle, phpMyAdmin/Adminer
+    # GLPI, Zabbix, Drupal, Nextcloud, Moodle, Vtiger CRM, osTicket, Ampache, phpMyAdmin/Adminer
     while IFS= read -r special_marker; do
         [[ -f "$special_marker" ]] || continue
         case "$special_marker" in
             */inc/define.php)
                 if grep -q "GLPI_VERSION" "$special_marker" 2>/dev/null; then
                     APP_DIR=$(dirname "$(dirname "$special_marker")")
+                    mark_app_audited "$APP_DIR" || continue
                     GLPI_V=$(grep -E "define\('GLPI_VERSION'" "$special_marker" 2>/dev/null | cut -d"'" -f4 || echo "Detectado")
                     echo -e "    • ${FG_GREEN}${BOLD}GLPI v${GLPI_V}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
                     add_role "Sistema GLPI (${GLPI_V})"
@@ -1457,6 +1606,7 @@ for base_dir in "${SCAN_DIRS[@]}"; do
                 ;;
             */zabbix.php)
                 APP_DIR=$(dirname "$special_marker")
+                mark_app_audited "$APP_DIR" || continue
                 echo -e "    • ${FG_GREEN}${BOLD}Zabbix Web Frontend${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
                 add_role "Zabbix Frontend Web"
                 add_unique_item RESUMO_SITES_DETECTADOS "Zabbix Frontend: ${APP_DIR}"
@@ -1464,20 +1614,49 @@ for base_dir in "${SCAN_DIRS[@]}"; do
                 ;;
             */core/lib/Drupal.php)
                 APP_DIR=$(dirname "$(dirname "$(dirname "$special_marker")")")
+                mark_app_audited "$APP_DIR" || continue
                 echo -e "    • ${FG_GREEN}${BOLD}CMS Drupal${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
                 add_role "Hospedagem Drupal"
                 add_unique_item RESUMO_SITES_DETECTADOS "Drupal: ${APP_DIR}"
+                FOUND_APPS=$((FOUND_APPS + 1))
+                ;;
+            */vtigerversion.php)
+                APP_DIR=$(dirname "$special_marker")
+                mark_app_audited "$APP_DIR" || continue
+                VT_VER=$(grep -E "\\\$vtiger_current_version\s*=" "$special_marker" 2>/dev/null | cut -d"'" -f2 | tr -d ' ";' || echo "Detectado")
+                VT_DB=""
+                VT_URL=""
+                if [[ -r "${APP_DIR}/config.inc.php" ]]; then
+                    VT_DB=$(grep -E "\\\$dbconfig\['db_name'\]" "${APP_DIR}/config.inc.php" 2>/dev/null | cut -d"'" -f4 || true)
+                    VT_URL=$(grep -E "\\\$site_URL\s*=" "${APP_DIR}/config.inc.php" 2>/dev/null | cut -d"'" -f2 || true)
+                fi
+                echo -e "    • ${FG_GREEN}${BOLD}Vtiger CRM v${VT_VER:-Detectado}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${VT_DB:+ (Banco: ${FG_YELLOW}${VT_DB}${NC})}${VT_URL:+ [URL: ${VT_URL}]}"
+                add_role "Sistema CRM (Vtiger ${VT_VER:-CRM})"
+                add_unique_item RESUMO_APPS_VERSOES "VtigerCRM:${VT_VER:-Ativo}"
+                add_unique_item RESUMO_SITES_DETECTADOS "Vtiger CRM v${VT_VER:-Detectado}: ${APP_DIR}${VT_DB:+ (Banco: $VT_DB)}"
+                FOUND_APPS=$((FOUND_APPS + 1))
+                ;;
+            */include/ost-config.php)
+                APP_DIR=$(dirname "$(dirname "$special_marker")")
+                mark_app_audited "$APP_DIR" || continue
+                OST_DB=$(grep -E "define\('DBNAME'" "$special_marker" 2>/dev/null | cut -d"'" -f4 || true)
+                echo -e "    • ${FG_GREEN}${BOLD}osTicket Helpdesk${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${OST_DB:+ (Banco: ${FG_YELLOW}${OST_DB}${NC})}"
+                add_role "Helpdesk (osTicket)"
+                add_unique_item RESUMO_APPS_VERSOES "osTicket:Ativo"
+                add_unique_item RESUMO_SITES_DETECTADOS "osTicket Helpdesk: ${APP_DIR}"
                 FOUND_APPS=$((FOUND_APPS + 1))
                 ;;
             */version.php)
                 if grep -q "\$OC_VersionString" "$special_marker" 2>/dev/null; then
                     APP_DIR=$(dirname "$special_marker")
                     audit_nextcloud_dir "$APP_DIR" "$special_marker" "${APP_DIR}/config/config.php" "Diretório Web Host"
-                    FOUND_APPS=$((FOUND_APPS + 1))
-                elif grep -q "MOODLE_INTERNAL" "$special_marker" 2>/dev/null && [[ -f "$(dirname "$special_marker")/config.php" ]]; then
+                elif grep -q "MOODLE_INTERNAL" "$special_marker" 2>/dev/null && [[ -f "$(dirname "$special_marker")/config.php" || -f "$(dirname "$special_marker")/config-dist.php" ]]; then
                     APP_DIR=$(dirname "$special_marker")
+                    mark_app_audited "$APP_DIR" || continue
                     MDL_V=$(grep "^\$release\s*=" "$special_marker" 2>/dev/null | cut -d"'" -f2 || echo "Detectado")
-                    echo -e "    • ${FG_GREEN}${BOLD}Moodle v${MDL_V}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                    MDL_DB=""
+                    [[ -r "${APP_DIR}/config.php" ]] && MDL_DB=$(grep -E "^\s*\\\$CFG->dbname\s*=" "${APP_DIR}/config.php" 2>/dev/null | cut -d"'" -f2 || true)
+                    echo -e "    • ${FG_GREEN}${BOLD}Moodle v${MDL_V}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${MDL_DB:+ (Banco: ${FG_YELLOW}${MDL_DB}${NC})}"
                     add_role "Plataforma EAD (Moodle)"
                     add_unique_item RESUMO_APPS_VERSOES "Moodle:${MDL_V}"
                     add_unique_item RESUMO_SITES_DETECTADOS "Moodle (${MDL_V}): ${APP_DIR}"
@@ -1485,12 +1664,14 @@ for base_dir in "${SCAN_DIRS[@]}"; do
                 fi
                 ;;
             *phpmyadmin*|*adminer*.php)
+                mark_app_audited "$special_marker" || continue
                 log_warning "Gerenciador de Banco Web Exposto no Disco: ${FG_YELLOW}${special_marker}${NC}"
                 add_alert "Ferramenta de banco web encontrada no disco (${special_marker}) — verificar restrição de acesso."
                 FOUND_APPS=$((FOUND_APPS + 1))
                 ;;
             *ampache.cfg.php*)
                 APP_DIR=$(dirname "$(dirname "$special_marker")")
+                mark_app_audited "$APP_DIR" || continue
                 AMP_VER=""
                 if [[ -f "${APP_DIR}/composer.json" ]]; then
                     AMP_VER=$(grep -E '"version"\s*:' "${APP_DIR}/composer.json" 2>/dev/null | head -n 1 | cut -d'"' -f4 || true)
@@ -1506,25 +1687,24 @@ for base_dir in "${SCAN_DIRS[@]}"; do
                 FOUND_APPS=$((FOUND_APPS + 1))
                 ;;
         esac
-    done < <(find "$base_dir" -maxdepth 4 -type f \( -path "*/inc/define.php" -o -name "zabbix.php" -o -path "*/core/lib/Drupal.php" -o -name "version.php" -o -iname "adminer*.php" -o -path "*/config/ampache.cfg.php*" \) 2>/dev/null | sort -u)
+    done < <(find "$base_dir" -maxdepth 5 -type f \( -path "*/inc/define.php" -o -name "zabbix.php" -o -path "*/core/lib/Drupal.php" -o -name "vtigerversion.php" -o -path "*/include/ost-config.php" -o -name "version.php" -o -iname "adminer*.php" -o -path "*/config/ampache.cfg.php*" \) 2>/dev/null | sort -u)
 
-    # Descoberta universal de projetos PHP (composer.json) e Node (package.json) em /var/www e /srv
-    if [[ "$base_dir" == "/var/www" || "$base_dir" == "/srv" ]]; then
-        while IFS= read -r comp_file; do
-            [[ -f "$comp_file" ]] || continue
-            APP_DIR=$(dirname "$comp_file")
-            [[ -f "${APP_DIR}/artisan" || -f "${APP_DIR}/wp-config.php" || -f "${APP_DIR}/configuration.php" || -f "${APP_DIR}/config/ampache.cfg.php" || -f "${APP_DIR}/config/ampache.cfg.php.dist" ]] && continue
-            PKG_NAME=$(grep -m 1 -E '"name"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
-            PKG_VER=$(grep -m 1 -E '"version"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
-            if [[ -n "$PKG_NAME" ]]; then
-                echo -e "    • ${FG_GREEN}${BOLD}Aplicação PHP/Composer (${PKG_NAME}${PKG_VER:+ v$PKG_VER})${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
-                add_role "Aplicação Web (${PKG_NAME}${PKG_VER:+ v$PKG_VER})"
-                add_unique_item RESUMO_APPS_VERSOES "${PKG_NAME}:${PKG_VER:-Composer}"
-                add_unique_item RESUMO_SITES_DETECTADOS "${PKG_NAME}${PKG_VER:+ v$PKG_VER}: ${APP_DIR}"
-                FOUND_APPS=$((FOUND_APPS + 1))
-            fi
-        done < <(find "$base_dir" -maxdepth 3 -type f -name "composer.json" ! -path "*/vendor/*" 2>/dev/null)
-    fi
+    # Descoberta universal de projetos PHP (composer.json) em diretórios web
+    while IFS= read -r comp_file; do
+        [[ -f "$comp_file" ]] || continue
+        APP_DIR=$(dirname "$comp_file")
+        [[ -f "${APP_DIR}/artisan" || -f "${APP_DIR}/wp-config.php" || -f "${APP_DIR}/configuration.php" || -f "${APP_DIR}/vtigerversion.php" || -f "${APP_DIR}/version.php" || -f "${APP_DIR}/config/ampache.cfg.php" || -f "${APP_DIR}/config/ampache.cfg.php.dist" ]] && continue
+        mark_app_audited "$APP_DIR" || continue
+        PKG_NAME=$(grep -m 1 -E '"name"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
+        PKG_VER=$(grep -m 1 -E '"version"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
+        if [[ -n "$PKG_NAME" ]]; then
+            echo -e "    • ${FG_GREEN}${BOLD}Aplicação PHP/Composer (${PKG_NAME}${PKG_VER:+ v$PKG_VER})${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+            add_role "Aplicação Web (${PKG_NAME}${PKG_VER:+ v$PKG_VER})"
+            add_unique_item RESUMO_APPS_VERSOES "${PKG_NAME}:${PKG_VER:-Composer}"
+            add_unique_item RESUMO_SITES_DETECTADOS "${PKG_NAME}${PKG_VER:+ v$PKG_VER}: ${APP_DIR}"
+            FOUND_APPS=$((FOUND_APPS + 1))
+        fi
+    done < <(find "$base_dir" -maxdepth 3 -type f -name "composer.json" ! -path "*/vendor/*" ! -path "*/3rdparty/*" ! -path "*/apps/*" 2>/dev/null)
 done
 
 (( FOUND_APPS == 0 )) && echo -e "    • Nenhum CMS/Aplicação web conhecida detectada em /var/www, /srv, /opt ou /home."
@@ -1806,10 +1986,10 @@ if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
         svc_base="${svc_unit%.service}"
         svc_ver=$(get_daemon_version "$svc_base")
         echo -e "      • ${FG_GREEN}${BOLD}${svc_unit}${NC}${svc_ver:+ (${FG_YELLOW}v${svc_ver}${NC})} — ${DIM}${svc_desc}${NC}"
-        if [[ ! "$svc_base" =~ ^(ssh|sshd|apache2|httpd|nginx|mariadb|mysql|mysqld|postgresql|redis|redis-server|docker|containerd|ufw|firewalld|nftables)$ ]]; then
+        if [[ ! "$svc_base" =~ ^(ssh|sshd|apache2|httpd|nginx|mariadb|mysql|mysqld|postgresql|redis|redis-server|docker|containerd|ufw|firewalld|nftables|php[0-9.]*-fpm|open-vm-tools|vmtoolsd|VGAuthService|qemu-guest-agent)$ ]]; then
             add_unique_item RESUMO_APPS_VERSOES "${svc_base}:${svc_ver:-Ativo}"
         fi
-    done < <(systemctl list-units --type=service --state=running --no-legend --plain 2>/dev/null | grep -vE "^(systemd-|user@|user-runtime-dir@|getty@|serial-getty@|container-getty@|console-getty|dbus\.service|polkit\.service|rsyslog\.service|syslog\.service|cron\.service|crond\.service|udev|kmod|multipathd|accounts-daemon|udisks2|upower|networkd-dispatcher|ModemManager|wpa_supplicant|avahi-daemon|bluetooth|colord|rtkit-daemon|switcheroo-control|thermald|power-profiles-daemon|irqbalance|packagekit|unattended-upgrades|wsl-pro|networking\.service|ifup@)" | awk '{
+    done < <(systemctl list-units --type=service --state=running --no-legend --plain 2>/dev/null | grep -vE "^(systemd-|user@|user-runtime-dir@|getty@|serial-getty@|container-getty@|console-getty|dbus\.service|polkit\.service|polkitd\.service|rsyslog\.service|syslog\.service|cron\.service|crond\.service|atd\.service|acpid\.service|iscsid\.service|lvm2-|lxcfs\.service|mdadm\.service|rc-local\.service|snapd\.service|apparmor\.service|auditd\.service|blk-availability\.service|ondemand\.service|cgmanager\.service|udev|kmod|multipathd|accounts-daemon|udisks2|upower|networkd-dispatcher|ModemManager|wpa_supplicant|avahi-daemon|bluetooth|colord|rtkit-daemon|switcheroo-control|thermald|power-profiles-daemon|irqbalance|packagekit|unattended-upgrades|wsl-pro|networking\.service|ifup@)" | awk '{
         unit=$1; $1=""; $2=""; $3=""; $4="";
         sub(/^[ \t]+/, "", $0);
         print unit "|" $0
