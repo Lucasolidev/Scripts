@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.7
+# Version: 2.8
 # ------------------------------------------------
-VERSION="2.7"
+VERSION="2.8"
 # ==============================================================================
 # AUDITORIA, VARREDURA E INVENTÁRIO 360° DO SERVIDOR LINUX (MULTI-DISTRO)
 # ==============================================================================
@@ -130,7 +130,7 @@ print_summary() {
     printf '  %b%s%*s%b%b%s%b\n' "$BOLD" "$label" "$padding" '' "$NC" "$color" "$val" "$NC"
 }
 
-# Arrays acumuladoras para o Resumo Executivo
+# Arrays acumuladoras para o Resumo Executivo e Descoberta
 PAPEIS_DETECTADOS=()
 ALERTAS_AUDITORIA=()
 RESUMO_APPS_VERSOES=()
@@ -143,13 +143,19 @@ RESUMO_GRUPOS_SUDO=()
 RESUMO_STORAGE_REDE=()
 RESUMO_CERTBOT_STATUS="Não instalado / Sem certificados Let's Encrypt"
 PACOTES_INSTALADOS=()
+DISCOVERED_WEB_ROOTS=()
+AUDITED_APP_DIRS=()
+SCAN_DIRS=()
+RENEW_MECHANISMS=()
 
 add_role() {
     local role="$1"
     local r
-    for r in "${PAPEIS_DETECTADOS[@]:-}"; do
-        [[ "$r" == "$role" ]] && return 0
-    done
+    if (( ${#PAPEIS_DETECTADOS[@]} > 0 )); then
+        for r in "${PAPEIS_DETECTADOS[@]}"; do
+            [[ "$r" == "$role" ]] && return 0
+        done
+    fi
     PAPEIS_DETECTADOS+=("$role")
 }
 
@@ -160,11 +166,17 @@ add_alert() {
 add_unique_item() {
     local arr_name="$1" val="$2"
     [[ -z "$val" ]] && return 0
-    eval "local existing=(\"\${${arr_name}[@]:-}\")"
-    local item
-    for item in "${existing[@]:-}"; do
-        [[ "$item" == "$val" ]] && return 0
-    done
+    local count=0
+    eval "count=\${#${arr_name}[@]}"
+    if (( count > 0 )); then
+        local -a existing=()
+        # shellcheck disable=SC2154
+        eval "existing=(\"\${${arr_name}[@]}\")"
+        local item
+        for item in "${existing[@]}"; do
+            [[ "$item" == "$val" ]] && return 0
+        done
+    fi
     eval "${arr_name}+=(\"\$val\")"
 }
 
@@ -1104,14 +1116,18 @@ fi
 if [[ -n "$CERTBOT_BIN" || -d /etc/letsencrypt/live ]]; then
     if (( RENEW_ACTIVE == 1 )); then
         echo -e "    • ${BOLD}Renovação Automática:${NC} ${FG_GREEN}${BOLD}ATIVA${NC}"
-        for rm_item in "${RENEW_MECHANISMS[@]}"; do
-            echo -e "      ├─ ${FG_CYAN}${rm_item}${NC}"
-        done
+        if (( ${#RENEW_MECHANISMS[@]} > 0 )); then
+            for rm_item in "${RENEW_MECHANISMS[@]}"; do
+                echo -e "      ├─ ${FG_CYAN}${rm_item}${NC}"
+            done
+        fi
     else
         echo -e "    • ${BOLD}Renovação Automática:${NC} ${FG_RED}${BOLD}INATIVA / NÃO CONFIGURADA${NC}"
-        for rm_item in "${RENEW_MECHANISMS[@]:-}"; do
-            [[ -n "$rm_item" ]] && echo -e "      ├─ ${FG_YELLOW}${rm_item}${NC}"
-        done
+        if (( ${#RENEW_MECHANISMS[@]} > 0 )); then
+            for rm_item in "${RENEW_MECHANISMS[@]}"; do
+                [[ -n "$rm_item" ]] && echo -e "      ├─ ${FG_YELLOW}${rm_item}${NC}"
+            done
+        fi
         if [[ -d /etc/letsencrypt/live ]]; then
             add_alert "Certbot possui diretório /etc/letsencrypt/live, mas a renovação automática (Timer/Cron) está INATIVA!"
         fi
@@ -1141,8 +1157,8 @@ if [[ -d /etc/letsencrypt/live ]] && command -v openssl >/dev/null 2>&1; then
 
         START_DATE=$(openssl x509 -startdate -noout -in "$cert_pem" 2>/dev/null | cut -d'=' -f2 || true)
         END_DATE=$(openssl x509 -enddate -noout -in "$cert_pem" 2>/dev/null | cut -d'=' -f2 || true)
-        ISSUER_STR=$(openssl x509 -issuer -noout -in "$cert_pem" 2>/dev/null | sed 's/^issuer=//' | xargs || true)
-        SAN_DOMAINS=$(openssl x509 -noout -ext subjectAltName -in "$cert_pem" 2>/dev/null | grep -oE 'DNS:[^, ]+' | sed 's/DNS://g' | xargs || true)
+        ISSUER_STR=$(openssl x509 -issuer -noout -in "$cert_pem" 2>/dev/null | sed -E 's/^issuer=[ \t]*//; s/[ \t]+$//' || true)
+        SAN_DOMAINS=$(openssl x509 -noout -ext subjectAltName -in "$cert_pem" 2>/dev/null | grep -oE 'DNS:[^, ]+' | sed 's/DNS://g' | tr '\n' ' ' | sed -E 's/^[ \t]+|[ \t]+$//g' || true)
 
         END_EPOCH=$(date -d "$END_DATE" +%s 2>/dev/null || echo 0)
         NOW_EPOCH=$(date +%s)
@@ -1259,8 +1275,12 @@ if [[ -d /etc/php ]]; then
             EXPOSE_PHP=$(awk -F'=' '/^\s*expose_php\s*=/ {gsub(/[ \t\r]/,"",$2); print $2}' "$INI_FILE" | tail -n 1)
             MEM_LIMIT=$(awk -F'=' '/^\s*memory_limit\s*=/ {gsub(/[ \t\r]/,"",$2); print $2}' "$INI_FILE" | tail -n 1)
             UPLOAD_MAX=$(awk -F'=' '/^\s*upload_max_filesize\s*=/ {gsub(/[ \t\r]/,"",$2); print $2}' "$INI_FILE" | tail -n 1)
-            DISABLE_FN=$(awk -F'=' '/^\s*disable_functions\s*=/ {print $2}' "$INI_FILE" | tail -n 1 | xargs || true)
-            echo -e "         └─ php.ini (${sapi}): expose_php=${EXPOSE_PHP:-On} | memory_limit=${MEM_LIMIT:-128M} | upload_max=${UPLOAD_MAX:-2M} | disable_functions=${DISABLE_FN:+Configurado}${DISABLE_FN:-Vazio}"
+            DISABLE_FN=$(awk -F'=' '/^\s*disable_functions\s*=/ {print $2}' "$INI_FILE" | tail -n 1 | sed -E 's/^[ \t]+|[ \t\r]+$//g' || true)
+            DF_STR="Vazio"
+            if [[ -n "$DISABLE_FN" ]]; then
+                DF_STR="Configurado (${DISABLE_FN:0:45}...)"
+            fi
+            echo -e "         └─ php.ini (${sapi}): expose_php=${EXPOSE_PHP:-On} | memory_limit=${MEM_LIMIT:-128M} | upload_max=${UPLOAD_MAX:-2M} | disable_functions=${DF_STR}"
             break
         done
     done
@@ -1371,9 +1391,11 @@ fi
 # 4.4 - Aplicações Web, CMSs e Sistemas Instalados no Disco (Quais e Versões)
 echo -e "\n  ${BOLD}4.4 Aplicações Web, CMSs e Sistemas Identificados no Disco (Quais e Versões):${NC}"
 SCAN_DIRS=()
-for d_root in "${DISCOVERED_WEB_ROOTS[@]}"; do
-    [[ -d "$d_root" ]] && add_unique_item SCAN_DIRS "$d_root"
-done
+if (( ${#DISCOVERED_WEB_ROOTS[@]} > 0 )); then
+    for d_root in "${DISCOVERED_WEB_ROOTS[@]}"; do
+        [[ -d "$d_root" ]] && add_unique_item SCAN_DIRS "$d_root"
+    done
+fi
 for std_dir in "/var/www" "/srv" "/home" "/opt" "/usr/share/nextcloud" "/usr/share/zabbix" "/usr/share/glpi" "/usr/share/roundcube"; do
     [[ -d "$std_dir" ]] && add_unique_item SCAN_DIRS "$std_dir"
 done
@@ -1397,9 +1419,11 @@ AUDITED_APP_DIRS=()
 mark_app_audited() {
     local target_dir="$1" real_d item
     real_d=$(readlink -f "$target_dir" 2>/dev/null || echo "${target_dir%/}")
-    for item in "${AUDITED_APP_DIRS[@]}"; do
-        [[ "$item" == "$real_d" ]] && return 1
-    done
+    if (( ${#AUDITED_APP_DIRS[@]} > 0 )); then
+        for item in "${AUDITED_APP_DIRS[@]}"; do
+            [[ "$item" == "$real_d" ]] && return 1
+        done
+    fi
     AUDITED_APP_DIRS+=("$real_d")
     return 0
 }
@@ -1524,10 +1548,11 @@ if [[ -d /var/snap/nextcloud/current ]] || [[ -f /snap/nextcloud/current/htdocs/
     fi
 fi
 
-for base_dir in "${SCAN_DIRS[@]}"; do
-    [[ -d "$base_dir" ]] || continue
+if (( ${#SCAN_DIRS[@]} > 0 )); then
+    for base_dir in "${SCAN_DIRS[@]}"; do
+        [[ -d "$base_dir" ]] || continue
 
-    # Joomla
+        # Joomla
     while IFS= read -r joomla_ver_file; do
         [[ -f "$joomla_ver_file" ]] || continue
         if [[ "$joomla_ver_file" == */libraries/src/Version.php ]]; then
@@ -1705,7 +1730,8 @@ for base_dir in "${SCAN_DIRS[@]}"; do
             FOUND_APPS=$((FOUND_APPS + 1))
         fi
     done < <(find "$base_dir" -maxdepth 3 -type f -name "composer.json" ! -path "*/vendor/*" ! -path "*/3rdparty/*" ! -path "*/apps/*" 2>/dev/null)
-done
+    done
+fi
 
 (( FOUND_APPS == 0 )) && echo -e "    • Nenhum CMS/Aplicação web conhecida detectada em /var/www, /srv, /opt ou /home."
 
@@ -2521,7 +2547,10 @@ if [[ "$FIREWALL_SUMMARY_STATE" == "INATIVO"* ]]; then
     FW_SUMMARY_COLOR="$FG_RED"
 fi
 
-LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]:-Nenhum (Modo 100% Passivo / Somente Leitura)}")
+LISTA_PACOTES="Nenhum (Modo 100% Passivo / Somente Leitura)"
+if (( ${#PACOTES_INSTALADOS[@]} > 0 )); then
+    LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
+fi
 
 print_summary "1. Sistema Operacional:"     "${OS_NAME} (Kernel ${KERNEL_VER})" "$FG_CYAN"
 print_summary "   Status de Atualização:"   "${OS_UPDATE_STATUS_STR}" "$UPDATES_SUMMARY_COLOR"
