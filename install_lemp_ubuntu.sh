@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.4
+# Version: 2.5
 # ------------------------------------------------
-VERSION="2.4"
+VERSION="2.5"
 # ==============================================================================
 # INSTALADOR AUTOMATICO DA PILHA LEMP - UBUNTU
 # ==============================================================================
@@ -40,7 +40,13 @@ install_packages() {
 }
 validate_root() {
     [[ "$1" =~ ^/[A-Za-z0-9_./-]+$ ]] || return 1
-    case "$1" in /var/www/*|/srv/www/*|/mnt/*/*|/arquivos/*/*) return 0 ;; *) return 1 ;; esac
+    case "$1" in
+        /var/www/*|/srv/www/*|/mnt/*|/arquivos/*)
+            [[ "$1" != "/var/www/" && "$1" != "/srv/www/" && "$1" != "/mnt/" && "$1" != "/arquivos/" ]] || return 1
+            return 0
+            ;;
+        *) return 1 ;;
+    esac
 }
 sql_escape() { local v="$1"; v=${v//\\/\\\\}; v=${v//\'/\'\'}; printf '%s' "$v"; }
 

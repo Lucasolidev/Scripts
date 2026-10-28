@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 3.5
+# Version: 3.6
 # ------------------------------------------------
-VERSION="3.5"
+VERSION="3.6"
 # ==============================================================================
 # SCRIPT DE INSTALACAO DA PILHA LAMP AUTOMATICO E ENDURECIDO - JOOMLA 5.x
 # COM AUDITORIA EM TEMPO REAL (AUDITD) E BLINDAGEM CONTRA WEBSHELLS
@@ -146,7 +146,10 @@ validate_docroot() {
     [[ "$path" == /* ]] || return 1
     [[ "$path" =~ ^/[A-Za-z0-9._/-]+$ ]] || return 1
     case "$path" in
-        /var/www/*|/srv/www/*|/mnt/*/*|/arquivos/*/*) return 0 ;;
+        /var/www/*|/srv/www/*|/mnt/*|/arquivos/*)
+            [[ "$path" != "/var/www/" && "$path" != "/srv/www/" && "$path" != "/mnt/" && "$path" != "/arquivos/" ]] || return 1
+            return 0
+            ;;
         *) return 1 ;;
     esac
 }
