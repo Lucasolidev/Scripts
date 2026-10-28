@@ -318,7 +318,10 @@ fi
 apt-get -o DPkg::Lock::Timeout=120 install -y software-properties-common > "$LOG_DIR/apt.log" 2>&1 || fatal "Falha ao instalar suporte a repositórios. Verifique APT/rede."
 add-apt-repository -y universe > "$LOG_DIR/apt.log" 2>&1 || fatal "Falha ao habilitar universe."
 apt-get -o DPkg::Lock::Timeout=120 update
-PACOTES_ESSENCIAIS=(locales openssh-server sudo fail2ban python3-systemd auditd audispd-plugins unattended-upgrades ufw)
+PACOTES_ESSENCIAIS=(locales openssh-server sudo fail2ban python3-systemd unattended-upgrades ufw)
+if ! is_wsl && ! systemd-detect-virt --container --quiet; then
+    PACOTES_ESSENCIAIS+=(auditd audispd-plugins)
+fi
 PACOTES=("${PACOTES_ESSENCIAIS[@]}" curl ncdu btop htop tmux dnsutils net-tools vim mtr-tiny iperf3 nmap tcpdump iotop jq tree rsync unzip "$PACOTE_7ZIP" sysstat lynis acl)
 [[ "$CONFIGURAR_VIM" != S ]] || PACOTES+=(git ca-certificates)
 if ! VIRT_TYPE=$(systemd-detect-virt 2>/dev/null); then VIRT_TYPE=none; fi
@@ -848,16 +851,22 @@ log_info "Origens permitidas preservadas; confirme resultados no histórico das 
 ETAPA="auditoria"
 print_header "AUDITORIA DO SISTEMA"
 AUDIT_STATUS="Não validado"
-backup_file /etc/audit/auditd.conf
-awk '
-    /^[[:space:]]*(max_log_file|num_logs|max_log_file_action|space_left|space_left_action|admin_space_left_action)[[:space:]]*=/ {next}
-    {print}
-    END {
-        print "max_log_file = 50\nnum_logs = 10\nmax_log_file_action = ROTATE"
-        print "space_left = 100\nspace_left_action = SYSLOG\nadmin_space_left_action = SUSPEND"
-    }' /etc/audit/auditd.conf > "$LOG_DIR/auditd.conf"
-install_config "$LOG_DIR/auditd.conf" /etc/audit/auditd.conf 640
-cat > "$LOG_DIR/audit-targets" <<'EOF'
+if is_wsl || systemd-detect-virt --container --quiet; then
+    systemctl disable --now auditd.service audit-rules.service >/dev/null 2>&1 || true
+    systemctl reset-failed auditd.service audit-rules.service >/dev/null 2>&1 || true
+    AUDIT_STATUS="Ignorado (ambiente LXC/WSL sem suporte de kernel para auditd)"
+    log_skipped "$AUDIT_STATUS"
+else
+    backup_file /etc/audit/auditd.conf
+    awk '
+        /^[[:space:]]*(max_log_file|num_logs|max_log_file_action|space_left|space_left_action|admin_space_left_action)[[:space:]]*=/ {next}
+        {print}
+        END {
+            print "max_log_file = 50\nnum_logs = 10\nmax_log_file_action = ROTATE"
+            print "space_left = 100\nspace_left_action = SYSLOG\nadmin_space_left_action = SUSPEND"
+        }' /etc/audit/auditd.conf > "$LOG_DIR/auditd.conf"
+    install_config "$LOG_DIR/auditd.conf" /etc/audit/auditd.conf 640
+    cat > "$LOG_DIR/audit-targets" <<'EOF'
 /etc/passwd wa auth_mod
 /etc/shadow wa auth_mod
 /etc/group wa auth_mod
@@ -882,17 +891,13 @@ cat > "$LOG_DIR/audit-targets" <<'EOF'
 /usr/bin/su x priv_escalation
 /usr/bin/passwd x priv_escalation
 EOF
-printf '# Gerenciado por pos_install_server; inclui somente caminhos existentes.\n' > "$LOG_DIR/audit.rules"
-while read -r path perms key; do
-    if [[ -e "$path" ]]; then
-        printf -- '-w %s -p %s -k %s\n' "$path" "$perms" "$key" >> "$LOG_DIR/audit.rules"
-    else log_info "Caminho de auditoria não presente nesta instalação: $path"; fi
-done < "$LOG_DIR/audit-targets"
-install_config "$LOG_DIR/audit.rules" /etc/audit/rules.d/server_security.rules 600
-if is_wsl || systemd-detect-virt --container --quiet; then
-    AUDIT_STATUS="Regras gravadas; kernel/contêiner requer validação no host"
-    pendencia "$AUDIT_STATUS"
-else
+    printf '# Gerenciado por pos_install_server_ubuntu; inclui somente caminhos existentes.\n' > "$LOG_DIR/audit.rules"
+    while read -r path perms key; do
+        if [[ -e "$path" ]]; then
+            printf -- '-w %s -p %s -k %s\n' "$path" "$perms" "$key" >> "$LOG_DIR/audit.rules"
+        else log_info "Caminho de auditoria não presente nesta instalação: $path"; fi
+    done < "$LOG_DIR/audit-targets"
+    install_config "$LOG_DIR/audit.rules" /etc/audit/rules.d/server_security.rules 600
     systemctl enable --now auditd
     # auditd recomenda service para preservar a identidade de login na operação.
     service auditd restart
@@ -1461,10 +1466,15 @@ else
 fi
 print_summary_section "AUDITD — AUDITORIA E CONTROLES DO SISTEMA"
 RESULT_COLOR=$FG_YELLOW
-if [[ "$AUDIT_STATUS" == "Ativo; regras verificadas no kernel" ]]; then RESULT_COLOR=$FG_GREEN; fi
+case "$AUDIT_STATUS" in
+    "Ativo; regras verificadas no kernel") RESULT_COLOR=$FG_GREEN ;;
+    "Ignorado (ambiente LXC/WSL sem suporte de kernel para auditd)") RESULT_COLOR=$FG_CYAN ;;
+esac
 print_summary "Auditd:" "$AUDIT_STATUS" "$RESULT_COLOR"
-print_summary "Regras gerenciadas:" "/etc/audit/rules.d/server_security.rules"
-print_summary "Logs de auditoria:" "/var/log/audit/"
+if ! is_wsl && ! systemd-detect-virt --container --quiet; then
+    print_summary "Regras gerenciadas:" "/etc/audit/rules.d/server_security.rules"
+    print_summary "Logs de auditoria:" "/var/log/audit/"
+fi
 RESULT_COLOR=$FG_YELLOW
 if [[ "$SHM_STATUS" == "noexec,nosuid,nodev verificados na montagem" ]]; then RESULT_COLOR=$FG_GREEN; fi
 print_summary "/dev/shm:" "$SHM_STATUS" "$RESULT_COLOR"

@@ -130,7 +130,7 @@ O objetivo é preparar a base de administração, segurança e diagnóstico do L
 
 As tabelas cobrem os **pacotes solicitados diretamente pelo script**. O APT também pode instalar suas dependências. Ferramentas descritas como **uso manual** ficam disponíveis para o administrador: sua instalação não significa que o script executou uma varredura, captura, teste de desempenho ou backup.
 
-As dependências essenciais são `locales`, `openssh-server`, `sudo`, `fail2ban`, `python3-systemd`, `auditd`, `audispd-plugins`, `unattended-upgrades` e `ufw`: se a instalação de alguma falhar, a execução é interrompida. Os demais utilitários gerais também são solicitados normalmente; uma falha entra nas pendências. Somente os pacotes da personalização Vim e os agentes de virtualização abaixo dependem dessas condições específicas.
+As dependências essenciais são `locales`, `openssh-server`, `sudo`, `fail2ban`, `python3-systemd`, `unattended-upgrades` e `ufw` (além de `auditd` e `audispd-plugins` em VMs/servidores físicos fora de contêineres LXC/WSL): se a instalação de alguma falhar, a execução é interrompida. Os demais utilitários gerais também são solicitados normalmente; uma falha entra nas pendências. Somente os pacotes da personalização Vim e os agentes de virtualização abaixo dependem dessas condições específicas.
 
 #### Base do sistema, acesso e segurança
 
@@ -142,8 +142,8 @@ As dependências essenciais são `locales`, `openssh-server`, `sudo`, `fail2ban`
 | `sudo` | Permite executar comandos com privilégios administrativos conforme a política sudoers; fornece `visudo` para validar essa política. | Vincula administradores ao grupo sudo e aplica a regra do grupo operacional solicitado. A implementação efetiva pode ser sudo-rs. |
 | `fail2ban` | Detecta falhas repetidas de autenticação nos logs e bloqueia temporariamente os endereços envolvidos. | Configura e ativa a jaula `sshd` com backend systemd, limite de cinco falhas em dez minutos e bloqueio de uma hora. As exceções de IP vêm dos parâmetros iniciais. |
 | `python3-systemd` | Permite que programas Python consultem recursos do systemd, incluindo o journal de logs. | Instala o suporte necessário para o Fail2Ban ler os eventos SSH pelo backend systemd. |
-| `auditd` | Registra eventos de auditoria fornecidos pelo kernel, como alterações em arquivos sensíveis e execução de comandos monitorados. | Configura retenção e regras para contas, sudoers, SSH, rede e persistência. Em Linux suportado, carrega/confere as regras; em WSL/contêiner, informa a limitação. |
-| `audispd-plugins` | Acrescenta plugins para encaminhar/processar eventos do sistema de auditoria. | Instala o pacote de suporte. Não configura encaminhamento para SIEM ou coletor remoto. |
+| `auditd` | Registra eventos de auditoria fornecidos pelo kernel, como alterações em arquivos sensíveis e execução de comandos monitorados. | Em VMs e servidores com kernel próprio, instala, configura retenção e regras para contas, sudoers, SSH, rede e persistência e confere o carregamento no kernel. Ignorado automaticamente em contêineres (LXC) e WSL. |
+| `audispd-plugins` | Acrescenta plugins para encaminhar/processar eventos do sistema de auditoria. | Instalado em VMs/servidores com kernel próprio junto ao `auditd` (ignorado em LXC/WSL). Não configura encaminhamento para SIEM ou coletor remoto. |
 | `unattended-upgrades` | Aplica automaticamente atualizações permitidas pela política de origens do APT, normalmente incluindo segurança. | Habilita a atualização periódica dos índices e as atualizações automáticas, com os timers APT. Preserva a política de origens da distribuição. |
 | `ufw` | Simplifica a administração do firewall Linux, controlando o tráfego permitido. | Se aceito, ativa o firewall, permite portas SSH detectadas e `10050/tcp` para Zabbix em IPv4/IPv6. |
 
@@ -620,7 +620,7 @@ O script valida cada política com o visudo instalado e depois valida o sudoers 
 
 ## 📊 10. Auditoria de Contas, Sudo e SSH
 
-Em VM Linux com suporte, o resumo só informa auditoria ativa após conferir serviço, estado do kernel e regras carregadas. Caminhos inexistentes são omitidos. Em WSL/contêiner, o relatório indica que a validação depende do host. Na homologação WSL de 30/09/2026, os arquivos passaram, mas `auditd.service` e `audit-rules.service` ficaram em `failed` por não conseguirem ativar a auditoria do kernel. Não considerar a auditoria operacional nesse ambiente apenas porque o pacote e as regras existem.
+Em VM Linux com suporte, o resumo só informa auditoria ativa após conferir serviço, estado do kernel e regras carregadas. Caminhos inexistentes são omitidos. Em WSL e contêineres (como LXC), a instalação e configuração do `auditd` são ignoradas automaticamente pelo script (e eventuais unidades `auditd.service`/`audit-rules.service` preexistentes são desabilitadas e limpas de estado `failed`), pois o subsistema de auditoria do kernel pertence ao host.
 
 ```bash
 sudo auditctl -s
