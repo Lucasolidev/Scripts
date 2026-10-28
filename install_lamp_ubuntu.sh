@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.5
+# Version: 2.6
 # ------------------------------------------------
-VERSION="2.5"
+VERSION="2.6"
 # ==============================================================================
 # INSTALADOR AUTOMATICO DA PILHA LAMP - UBUNTU
 # ==============================================================================
@@ -459,8 +459,17 @@ EOF
     fail2ban-client -t > /dev/null 2>&1
     systemctl enable --now fail2ban > /dev/null
     systemctl restart fail2ban
+    F2B_ATTEMPT=0
+    while ! fail2ban-client ping > /dev/null 2>&1; do
+        ((F2B_ATTEMPT++ >= 10)) && die "Timeout aguardando inicializacao do socket do Fail2Ban."
+        sleep 1
+    done
     for jail in sshd "${WEB_JAILS[@]}"; do
-        fail2ban-client status "$jail" > /dev/null || die "Jaula Fail2Ban inativa: $jail."
+        F2B_ATTEMPT=0
+        while ! fail2ban-client status "$jail" > /dev/null 2>&1; do
+            ((F2B_ATTEMPT++ >= 5)) && die "Jaula Fail2Ban inativa: $jail."
+            sleep 1
+        done
     done
     log_success "Fail2Ban ativo: SSH e ${WEB_JAILS[*]}."
     if [[ -n "$TRUSTED_PROXY" ]]; then
