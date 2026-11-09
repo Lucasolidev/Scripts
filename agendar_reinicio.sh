@@ -95,7 +95,7 @@ print_header "COLETA DE PARÂMETROS"
 
 HORA_ALVO=""
 while [ -z "$HORA_ALVO" ]; do
-    read -r -p "  ${FG_YELLOW}${ARROW} Digite o horário de reinício (formato HH:MM, ex: 23:30): ${NC}" ENTRADA_HORA
+    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Digite o horário de reinício (formato HH:MM, ex: 23:30): ${NC}")" ENTRADA_HORA
     ENTRADA_HORA=$(echo "$ENTRADA_HORA" | xargs)
 
     if [[ "$ENTRADA_HORA" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; then
