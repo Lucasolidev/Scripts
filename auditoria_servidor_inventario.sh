@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.8
+# Version: 2.9
 # ------------------------------------------------
-VERSION="2.8"
+VERSION="2.9"
 # ==============================================================================
 # AUDITORIA, VARREDURA E INVENTÁRIO 360° DO SERVIDOR LINUX (MULTI-DISTRO)
 # ==============================================================================
@@ -1892,8 +1892,19 @@ fi
 echo -e "\n  ${BOLD}4.6 Outros Serviços de Infraestrutura, Agentes e Daemons em Execução:${NC}"
 INFRA_FOUND=0
 
+_get_pkg_ver() {
+    local pkg="$1" v=""
+    if command -v dpkg-query >/dev/null 2>&1; then
+        v=$(dpkg-query -W -f='${Version}\n' "$pkg" 2>/dev/null | head -n 1 | sed 's/^[0-9]*://; s/-.*//' || true)
+    fi
+    if [[ -z "$v" ]] && command -v rpm >/dev/null 2>&1; then
+        v=$(rpm -q --qf '%{VERSION}\n' "$pkg" 2>/dev/null | grep -v "not installed" | head -n 1 || true)
+    fi
+    printf '%s' "$v"
+}
+
 get_daemon_version() {
-    local svc="$1" ver=""
+    local svc="$1" ver="" cand_bin="" cand_pkg="" exec_bin="" real_exec="" owner_pkg=""
     case "$svc" in
         cloudflared)
             ver=$(cloudflared --version 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="version") {print $(i+1); exit}}' || true)
@@ -1919,16 +1930,85 @@ get_daemon_version() {
         openvpn)
             ver=$(openvpn --version 2>/dev/null | head -n 1 | awk '{print $2}' || true)
             ;;
+        ssh|sshd)
+            cand_bin=$(command -v sshd 2>/dev/null || echo "/usr/sbin/sshd")
+            if [[ -x "$cand_bin" ]]; then
+                ver=$(timeout 2 "$cand_bin" -V 2>&1 | grep -oE 'OpenSSH_[0-9]+\.[0-9]+([a-zA-Z0-9.]+)?' | head -n 1 | sed 's/^OpenSSH_//' || true)
+            fi
+            [[ -z "$ver" ]] && ver=$(_get_pkg_ver "openssh-server")
+            ;;
+        zabbix-proxy)
+            for cand_bin in "$(command -v zabbix_proxy 2>/dev/null || true)" /usr/sbin/zabbix_proxy /usr/local/sbin/zabbix_proxy; do
+                if [[ -n "$cand_bin" && -x "$cand_bin" ]]; then
+                    ver=$(timeout 2 "$cand_bin" -V </dev/null 2>&1 | head -n 1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_.-]+)?' | head -n 1 || true)
+                    [[ -n "$ver" ]] && break
+                fi
+            done
+            if [[ -z "$ver" ]]; then
+                for cand_pkg in zabbix-proxy-sqlite3 zabbix-proxy-mysql zabbix-proxy-pgsql zabbix-proxy; do
+                    ver=$(_get_pkg_ver "$cand_pkg")
+                    [[ -n "$ver" ]] && break
+                done
+            fi
+            ;;
+        zabbix-server)
+            for cand_bin in "$(command -v zabbix_server 2>/dev/null || true)" /usr/sbin/zabbix_server /usr/local/sbin/zabbix_server; do
+                if [[ -n "$cand_bin" && -x "$cand_bin" ]]; then
+                    ver=$(timeout 2 "$cand_bin" -V </dev/null 2>&1 | head -n 1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_.-]+)?' | head -n 1 || true)
+                    [[ -n "$ver" ]] && break
+                fi
+            done
+            if [[ -z "$ver" ]]; then
+                for cand_pkg in zabbix-server-mysql zabbix-server-pgsql zabbix-server; do
+                    ver=$(_get_pkg_ver "$cand_pkg")
+                    [[ -n "$ver" ]] && break
+                done
+            fi
+            ;;
+        zabbix-agent)
+            for cand_bin in "$(command -v zabbix_agentd 2>/dev/null || true)" /usr/sbin/zabbix_agentd /usr/local/sbin/zabbix_agentd; do
+                if [[ -n "$cand_bin" && -x "$cand_bin" ]]; then
+                    ver=$(timeout 2 "$cand_bin" -V </dev/null 2>&1 | head -n 1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_.-]+)?' | head -n 1 || true)
+                    [[ -n "$ver" ]] && break
+                fi
+            done
+            ;;
+        zabbix-agent2)
+            for cand_bin in "$(command -v zabbix_agent2 2>/dev/null || true)" /usr/sbin/zabbix_agent2 /usr/local/sbin/zabbix_agent2; do
+                if [[ -n "$cand_bin" && -x "$cand_bin" ]]; then
+                    ver=$(timeout 2 "$cand_bin" -V </dev/null 2>&1 | head -n 1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_.-]+)?' | head -n 1 || true)
+                    [[ -n "$ver" ]] && break
+                fi
+            done
+            ;;
+        zabbix-java-gateway)
+            ver=$(_get_pkg_ver "zabbix-java-gateway")
+            ;;
     esac
-    if [[ -z "$ver" ]] && command -v dpkg-query >/dev/null 2>&1; then
-        ver=$(dpkg-query -W -f='${Version}\n' "$svc" 2>/dev/null | head -n 1 | sed 's/^[0-9]*://; s/-.*//' || true)
-    fi
-    if [[ -z "$ver" ]] && command -v rpm >/dev/null 2>&1; then
-        ver=$(rpm -q --qf '%{VERSION}\n' "$svc" 2>/dev/null | grep -v "not installed" | head -n 1 || true)
+    [[ -z "$ver" ]] && ver=$(_get_pkg_ver "$svc")
+    if [[ -z "$ver" ]] && command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+        exec_bin=$(systemctl show "${svc}.service" -p ExecStart --value 2>/dev/null | sed -n 's/.*path=\([^ ;]*\).*/\1/p' | head -n 1 || true)
+        if [[ -z "$exec_bin" ]]; then
+            exec_bin=$(systemctl show "${svc}.service" -p ExecStart --value 2>/dev/null | awk '{print $1}' | sed 's/^[-@!+]*//' || true)
+        fi
+        if [[ -n "$exec_bin" && -e "$exec_bin" ]]; then
+            if command -v dpkg-query >/dev/null 2>&1; then
+                owner_pkg=$(dpkg-query -S "$exec_bin" 2>/dev/null | grep -v '^diversion ' | head -n 1 | sed 's/:[[:space:]].*//; s/,.*//' || true)
+                if [[ -z "$owner_pkg" ]]; then
+                    real_exec=$(readlink -f "$exec_bin" 2>/dev/null || true)
+                    [[ -n "$real_exec" ]] && owner_pkg=$(dpkg-query -S "$real_exec" 2>/dev/null | grep -v '^diversion ' | head -n 1 | sed 's/:[[:space:]].*//; s/,.*//' || true)
+                fi
+                [[ -n "$owner_pkg" ]] && ver=$(_get_pkg_ver "$owner_pkg")
+            fi
+            if [[ -z "$ver" ]] && command -v rpm >/dev/null 2>&1; then
+                ver=$(rpm -qf --qf '%{VERSION}\n' "$exec_bin" 2>/dev/null | grep -v "not installed" | head -n 1 || true)
+            fi
+        fi
     fi
     if [[ -z "$ver" ]] && command -v "$svc" >/dev/null 2>&1; then
-        ver=$(timeout 2 "$svc" --version 2>/dev/null | head -n 1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_-]+)?' | head -n 1 || true)
+        ver=$(timeout 2 "$svc" --version </dev/null 2>/dev/null | head -n 1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9a-zA-Z_-]+)?' | head -n 1 || true)
     fi
+    ver="${ver#[vV]}"
     printf '%s' "${ver:-}"
 }
 
@@ -1969,6 +2049,15 @@ check_infra_service "exim4"                "Servidor de E-mail SMTP (Exim4)"    
 check_infra_service "dovecot"              "Servidor IMAP/POP3 (Dovecot)"               "Servidor IMAP/POP3"
 check_infra_service "zabbix-server"        "Zabbix Server (Central de Monitoramento)"   "Zabbix Server"
 check_infra_service "zabbix-proxy"         "Zabbix Proxy (Coletor Remoto)"              "Zabbix Proxy"
+if [[ -r /etc/zabbix/zabbix_proxy.conf ]] && { [[ "$(get_service_status_plain zabbix-proxy)" != "Não instalado" ]] || pgrep -x zabbix_proxy >/dev/null 2>&1; }; then
+    ZP_MODE_RAW=$(awk -F'=' '/^[ \t]*ProxyMode[ \t]*=/ {gsub(/[ \t\r]/,"",$2); print $2}' /etc/zabbix/zabbix_proxy.conf 2>/dev/null | tail -n 1 || true)
+    ZP_MODE_TXT="Ativo (0 - Padrão)"
+    [[ "$ZP_MODE_RAW" == "1" ]] && ZP_MODE_TXT="Passivo (1)"
+    ZP_SERVER=$(awk -F'=' '/^[ \t]*Server[ \t]*=/ {gsub(/[ \t\r]/,"",$2); print $2}' /etc/zabbix/zabbix_proxy.conf 2>/dev/null | tail -n 1 || true)
+    ZP_HOSTNAME=$(awk -F'=' '/^[ \t]*Hostname[ \t]*=/ {gsub(/^[ \t]+|[ \t\r]+$/,"",$2); print $2}' /etc/zabbix/zabbix_proxy.conf 2>/dev/null | tail -n 1 || true)
+    ZP_DBNAME=$(awk -F'=' '/^[ \t]*DBName[ \t]*=/ {gsub(/^[ \t]+|[ \t\r]+$/,"",$2); print $2}' /etc/zabbix/zabbix_proxy.conf 2>/dev/null | tail -n 1 || true)
+    echo -e "      └─ ${BOLD}Config Zabbix Proxy:${NC} Modo: ${FG_CYAN}${ZP_MODE_TXT}${NC}${ZP_HOSTNAME:+ | Hostname: ${FG_YELLOW}${ZP_HOSTNAME}${NC}}${ZP_SERVER:+ | Server: ${FG_GREEN}${ZP_SERVER}${NC}}${ZP_DBNAME:+ | DB: ${DIM}${ZP_DBNAME}${NC}}"
+fi
 check_infra_service "zabbix-agent2"        "Agente de Monitoramento Zabbix Agent 2"     "Monitorado (Zabbix Agent 2)"
 check_infra_service "zabbix-agent"         "Agente de Monitoramento Zabbix Agent"       "Monitorado (Zabbix Agent)"
 check_infra_service "snmpd"                "Agente SNMP (snmpd)"                        "Agente SNMP"
@@ -2012,7 +2101,7 @@ if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
         svc_base="${svc_unit%.service}"
         svc_ver=$(get_daemon_version "$svc_base")
         echo -e "      • ${FG_GREEN}${BOLD}${svc_unit}${NC}${svc_ver:+ (${FG_YELLOW}v${svc_ver}${NC})} — ${DIM}${svc_desc}${NC}"
-        if [[ ! "$svc_base" =~ ^(ssh|sshd|apache2|httpd|nginx|mariadb|mysql|mysqld|postgresql|redis|redis-server|docker|containerd|ufw|firewalld|nftables|php[0-9.]*-fpm|open-vm-tools|vmtoolsd|VGAuthService|qemu-guest-agent)$ ]]; then
+        if [[ ! "$svc_base" =~ ^(ssh|sshd|apache2|httpd|nginx|mariadb|mysql|mysqld|postgresql|redis|redis-server|docker|containerd|ufw|firewalld|nftables|php[0-9.]*-fpm|open-vm-tools|vmtoolsd|vgauth|VGAuthService|qemu-guest-agent)$ ]]; then
             add_unique_item RESUMO_APPS_VERSOES "${svc_base}:${svc_ver:-Ativo}"
         fi
     done < <(systemctl list-units --type=service --state=running --no-legend --plain 2>/dev/null | grep -vE "^(systemd-|user@|user-runtime-dir@|getty@|serial-getty@|container-getty@|console-getty|dbus\.service|polkit\.service|polkitd\.service|rsyslog\.service|syslog\.service|cron\.service|crond\.service|atd\.service|acpid\.service|iscsid\.service|lvm2-|lxcfs\.service|mdadm\.service|rc-local\.service|snapd\.service|apparmor\.service|auditd\.service|blk-availability\.service|ondemand\.service|cgmanager\.service|udev|kmod|multipathd|accounts-daemon|udisks2|upower|networkd-dispatcher|ModemManager|wpa_supplicant|avahi-daemon|bluetooth|colord|rtkit-daemon|switcheroo-control|thermald|power-profiles-daemon|irqbalance|packagekit|unattended-upgrades|wsl-pro|networking\.service|ifup@)" | awk '{
