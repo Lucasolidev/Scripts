@@ -118,9 +118,13 @@ function Invoke-DismEtapa {
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string[]]$Argumentos
+        [string[]]$Argumentos,
+
+        [Parameter(Mandatory = $true)]
+        [ref]$ReinicioDetectado
     )
 
+    # Chamada direta sem capturar saida garante exibicao ao vivo da barra de progresso do DISM
     & $CaminhoDism @Argumentos
     $codigoRetorno = $LASTEXITCODE
 
@@ -135,9 +139,9 @@ function Invoke-DismEtapa {
         throw $excecao
     }
 
-    return [PSCustomObject]@{
-        Codigo             = [int]$codigoRetorno
-        ReinicioNecessario = ($codigoRetorno -eq 3010)
+    if ($codigoRetorno -eq 3010) {
+        $ReinicioDetectado.Value = $true
+        Write-Host "`n[AVISO] A etapa '$NomeEtapa' retornou codigo 3010 (reinicializacao recomendada)." -ForegroundColor Yellow
     }
 }
 
@@ -183,11 +187,7 @@ else {
 
         if ($suportaRecursosAvancadosDism) {
             Write-Host "(Aguarde a conclusao da verificacao pelo DISM...)`n" -ForegroundColor Yellow
-            $resultadoAnalise = Invoke-DismEtapa -CaminhoDism $caminhoDism -NomeEtapa $etapa -Argumentos @('/Online', '/Cleanup-Image', '/AnalyzeComponentStore')
-            if ($resultadoAnalise.ReinicioNecessario) {
-                $reinicioNecessario = $true
-                Write-Host "`n[AVISO] A analise retornou codigo 3010 (reinicializacao recomendada)." -ForegroundColor Yellow
-            }
+            Invoke-DismEtapa -CaminhoDism $caminhoDism -NomeEtapa $etapa -Argumentos @('/Online', '/Cleanup-Image', '/AnalyzeComponentStore') -ReinicioDetectado ([ref]$reinicioNecessario)
         }
         else {
             Write-Host "[AVISO] Build $buildSistema detectada (Windows Server 2012 / 8). A flag /AnalyzeComponentStore requer build 9600+ (Server 2012 R2+)." -ForegroundColor Yellow
@@ -219,11 +219,7 @@ else {
         Write-Host "==========================================================" -ForegroundColor Cyan
         Write-Host "(Aguarde a conclusao da limpeza pelo DISM...)`n" -ForegroundColor Yellow
 
-        $resultadoLimpeza = Invoke-DismEtapa -CaminhoDism $caminhoDism -NomeEtapa $etapa -Argumentos $argumentosLimpeza
-        if ($resultadoLimpeza.ReinicioNecessario) {
-            $reinicioNecessario = $true
-            Write-Host "`n[AVISO] A limpeza concluiu com codigo 3010 (reinicializacao recomendada para finalizar remocoes)." -ForegroundColor Yellow
-        }
+        Invoke-DismEtapa -CaminhoDism $caminhoDism -NomeEtapa $etapa -Argumentos $argumentosLimpeza -ReinicioDetectado ([ref]$reinicioNecessario)
 
         $espacoDepoisBytes = (Get-PSDrive -Name $letraDiscoSistema).Free
         $diferencaBytes = $espacoDepoisBytes - $espacoAntesBytes
