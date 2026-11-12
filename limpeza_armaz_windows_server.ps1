@@ -272,7 +272,13 @@ else {
 if ($null -ne $codigoDismErro) {
     Write-Host "  - Codigo erro DISM:  $codigoDismErro" -ForegroundColor Red
 }
-Write-Host "  - Codigo de saida:   $codigoSaida" -ForegroundColor White
+if ($codigoSaida -eq 0) {
+    $descricaoCodigoSaida = '0 (Sucesso - concluido sem erros)'
+}
+else {
+    $descricaoCodigoSaida = "$codigoSaida (Falha - operacao interrompida por erro)"
+}
+Write-Host "  - Codigo de saida:   $descricaoCodigoSaida" -ForegroundColor $corStatus
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
 
 # Quando executado via Invoke-Expression (iex), usa return para nao fechar a janela do PowerShell do operador
