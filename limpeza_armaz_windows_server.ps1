@@ -1,25 +1,27 @@
 <#
 .SYNOPSIS
-    Analisa o repositorio de componentes (WinSxS) no Windows Server e executa a limpeza se recomendado.
+    Analisa e executa a limpeza do repositorio de componentes (WinSxS) no Windows Server.
 .DESCRIPTION
-    Script PowerShell compativel com versoes antigas e recentes.
-    Executa 'Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore' e, caso a limpeza seja recomendada,
-    inicia a operacao 'Dism.exe /Online /Cleanup-Image /StartComponentCleanup'.
+    Script PowerShell compativel com versoes antigas e recentes do Windows Server.
+    Executa sequencialmente a analise (/AnalyzeComponentStore) e a limpeza (/StartComponentCleanup).
 .EXAMPLE
     .\limpeza_armaz_windows_server.ps1
-.EXAMPLE
-    .\limpeza_armaz_windows_server.ps1 -WhatIf
 .NOTES
-    Versao: 1.2
+    Versao: 1.3
     Requisitos: Windows PowerShell 5.1 ou PowerShell 7.
     Requer privilegios de Administrador para operacoes do DISM.
-    Saida: 0 = sucesso ou simulacao; 1 = falha; 2 = cancelamento.
+    Saida: 0 = sucesso; 1 = falha.
 #>
+
+# ==============================================================================
+# Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/lucasolidev/scripts/main/limpeza_armaz_windows_server.ps1 | iex
+# ==============================================================================
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
 
-[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+[CmdletBinding()]
 [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Script interativo de console com interface visual para o operador')]
 param()
 
@@ -28,88 +30,69 @@ $codigoSaida = 1
 $status = 'Falha'
 $corStatus = 'Red'
 $etapa = 'Validacao inicial'
-$detalheLimpeza = 'Nao executada'
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " Script de Limpeza da Pasta Updates (WinSxS) v1.2" -ForegroundColor Cyan
+Write-Host " Script de Limpeza do Component Store (WinSxS) v1.3" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
+
+# Validacao de privilegios de Administrador (garante funcionamento mesmo via Invoke-Expression / iex)
+$identidade = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]$identidade
+$isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if (-not $isAdmin) {
+    Write-Host "`nERRO: Este script requer privilegios de Administrador para executar o DISM." -ForegroundColor Red
+    Write-Host "Por favor, abra o PowerShell como Administrador e execute novamente.`n" -ForegroundColor Yellow
+    if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)) {
+        return
+    }
+    exit 1
+}
 
 try {
+    # -------------------------------------------------------------------------
+    # Etapa 1: Verifica (AnalyzeComponentStore)
+    # -------------------------------------------------------------------------
     $etapa = 'Analise do Component Store'
-    Write-Host "`nIniciando analise do repositorio de componentes (WinSxS)..." -ForegroundColor Cyan
-    Write-Host "(Essa operacao pode demorar alguns minutos. Aguarde...)" -ForegroundColor Yellow
+    Write-Host "`n==========================================================" -ForegroundColor Cyan
+    Write-Host " Etapa 1/2: Analisando o Component Store..." -ForegroundColor Cyan
+    Write-Host "==========================================================" -ForegroundColor Cyan
+    Write-Host "(Aguarde a conclusao da verificacao pelo DISM...)`n" -ForegroundColor Yellow
 
-    $argumentosAnalise = @('/Online', '/Cleanup-Image', '/AnalyzeComponentStore', '/NoRestart')
-    $analise = & Dism.exe @argumentosAnalise 2>&1 | Out-String
+    $argumentosAnalise = @('/Online', '/Cleanup-Image', '/AnalyzeComponentStore')
+    & Dism.exe @argumentosAnalise
+    $codigoDismAnalise = $LASTEXITCODE
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "O DISM falhou durante a analise do repositorio (codigo de saida: $LASTEXITCODE)."
+    if ($codigoDismAnalise -ne 0) {
+        throw "O DISM falhou durante a analise do repositorio (codigo de saida: $codigoDismAnalise)."
     }
 
-    Write-Host "`n$analise" -ForegroundColor White
+    # -------------------------------------------------------------------------
+    # Etapa 2: Limpeza (StartComponentCleanup)
+    # -------------------------------------------------------------------------
+    $etapa = 'Limpeza do Component Store'
+    Write-Host "`n==========================================================" -ForegroundColor Cyan
+    Write-Host " Etapa 2/2: Executando a Limpeza do Component Store..." -ForegroundColor Cyan
+    Write-Host "==========================================================" -ForegroundColor Cyan
+    Write-Host "(Aguarde a conclusao da limpeza pelo DISM...)`n" -ForegroundColor Yellow
 
-    $padraoLimpezaRecomendada = '(Limpeza.*Componentes Recomendada\s*:\s*Sim)|(Component Store Cleanup Recommended\s*:\s*Yes)'
+    $argumentosLimpeza = @('/Online', '/Cleanup-Image', '/StartComponentCleanup')
+    & Dism.exe @argumentosLimpeza
+    $codigoDismLimpeza = $LASTEXITCODE
 
-    if ($analise -match $padraoLimpezaRecomendada) {
-        Write-Host "==========================================================" -ForegroundColor Green
-        Write-Host " Limpeza RECOMENDADA pelo sistema operacional!            " -ForegroundColor Green
-        Write-Host "==========================================================" -ForegroundColor Green
-
-        if ($PSCmdlet.ShouldProcess('WinSxS Component Store', 'Executar StartComponentCleanup')) {
-            $etapa = 'Execucao da Limpeza (StartComponentCleanup)'
-
-            $espacoLivreAntes = (Get-PSDrive -Name C).Free
-
-            $argumentosLimpeza = @('/Online', '/Cleanup-Image', '/StartComponentCleanup', '/NoRestart')
-            & Dism.exe @argumentosLimpeza
-
-            $codigoDism = $LASTEXITCODE
-            if ($codigoDism -ne 0) {
-                throw "O DISM falhou durante a limpeza (codigo de saida: $codigoDism)."
-            }
-
-            $espacoLivreDepois = (Get-PSDrive -Name C).Free
-            $liberadoBytes = $espacoLivreDepois - $espacoLivreAntes
-
-            if ($liberadoBytes -gt 0) {
-                $liberadoMB = [math]::Round($liberadoBytes / 1MB, 2)
-                $liberadoGB = [math]::Round($liberadoBytes / 1GB, 2)
-                $detalheLimpeza = "Espaco liberado: $liberadoMB MB ($liberadoGB GB)"
-                Write-Host "`n$detalheLimpeza" -ForegroundColor Green
-            }
-            else {
-                $detalheLimpeza = 'Limpeza concluida sem liberacao imediata de espaco adicional'
-                Write-Host "`n$detalheLimpeza" -ForegroundColor Yellow
-            }
-
-            $status = 'Limpeza concluida com exito'
-            $corStatus = 'Green'
-            $codigoSaida = 0
-        }
-        elseif ($WhatIfPreference) {
-            $status = 'Simulacao concluida; nenhuma alteracao aplicada'
-            $corStatus = 'Yellow'
-            $detalheLimpeza = 'Simulacao de limpeza'
-            $codigoSaida = 0
-        }
-        else {
-            $status = 'Cancelado pelo operador; nenhuma alteracao aplicada'
-            $corStatus = 'Yellow'
-            $codigoSaida = 2
-        }
+    if ($codigoDismLimpeza -ne 0) {
+        throw "O DISM falhou durante a limpeza do repositorio (codigo de saida: $codigoDismLimpeza)."
     }
-    else {
-        Write-Host "==========================================================" -ForegroundColor Yellow
-        Write-Host " Limpeza NAO e necessaria no momento.                     " -ForegroundColor Yellow
-        Write-Host "==========================================================" -ForegroundColor Yellow
-        $status = 'Analise concluida (Limpeza desnecessaria)'
-        $corStatus = 'Green'
-        $detalheLimpeza = 'Repositorio saudavel'
-        $codigoSaida = 0
-    }
+
+    $status = 'Processo concluido com exito'
+    $corStatus = 'Green'
+    $codigoSaida = 0
 }
 catch {
-    Write-Error -Message "Falha na etapa: $etapa. A operacao foi interrompida." -ErrorAction Continue
+    Write-Host "`n==========================================================" -ForegroundColor Red
+    Write-Host "  [ERRO] Falha na etapa: $etapa" -ForegroundColor Red
+    Write-Host "==========================================================" -ForegroundColor Red
+    Write-Host "A operacao foi interrompida antes de concluir todas as etapas." -ForegroundColor Yellow
     $status = 'Falha durante a execucao'
     $corStatus = 'Red'
     $codigoSaida = 1
@@ -119,8 +102,12 @@ Write-Host "`n==========================================================" -Foreg
 Write-Host "  RESUMO DA EXECUCAO" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "  - Status:          $status" -ForegroundColor $corStatus
-Write-Host "  - Resultado WinSxS: $detalheLimpeza" -ForegroundColor White
 Write-Host "  - Codigo de saida: $codigoSaida" -ForegroundColor White
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+
+# Quando executado via Invoke-Expression (iex), usa return para nao fechar a janela do PowerShell do operador
+if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)) {
+    return
+}
 
 exit $codigoSaida
