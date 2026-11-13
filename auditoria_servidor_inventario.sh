@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 2.9
+# Version: 3.0
 # ------------------------------------------------
-VERSION="2.9"
+VERSION="3.0"
 # ==============================================================================
 # AUDITORIA, VARREDURA E INVENTÁRIO 360° DO SERVIDOR LINUX (MULTI-DISTRO)
 # ==============================================================================
@@ -10,12 +10,12 @@ VERSION="2.9"
 # Descrição: Raio-X completo e 100% passivo (somente leitura) organizado por:
 #            1. Sistema Operacional, Atualizações Pendentes e Reboot Pendente;
 #            2. Usuários Ativos, Grupos Pertencentes, Sudos e LDAP/AD;
-#            3. Armazenamento, Unidades no FSTAB, NFS e SAMBA (Cliente/Servidor);
-#            4. Aplicações, Web, PHP Profundo, Runtimes, CMSs e Containers;
-#            5. Bancos de Dados (Quais, Versões, Datadir, Tamanhos e Schemas);
-#            6. Firewall (Ativo/Inativo), Regras de Filtragem e Segurança;
-#            7. Portas Abertas (LISTEN), Rede, /etc/hosts e Conexões Ativas;
-#            8. Crontabs, Systemd Timers, Scripts e Backups Locais.
+#            3. Armazenamento, Inodes, RAID/ZFS, FSTAB, NFS e SAMBA;
+#            4. Aplicações, Web (Apache/Nginx), Certbot, PHP, Runtimes, CMSs, Node/Python e Containers;
+#            5. Bancos de Dados (MySQL/MariaDB, PostgreSQL, Redis, Mongo, SQLite);
+#            6. Firewall (Ativo/Inativo, Docker Bypass), Regras, SSH, Fail2Ban e Segurança;
+#            7. Portas Abertas (LISTEN), Rede, DNS, /etc/hosts e Conexões Ativas;
+#            8. Crontabs, Systemd Timers, Scripts, Backups Locais e Exportação JSON opcional.
 #            Grava o relatório exclusivamente na Home do usuário executor.
 # Autor: Lucas Oliveira
 # Repositório: https://github.com/Lucasolidev/Scripts
@@ -25,12 +25,12 @@ VERSION="2.9"
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Sistema Operacional: Identifica distro, versão, kernel, hardware/VM, verifica se está atualizado, lista quais pacotes estão pendentes e se aguarda reinicialização (reboot required).
 # 2. Usuários, Grupos, Sudo e LDAP/AD: Lista usuários ativos e todos os grupos a que pertencem, quem são os usuários/grupos sudo, histórico de acessos e integração LDAP/Active Directory/SSSD/Winbind.
-# 3. Armazenamento, FSTAB, NFS e SAMBA: Mostra discos/partições, valida todas as entradas do /etc/fstab (montadas ou não), mapeia cliente/servidor NFS (/etc/exports) e cliente/servidor Samba (smb.conf shares).
-# 4. Aplicações (Quais e Versões): Inventaria Servidores Web (Apache, Nginx, Caddy, HAProxy, Tomcat), PHP (CLI, FPM, CGI, mod_php, php.ini, CVEs/EOL), Runtimes (Node, Python, Java, .NET, Go), CMSs/Sistemas no disco (Joomla, WordPress, Laravel, GLPI, Zabbix, Moodle, Nextcloud, etc.) e Contêineres Docker/Podman (inspeção interna).
+# 3. Armazenamento, Inodes, RAID/ZFS, FSTAB, NFS e SAMBA: Mostra discos/partições, checa inodes (df -i), saúde de RAID (mdadm) e ZFS, valida /etc/fstab (com timeout em montagens remotas) e mapeia NFS/Samba.
+# 4. Aplicações (Quais e Versões): Inventaria Servidores Web (Apache e Nginx bloco-a-bloco), Certbot/SSL, PHP (CLI, FPM, CGI, mod_php, extensões, php.ini, CVEs/EOL), Runtimes, Apps (Nextcloud, Joomla, WordPress, Vtiger, GLPI, Moodle, Node, Python) e Contêineres Docker/Podman (restarts, Compose e portas públicas).
 # 5. Bancos de Dados (Quais, Versões e Relevantes): Detecta MariaDB/MySQL, PostgreSQL, Redis, MongoDB, Firebird, MSSQL, SQLite, mostrando versão, status, porta/bind, datadir, tamanho em disco e schemas/bases criadas.
-# 6. Firewall e Segurança: Verifica se o Firewall está ativo ou inativo (UFW, Firewalld, NFTables, IPTables), lista as regras reais configuradas, audita SSH, Fail2Ban, SELinux/AppArmor e unidades systemd com falha.
-# 7. Portas Abertas e Rede: Lista todas as portas TCP/UDP abertas com PID, processo, serviço systemd e diretório (CWD), além de IPs, rotas, DNS, /etc/hosts e conexões estabelecidas.
-# 8. Automação, Scripts, Backups e Resumo Executivo: Lista crontabs, timers, scripts locais (.sh/.py), dumps/backups (.sql/.tar.gz) e salva o relatório limpo apenas na Home de quem executou.
+# 6. Firewall e Segurança: Verifica Firewall (UFW, Firewalld, NFTables, IPTables), alerta sobre portas Docker que contornam UFW/Firewalld, audita SSH, Fail2Ban (com IPs banidos por jail), SELinux/AppArmor e unidades systemd com falha.
+# 7. Portas Abertas e Rede: Lista portas TCP/UDP abertas com PID, serviço e CWD, alerta exposições sensíveis em 0.0.0.0, testa resolução DNS, exibe IPs, rotas, /etc/hosts e conexões estabelecidas.
+# 8. Automação, Scripts, Backups e Resumo Executivo: Lista crontabs, timers, scripts locais (.sh/.py), dumps/backups e salva relatório (.log e opcionalmente .json) apenas na Home de quem executou.
 # ==============================================================================
 
 set -Eeuo pipefail
@@ -46,23 +46,93 @@ fi
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ==============================================================================
-# 1 - INICIALIZAÇÃO E FUNÇÕES BASE (100% SOMENTE LEITURA NO SISTEMA)
+# 1 - INICIALIZAÇÃO, ARGUMENTOS CLI E FUNÇÕES BASE (100% SOMENTE LEITURA)
 # ==============================================================================
 
-# 1.1 - PALETA DE CORES E ESTILOS (ANSI)
-NC='\033[0m'
-BOLD='\033[1m'
-DIM='\033[2m'
+OPT_NO_COLOR=0
+OPT_FAST=0
+OPT_JSON=0
 
-FG_RED='\033[31m'
-FG_GREEN='\033[32m'
-FG_YELLOW='\033[33m'
-FG_CYAN='\033[36m'
-FG_WHITE='\033[37m'
+while (( $# > 0 )); do
+    case "$1" in
+        --plain|--no-color)
+            OPT_NO_COLOR=1
+            shift
+            ;;
+        --fast|--no-du)
+            OPT_FAST=1
+            shift
+            ;;
+        --json)
+            OPT_JSON=1
+            shift
+            ;;
+        -h|--help)
+            cat <<EOF
+Uso: sudo ./$(basename "$0") [OPÇÕES]
+
+Opções disponíveis:
+  --fast, --no-du      Pula cálculos de tamanho (du -sh) em diretórios grandes
+  --json               Exporta também resumo estruturado em JSON na Home
+  --plain, --no-color  Desativa cores ANSI na saída do terminal
+  -h, --help           Exibe esta ajuda e sai
+EOF
+            exit 0
+            ;;
+        *)
+            echo "Opção desconhecida: $1 (use --help para ver as opções disponíveis)" >&2
+            exit 2
+            ;;
+    esac
+done
+[[ -n "${NO_COLOR:-}" ]] && OPT_NO_COLOR=1
+
+# 1.1 - PALETA DE CORES E ESTILOS (ANSI)
+if (( OPT_NO_COLOR == 0 )); then
+    NC='\033[0m'
+    BOLD='\033[1m'
+    DIM='\033[2m'
+    FG_RED='\033[31m'
+    FG_GREEN='\033[32m'
+    FG_YELLOW='\033[33m'
+    FG_CYAN='\033[36m'
+    FG_WHITE='\033[37m'
+else
+    NC=''
+    BOLD=''
+    DIM=''
+    FG_RED=''
+    FG_GREEN=''
+    FG_YELLOW=''
+    FG_CYAN=''
+    FG_WHITE=''
+fi
 
 ARROW="❯"
 
-# 1.2 - FUNÇÕES AUXILIARES DE VISUAL E DETECÇÃO MULTI-DISTRO DE SERVIÇOS
+# 1.2 - FUNÇÕES AUXILIARES DE VISUAL, HIGIENIZAÇÃO E DETECÇÃO MULTI-DISTRO
+# shellcheck disable=SC2120
+trim_ws() {
+    local s=""
+    if (( $# > 0 )); then
+        s="$1"
+    else
+        s=$(cat)
+    fi
+    printf '%s' "$s" | tr '\r\n' '  ' | sed -E 's/^[ \t]+|[ \t]+$//g; s/[ \t]{2,}/ /g'
+}
+
+safe_du() {
+    local target="$1"
+    if (( OPT_FAST == 1 )); then
+        printf 'Pulado (--fast)'
+        return 0
+    fi
+    local res=""
+    res=$(timeout 5 du -sh "$target" 2>/dev/null | awk '{print $1}' || true)
+    printf '%s' "${res:-N/A (>5s)}"
+}
+
 draw_separator() {
     echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
 }
@@ -147,6 +217,8 @@ DISCOVERED_WEB_ROOTS=()
 AUDITED_APP_DIRS=()
 SCAN_DIRS=()
 RENEW_MECHANISMS=()
+DOCKER_PUBLIC_PORTS=()
+SQLITE_DBS_FOUND=()
 
 add_role() {
     local role="$1"
@@ -178,6 +250,77 @@ add_unique_item() {
         done
     fi
     eval "${arr_name}+=(\"\$val\")"
+}
+
+# shellcheck disable=SC2317,SC2329
+_json_escape() {
+    printf '%s' "${1:-}" | awk '
+        BEGIN { ORS=""; first=1 }
+        {
+            if (!first) printf "\\n"
+            first=0
+            gsub(/\\/, "\\\\")
+            gsub(/"/, "\\\"")
+            gsub(/\t/, "\\t")
+            gsub(/\r/, "")
+            printf "%s", $0
+        }
+    '
+}
+
+# shellcheck disable=SC2317,SC2329
+_json_array() {
+    local arr_name="$1"
+    local count=0 i=0
+    eval "count=\${#${arr_name}[@]}"
+    printf '['
+    if (( count > 0 )); then
+        local -a items=()
+        # shellcheck disable=SC2154
+        eval "items=(\"\${${arr_name}[@]}\")"
+        local item
+        for item in "${items[@]}"; do
+            (( i > 0 )) && printf ', '
+            printf '"%s"' "$(_json_escape "$item")"
+            i=$((i + 1))
+        done
+    fi
+    printf ']'
+}
+
+# shellcheck disable=SC2317,SC2329
+write_json_summary() {
+    local out_file="$1"
+    local fqdn_val
+    fqdn_val=$(hostname -f 2>/dev/null || hostname 2>/dev/null || uname -n 2>/dev/null || echo "")
+    cat > "$out_file" <<EOF
+{
+  "script_version": "$(_json_escape "${VERSION:-}")",
+  "scanned_at": "$(date '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S')",
+  "hostname": "$(_json_escape "${HOSTNAME_SHORT:-}")",
+  "fqdn": "$(_json_escape "$fqdn_val")",
+  "primary_ip": "$(_json_escape "${PRIMARY_IP:-}")",
+  "public_ip": "$(_json_escape "${PUBLIC_IP:-}")",
+  "os": "$(_json_escape "${OS_NAME:-}")",
+  "os_family": "$(_json_escape "${OS_FAMILY:-}")",
+  "kernel": "$(_json_escape "${KERNEL_VER:-}")",
+  "virtualization": "$(_json_escape "${VIRT_TYPE:-}")",
+  "updates_pending": ${PENDING_UPDATES_COUNT:-0},
+  "reboot_required": "$(_json_escape "${REBOOT_NEEDED:-Não}")",
+  "firewall_state": "$(_json_escape "${FIREWALL_SUMMARY_STATE:-INATIVO}")",
+  "certbot": "$(_json_escape "${RESUMO_CERTBOT_STATUS:-}")",
+  "roles": $(_json_array PAPEIS_DETECTADOS),
+  "apps": $(_json_array RESUMO_APPS_VERSOES),
+  "php": $(_json_array RESUMO_PHP_VERSOES),
+  "databases": $(_json_array RESUMO_BANCOS_ATIVOS),
+  "containers": $(_json_array RESUMO_CONTAINERS_ATIVOS),
+  "sites": $(_json_array RESUMO_SITES_DETECTADOS),
+  "sudo_users": $(_json_array RESUMO_USUARIOS_SUDO),
+  "sudo_groups": $(_json_array RESUMO_GRUPOS_SUDO),
+  "storage_net": $(_json_array RESUMO_STORAGE_REDE),
+  "alerts": $(_json_array ALERTAS_AUDITORIA)
+}
+EOF
 }
 
 # 1.3 - FUNÇÕES DE ESCRITA EXCLUSIVA NA HOME DO EXECUTOR (NADA FORA DA HOME É ALTERADO)
@@ -225,6 +368,10 @@ finalizar() {
     if [[ -f "${LOG_FILE:-}" ]]; then
         sed -r 's/\x1B\[[0-9;]*[a-zA-Z]//g' "$LOG_FILE" > "$CLEAN_LOG_FILE" 2>/dev/null || cp "$LOG_FILE" "$CLEAN_LOG_FILE"
 
+        if (( OPT_JSON == 1 )) && [[ -n "${JSON_FILE:-}" ]]; then
+            write_json_summary "$JSON_FILE" 2>/dev/null || true
+        fi
+
         echo -e ""
         print_header "9. GERAÇÃO E SALVAMENTO DO RELATÓRIO NA HOME DO EXECUTOR"
 
@@ -238,6 +385,14 @@ finalizar() {
                 else
                     log_warning "Não foi possível gravar na Home (${EXECUTOR_HOME})."
                 fi
+                if (( OPT_JSON == 1 )) && [[ -s "${JSON_FILE:-}" ]]; then
+                    if copy_to_home "$EXECUTOR_USER" "$EXECUTOR_HOME" "$JSON_FILE" "$JSON_FILENAME" &&
+                       copy_to_home "$EXECUTOR_USER" "$EXECUTOR_HOME" "$JSON_FILE" "$JSON_LATEST"; then
+                        log_success "Inventário JSON salvo na Home: ${FG_CYAN}${EXECUTOR_HOME}/${JSON_FILENAME}${NC}"
+                    else
+                        log_warning "Não foi possível gravar o JSON na Home (${EXECUTOR_HOME})."
+                    fi
+                fi
             else
                 if save_direct_report "$CLEAN_LOG_FILE" "${EXECUTOR_HOME}/${LOG_FILENAME}" 600 &&
                    save_direct_report "$CLEAN_LOG_FILE" "${EXECUTOR_HOME}/${LOG_LATEST}" 600; then
@@ -246,6 +401,14 @@ finalizar() {
                     log_info "Atalho atualizado: ${FG_CYAN}${EXECUTOR_HOME}/${LOG_LATEST}${NC}"
                 else
                     log_warning "Não foi possível gravar na Home (${EXECUTOR_HOME})."
+                fi
+                if (( OPT_JSON == 1 )) && [[ -s "${JSON_FILE:-}" ]]; then
+                    if save_direct_report "$JSON_FILE" "${EXECUTOR_HOME}/${JSON_FILENAME}" 600 &&
+                       save_direct_report "$JSON_FILE" "${EXECUTOR_HOME}/${JSON_LATEST}" 600; then
+                        log_success "Inventário JSON salvo na Home: ${FG_CYAN}${EXECUTOR_HOME}/${JSON_FILENAME}${NC}"
+                    else
+                        log_warning "Não foi possível gravar o JSON na Home (${EXECUTOR_HOME})."
+                    fi
                 fi
             fi
         fi
@@ -298,9 +461,12 @@ if [[ -e "${EXECUTOR_HOME}/${LOG_FILENAME}" || -L "${EXECUTOR_HOME}/${LOG_FILENA
     LOG_FILENAME="relatorio_inventario_${HOSTNAME_SHORT}_${LOG_TIMESTAMP}_$$.log"
 fi
 LOG_LATEST="relatorio_inventario_latest.log"
+JSON_FILENAME="${LOG_FILENAME%.log}.json"
+JSON_LATEST="relatorio_inventario_latest.json"
 LOG_DIR=$(mktemp -d -p /tmp auditoria_inventario.XXXXXXXX)
 LOG_FILE="${LOG_DIR}/${LOG_FILENAME}.raw"
 CLEAN_LOG_FILE="${LOG_DIR}/${LOG_FILENAME}"
+JSON_FILE="${LOG_DIR}/${JSON_FILENAME}"
 touch "$LOG_FILE"
 
 exec 3>&1 4>&2
@@ -374,10 +540,10 @@ SYS_VENDOR=""
 PRODUCT_NAME=""
 PRODUCT_UUID=""
 PRODUCT_SERIAL=""
-[[ -r /sys/class/dmi/id/sys_vendor ]] && SYS_VENDOR=$(xargs < /sys/class/dmi/id/sys_vendor 2>/dev/null || true)
-[[ -r /sys/class/dmi/id/product_name ]] && PRODUCT_NAME=$(xargs < /sys/class/dmi/id/product_name 2>/dev/null || true)
-[[ -r /sys/class/dmi/id/product_uuid ]] && PRODUCT_UUID=$(xargs < /sys/class/dmi/id/product_uuid 2>/dev/null || true)
-[[ -r /sys/class/dmi/id/product_serial ]] && PRODUCT_SERIAL=$(xargs < /sys/class/dmi/id/product_serial 2>/dev/null || true)
+[[ -r /sys/class/dmi/id/sys_vendor ]] && SYS_VENDOR=$(trim_ws < /sys/class/dmi/id/sys_vendor 2>/dev/null || true)
+[[ -r /sys/class/dmi/id/product_name ]] && PRODUCT_NAME=$(trim_ws < /sys/class/dmi/id/product_name 2>/dev/null || true)
+[[ -r /sys/class/dmi/id/product_uuid ]] && PRODUCT_UUID=$(trim_ws < /sys/class/dmi/id/product_uuid 2>/dev/null || true)
+[[ -r /sys/class/dmi/id/product_serial ]] && PRODUCT_SERIAL=$(trim_ws < /sys/class/dmi/id/product_serial 2>/dev/null || true)
 HW_IDENTITY="${SYS_VENDOR:-Genérico}${PRODUCT_NAME:+ ${PRODUCT_NAME}}"
 
 TZ_VAL="Desconhecido"
@@ -396,7 +562,7 @@ elif [[ -L /etc/localtime ]]; then
 fi
 
 # 1.3 - Hardware (CPU e Memória)
-CPU_MODEL=$(grep -m 1 "model name" /proc/cpuinfo 2>/dev/null | cut -d':' -f2 | xargs || lscpu 2>/dev/null | awk -F: '/Model name/ {print $2}' | xargs || echo "Desconhecido")
+CPU_MODEL=$(grep -m 1 "model name" /proc/cpuinfo 2>/dev/null | cut -d':' -f2 | trim_ws || lscpu 2>/dev/null | awk -F: '/Model name/ {print $2}' | trim_ws || echo "Desconhecido")
 CPU_CORES=$(nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo "1")
 
 MEM_TOTAL=$(free -h 2>/dev/null | awk '/^Mem:/ {print $2}')
@@ -426,17 +592,17 @@ if command -v apt-get >/dev/null 2>&1; then
     APT_SIM=$(apt-get -s upgrade 2>/dev/null || true)
     PENDING_UPDATES_COUNT=$(echo "$APT_SIM" | awk '/^Inst / {c++} END {print c+0}')
     PENDING_LIST_DETAILS=$(echo "$APT_SIM" | awk '/^Inst / {print $2 " " $3 " -> " $4}' || true)
-    CRITICAL_PKGS_PENDING=$( (echo "$APT_SIM" | awk '/^Inst / {print $2}' | grep -E '^(php|libapache2-mod-php|apache2|nginx|mariadb|mysql|postgresql|openssh|openssl|linux-image|docker|samba|bind9|sudo|cloudflared)' || true) | xargs || true )
+    CRITICAL_PKGS_PENDING=$( (echo "$APT_SIM" | awk '/^Inst / {print $2}' | grep -E '^(php|libapache2-mod-php|apache2|nginx|mariadb|mysql|postgresql|openssh|openssl|linux-image|docker|samba|bind9|sudo|cloudflared)' || true) | trim_ws || true )
 elif command -v dnf >/dev/null 2>&1; then
     DNF_SIM=$(dnf check-update -q --cacheonly 2>/dev/null || true)
     PENDING_UPDATES_COUNT=$(echo "$DNF_SIM" | awk 'NF>=3 && $1 !~ /^(Last|Obsoleting|Security:)/ {count++} END {print count+0}')
     PENDING_LIST_DETAILS=$(echo "$DNF_SIM" | awk 'NF>=3 && $1 !~ /^(Last|Obsoleting|Security:)/ {print $1 " -> " $2 " (" $3 ")"}' || true)
-    CRITICAL_PKGS_PENDING=$(echo "$DNF_SIM" | awk 'NF>=3 {print $1}' | grep -E '^(php|httpd|nginx|mariadb|mysql|postgresql|openssh|openssl|kernel|docker|samba|bind|sudo)' | xargs || true)
+    CRITICAL_PKGS_PENDING=$(echo "$DNF_SIM" | awk 'NF>=3 {print $1}' | grep -E '^(php|httpd|nginx|mariadb|mysql|postgresql|openssh|openssl|kernel|docker|samba|bind|sudo)' | trim_ws || true)
 elif command -v yum >/dev/null 2>&1; then
     YUM_SIM=$(yum check-update -q -C 2>/dev/null || true)
     PENDING_UPDATES_COUNT=$(echo "$YUM_SIM" | awk 'NF>=3 && $1 !~ /^(Loaded|Obsoleting|Security:)/ {count++} END {print count+0}')
     PENDING_LIST_DETAILS=$(echo "$YUM_SIM" | awk 'NF>=3 && $1 !~ /^(Loaded|Obsoleting|Security:)/ {print $1 " -> " $2 " (" $3 ")"}' || true)
-    CRITICAL_PKGS_PENDING=$(echo "$YUM_SIM" | awk 'NF>=3 {print $1}' | grep -E '^(php|httpd|nginx|mariadb|mysql|postgresql|openssh|openssl|kernel|docker|samba|bind|sudo)' | xargs || true)
+    CRITICAL_PKGS_PENDING=$(echo "$YUM_SIM" | awk 'NF>=3 {print $1}' | grep -E '^(php|httpd|nginx|mariadb|mysql|postgresql|openssh|openssl|kernel|docker|samba|bind|sudo)' | trim_ws || true)
 elif command -v zypper >/dev/null 2>&1; then
     ZYP_SIM=$(zypper --non-interactive list-updates 2>/dev/null | awk -F'|' 'NR>4 && NF>=5 {gsub(/^[ \t]+|[ \t]+$/, "", $3); gsub(/^[ \t]+|[ \t]+$/, "", $4); gsub(/^[ \t]+|[ \t]+$/, "", $5); if ($3!="") print $3 " (" $4 " -> " $5 ")"}' || true)
     if [[ -n "$ZYP_SIM" ]]; then
@@ -555,9 +721,9 @@ for priv_grp in sudo wheel admin adm docker lxd; do
     GRP_ENTRY=$(getent group "$priv_grp" 2>/dev/null || true)
     [[ -z "$GRP_ENTRY" ]] && continue
     GRP_GID=$(echo "$GRP_ENTRY" | cut -d: -f3)
-    GRP_USERS=$(echo "$GRP_ENTRY" | cut -d: -f4 | tr ',' ' ' | xargs || true)
-    PRI_USERS=$(awk -F: -v gid="$GRP_GID" '$4 == gid {print $1}' /etc/passwd 2>/dev/null | xargs || true)
-    ALL_GRP_MEMBERS=$(echo "${GRP_USERS} ${PRI_USERS}" | xargs -n1 2>/dev/null | sort -u | xargs || true)
+    GRP_USERS=$(echo "$GRP_ENTRY" | cut -d: -f4 | tr ',' ' ' | trim_ws || true)
+    PRI_USERS=$(awk -F: -v gid="$GRP_GID" '$4 == gid {print $1}' /etc/passwd 2>/dev/null | trim_ws || true)
+    ALL_GRP_MEMBERS=$(printf '%s\n' "${GRP_USERS}" "${PRI_USERS}" | tr ' ' '\n' | grep -v '^$' | sort -u | trim_ws || true)
 
     echo -e "    • Grupo ${FG_YELLOW}${BOLD}${priv_grp}${NC} (GID ${GRP_GID}): Membros -> ${FG_GREEN}${BOLD}${ALL_GRP_MEMBERS:-Nenhum membro cadastrado}${NC}"
     if [[ "$priv_grp" =~ ^(sudo|wheel|admin)$ ]]; then
@@ -593,7 +759,7 @@ if [[ -r /etc/sudoers ]]; then
             echo -e "    • [${FG_CYAN}$(basename "$s_file")${NC}] ${BOLD}${ENTITY}${NC} -> ${DIM}${s_line}${NC}"
             if [[ "$ENTITY" == %* ]]; then
                 GRP_CLEAN="${ENTITY#%}"
-                GRP_MEM=$(getent group "$GRP_CLEAN" 2>/dev/null | cut -d: -f4 | tr ',' ' ' | xargs || true)
+                GRP_MEM=$(getent group "$GRP_CLEAN" 2>/dev/null | cut -d: -f4 | tr ',' ' ' | trim_ws || true)
                 add_unique_item RESUMO_GRUPOS_SUDO "${ENTITY} (${GRP_MEM:-vazio})"
                 for gm in $GRP_MEM; do
                     add_unique_item RESUMO_USUARIOS_SUDO "${gm} (grupo ${GRP_CLEAN})"
@@ -642,8 +808,8 @@ fi
 
 for ldap_cfg in /etc/ldap/ldap.conf /etc/openldap/ldap.conf /etc/nslcd.conf /etc/pam_ldap.conf; do
     [[ -r "$ldap_cfg" ]] || continue
-    LDAP_URI=$(grep -iE "^\s*URI\s+" "$ldap_cfg" 2>/dev/null | awk '{$1=""; print $0}' | xargs || true)
-    LDAP_BASE=$(grep -iE "^\s*BASE\s+" "$ldap_cfg" 2>/dev/null | awk '{$1=""; print $0}' | xargs || true)
+    LDAP_URI=$(grep -iE "^\s*URI\s+" "$ldap_cfg" 2>/dev/null | awk '{$1=""; print $0}' | trim_ws || true)
+    LDAP_BASE=$(grep -iE "^\s*BASE\s+" "$ldap_cfg" 2>/dev/null | awk '{$1=""; print $0}' | trim_ws || true)
     if [[ -n "$LDAP_URI" || -n "$LDAP_BASE" ]]; then
         DIR_AUTH_FOUND=1
         echo -e "    • ${FG_YELLOW}${BOLD}Cliente LDAP Configurado (${ldap_cfg}):${NC} URI=${FG_CYAN}${LDAP_URI:-N/A}${NC} | Base=${FG_CYAN}${LDAP_BASE:-N/A}${NC}"
@@ -666,7 +832,7 @@ if [[ "$(get_service_status_plain sssd)" != "Não instalado" ]] || [[ -f /etc/ss
 fi
 
 if command -v realm >/dev/null 2>&1; then
-    REALM_INFO=$(realm list --name-only 2>/dev/null | xargs || true)
+    REALM_INFO=$(realm list --name-only 2>/dev/null | trim_ws || true)
     if [[ -n "$REALM_INFO" ]]; then
         DIR_AUTH_FOUND=1
         echo -e "    • ${BOLD}Domínio Active Directory (realmd):${NC} ${FG_YELLOW}${REALM_INFO}${NC}"
@@ -694,12 +860,17 @@ fi
 # ==============================================================================
 print_header "3. ARMAZENAMENTO, UNIDADES NO FSTAB, NFS E SAMBA (CLIENTE E SERVIDOR)"
 
-# 3.1 - Partições Montadas e Uso de Espaço
+# 3.1 - Partições Montadas, Uso de Espaço, Inodes e RAID/ZFS
 echo -e "  ${BOLD}Unidades de Armazenamento Montadas Agora (df -hT):${NC}"
-df -hT -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | awk '
-    NR==1 {printf "    %-24s %-10s %-8s %-8s %-8s %-6s %s\n", $1, $2, $3, $4, $5, $6, $7}
-    NR>1  {printf "    %-24s %-10s %-8s %-8s %-8s %-6s %s\n", $1, $2, $3, $4, $5, $6, $7}
-' || df -h 2>/dev/null | sed 's/^/    /' || true
+DF_HT_OUT=$(timeout 5 df -hT -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null || timeout 5 df -hT 2>/dev/null || true)
+if [[ -n "$DF_HT_OUT" ]]; then
+    echo "$DF_HT_OUT" | awk '
+        NR==1 {printf "    %-24s %-10s %-8s %-8s %-8s %-6s %s\n", $1, $2, $3, $4, $5, $6, $7}
+        NR>1  {printf "    %-24s %-10s %-8s %-8s %-8s %-6s %s\n", $1, $2, $3, $4, $5, $6, $7}
+    ' || echo "$DF_HT_OUT" | awk '{print "    " $0}'
+else
+    log_warning "Timeout ou falha ao consultar sistemas de arquivos montados (df -hT)."
+fi
 
 while IFS= read -r disk_line; do
     [[ -z "$disk_line" ]] && continue
@@ -709,11 +880,49 @@ while IFS= read -r disk_line; do
         log_warning "Partição ${MNT_PT} está com uso elevado: ${USE_PCT}%"
         add_alert "Disco com uso crítico (${USE_PCT}%) na partição ${MNT_PT}."
     fi
-done < <(df -P -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | awk 'NR>1')
+done < <(timeout 5 df -P -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | awk 'NR>1' || true)
+
+INODE_HIGH_FOUND=0
+while IFS= read -r inode_line; do
+    [[ -z "$inode_line" ]] && continue
+    IUSE_PCT=$(echo "$inode_line" | awk '{gsub(/%/,"",$5); print $5}')
+    IMNT_PT=$(echo "$inode_line" | awk '{print $6}')
+    if [[ "$IUSE_PCT" =~ ^[0-9]+$ ]] && (( IUSE_PCT >= 85 )); then
+        INODE_HIGH_FOUND=1
+        log_warning "Inodes elevados na partição ${IMNT_PT}: ${IUSE_PCT}% em uso"
+        add_alert "Uso crítico de inodes (${IUSE_PCT}%) na partição ${IMNT_PT}."
+    fi
+done < <(timeout 5 df -Pi -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | awk 'NR>1' || true)
+if (( INODE_HIGH_FOUND == 0 )); then
+    log_success "Uso de Inodes (df -Pi): Normal (todas as partições abaixo de 85%)"
+fi
+
+if [[ -r /proc/mdstat ]] && grep -qE "^md[0-9]+" /proc/mdstat 2>/dev/null; then
+    echo -e "\n  ${BOLD}Status de Software RAID (/proc/mdstat):${NC}"
+    grep -E "^(Personalities|md[0-9]+|.*\[[U_]+\])" /proc/mdstat 2>/dev/null | sed 's/^/    /' || true
+    if grep -qE "\[[U_]*_[U_]*\]" /proc/mdstat 2>/dev/null; then
+        log_warning "Software RAID (mdadm) DEGRADADO detectado em /proc/mdstat!"
+        add_alert "Software RAID (mdadm) com disco falho/degradado em /proc/mdstat."
+    else
+        log_success "Software RAID (mdadm): Saudável (todos os arrays sincronizados)"
+    fi
+fi
+
+if command -v zpool >/dev/null 2>&1; then
+    ZFS_HEALTH=$(timeout 5 zpool status -x 2>/dev/null || true)
+    if [[ -n "$ZFS_HEALTH" ]]; then
+        echo -e "\n  ${BOLD}Saúde dos Pools ZFS (zpool status -x):${NC}"
+        echo "$ZFS_HEALTH" | awk '{print "    " $0}'
+        if ! echo "$ZFS_HEALTH" | grep -qiE "all pools are healthy|no pools available"; then
+            log_warning "Atenção: Pool ZFS reportou estado degradado/com erros!"
+            add_alert "Pool ZFS reportando estado degradado ou erros (verifique zpool status)."
+        fi
+    fi
+fi
 
 if command -v lsblk >/dev/null 2>&1; then
     echo -e "\n  ${BOLD}Topologia de Discos Físicos, Partições e LVM (lsblk):${NC}"
-    lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT 2>/dev/null | grep -v "^loop" | sed 's/^/    /' || true
+    timeout 5 lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT 2>/dev/null | grep -v "^loop" | sed 's/^/    /' || true
 fi
 
 # 3.2 - Análise Completa do /etc/fstab (Verifica se cada entrada está montada ou não)
@@ -887,7 +1096,7 @@ if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
     if [[ "$(get_service_status_plain apache2)" == "Não instalado" && "$(get_service_status_plain httpd)" != "Não instalado" ]]; then
         APACHE_SVC="httpd"
     fi
-    APACHE_VER=$($APACHE_BIN -v 2>/dev/null | head -n 1 | cut -d':' -f2 | xargs || echo "Instalado")
+    APACHE_VER=$($APACHE_BIN -v 2>/dev/null | head -n 1 | cut -d':' -f2 | trim_ws || echo "Instalado")
     log_success "Apache (${APACHE_SVC}): ${BOLD}${APACHE_VER}${NC} [$(get_service_status "$APACHE_SVC")]"
     add_unique_item RESUMO_APPS_VERSOES "Apache:${APACHE_VER}"
     if [[ "$(get_service_status_plain "$APACHE_SVC")" == "Ativo" ]]; then
@@ -895,10 +1104,10 @@ if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
     fi
 
     APACHE_CTL=$(command -v apache2ctl || command -v apachectl || echo "$APACHE_BIN")
-    APACHE_MPM=$($APACHE_CTL -V 2>/dev/null | awk -F': ' '/Server MPM/ {print $2}' | xargs || true)
+    APACHE_MPM=$($APACHE_CTL -V 2>/dev/null | awk -F': ' '/Server MPM/ {print $2}' | trim_ws || true)
     [[ -n "$APACHE_MPM" ]] && log_item "Modo MPM" "${FG_CYAN}${APACHE_MPM}${NC}"
 
-    APACHE_MODS=$($APACHE_CTL -M 2>/dev/null | awk '/_module/ {sub(/_module/,"",$1); print $1}' | sort -u | xargs || true)
+    APACHE_MODS=$($APACHE_CTL -M 2>/dev/null | awk '/_module/ {sub(/_module/,"",$1); print $1}' | sort -u | trim_ws || true)
     echo -e "    • ${BOLD}Módulos Ativos:${NC} ${DIM}${APACHE_MODS:-Não foi possível listar}${NC}"
 
     echo -e "\n    ${BOLD}VirtualHosts e Sites Habilitados no Apache:${NC}"
@@ -968,7 +1177,7 @@ if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
                 add_unique_item RESUMO_SITES_DETECTADOS "Apache: ${vh_name:-$(basename "$vhost_file")} (${vh_root:-${vh_proxy:-N/A}})"
             done <<< "$VH_BLOCKS"
         else
-            VH_NAME=$(grep -iE "^\s*ServerName\s+" "$vhost_file" 2>/dev/null | awk '{print $2}' | tr -d ';' | xargs || true)
+            VH_NAME=$(grep -iE "^\s*ServerName\s+" "$vhost_file" 2>/dev/null | awk '{print $2}' | tr -d ';' | trim_ws || true)
             VH_ROOT=$(grep -iE "^\s*DocumentRoot\s+" "$vhost_file" 2>/dev/null | awk '{print $2}' | tr -d '"' | head -n 1 || true)
             if [[ -n "$VH_NAME" || -n "$VH_ROOT" ]]; then
                 APACHE_SITES_COUNT=$((APACHE_SITES_COUNT + 1))
@@ -998,7 +1207,7 @@ fi
 
 if command -v nginx >/dev/null 2>&1; then
     WEB_FOUND=1
-    NGINX_VER=$(nginx -v 2>&1 | cut -d':' -f2 | xargs || echo "Instalado")
+    NGINX_VER=$(nginx -v 2>&1 | cut -d':' -f2 | trim_ws || echo "Instalado")
     log_success "Nginx: ${BOLD}${NGINX_VER}${NC} [$(get_service_status nginx)]"
     add_unique_item RESUMO_APPS_VERSOES "Nginx:${NGINX_VER}"
     if [[ "$(get_service_status_plain nginx)" == "Ativo" ]]; then
@@ -1007,24 +1216,103 @@ if command -v nginx >/dev/null 2>&1; then
 
     echo -e "\n    ${BOLD}Server Blocks / Domínios Configurados no Nginx:${NC}"
     NGINX_SITES_COUNT=0
+    NGINX_CONF_FILES=()
     for conf in /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf; do
-        [[ -f "$conf" ]] || continue
-        NGINX_SITES_COUNT=$((NGINX_SITES_COUNT + 1))
-        DOMAINS=$(grep -E "^\s*server_name\s+" "$conf" 2>/dev/null | sed -E 's/^\s*server_name\s+//; s/;//g' | xargs || true)
-        DOC_ROOT=$(grep -E "^\s*root\s+" "$conf" 2>/dev/null | sed -E 's/^\s*root\s+//; s/;//g' | xargs || true)
-        PROXY_PASS=$(grep -E "^\s*proxy_pass\s+" "$conf" 2>/dev/null | sed -E 's/^\s*proxy_pass\s+//; s/;//g' | head -n 2 | xargs || true)
-        FASTCGI_PASS=$(grep -E "^\s*fastcgi_pass\s+" "$conf" 2>/dev/null | sed -E 's/^\s*fastcgi_pass\s+//; s/;//g' | head -n 1 | xargs || true)
-
-        while IFS= read -r ng_root; do
-            [[ -n "$ng_root" ]] && add_web_root "$ng_root"
-        done < <(grep -E "^\s*root\s+" "$conf" 2>/dev/null | sed -E 's/^\s*root\s+//; s/;//g' || true)
-
-        echo -e "      • Arquivo: ${FG_CYAN}$(basename "$conf")${NC} | Domínios: ${FG_YELLOW}${DOMAINS:-_}${NC}"
-        [[ -n "$DOC_ROOT" ]]     && echo -e "        ├─ Root:         ${FG_GREEN}${DOC_ROOT}${NC}"
-        [[ -n "$PROXY_PASS" ]]   && echo -e "        ├─ Proxy Reverso:${FG_CYAN} ${PROXY_PASS}${NC}"
-        [[ -n "$FASTCGI_PASS" ]] && echo -e "        └─ PHP FastCGI:  ${FG_YELLOW}${FASTCGI_PASS}${NC}"
-        add_unique_item RESUMO_SITES_DETECTADOS "Nginx: ${DOMAINS:-$(basename "$conf")} (${DOC_ROOT:-${PROXY_PASS:-N/A}})"
+        [[ -f "$conf" ]] && NGINX_CONF_FILES+=("$conf")
     done
+    if (( ${#NGINX_CONF_FILES[@]} == 0 )) && [[ -f /etc/nginx/nginx.conf ]]; then
+        NGINX_CONF_FILES+=("/etc/nginx/nginx.conf")
+    fi
+
+    if (( ${#NGINX_CONF_FILES[@]} > 0 )); then
+        for conf in "${NGINX_CONF_FILES[@]}"; do
+            [[ -r "$conf" ]] || continue
+            NGINX_BLOCKS=$(awk '
+                BEGIN { depth=0; srv_depth=0; in_srv=0; sname=""; listen=""; docroot=""; proxy=""; fastcgi=""; sslcert="" }
+                /^[ \t]*#/ { next }
+                {
+                    line=$0
+                    sub(/#.*$/, "", line)
+                    gsub(/\r/, "", line)
+                    clean=line
+                    gsub(/^[ \t]+|[ \t]+$/, "", clean)
+
+                    # Detecta inicio de bloco server {
+                    if (!in_srv && clean ~ /^server[ \t]*\{/) {
+                        in_srv=1
+                        srv_depth=depth + 1
+                        sname=""; listen=""; docroot=""; proxy=""; fastcgi=""; sslcert=""
+                    }
+
+                    # Atualiza contagem de chaves considerando multiplas na mesma linha
+                    tmp=line
+                    opens=gsub(/\{/, "{", tmp)
+                    tmp=line
+                    closes=gsub(/\}/, "}", tmp)
+                    depth = depth + opens - closes
+
+                    if (in_srv) {
+                        if (clean ~ /^server_name[ \t]+/) {
+                            val=clean; sub(/^server_name[ \t]+/, "", val); sub(/;.*/, "", val)
+                            sname=(sname ? sname " " val : val)
+                        } else if (clean ~ /^listen[ \t]+/) {
+                            val=clean; sub(/^listen[ \t]+/, "", val); sub(/;.*/, "", val)
+                            listen=(listen ? listen ", " val : val)
+                        } else if (clean ~ /^root[ \t]+/) {
+                            val=clean; sub(/^root[ \t]+/, "", val); sub(/;.*/, "", val)
+                            gsub(/["'\'']/, "", val)
+                            if (docroot == "") docroot=val
+                        } else if (clean ~ /^proxy_pass[ \t]+/) {
+                            val=clean; sub(/^proxy_pass[ \t]+/, "", val); sub(/;.*/, "", val)
+                            if (index(proxy, val) == 0) proxy=(proxy ? proxy "; " val : val)
+                        } else if (clean ~ /^fastcgi_pass[ \t]+/) {
+                            val=clean; sub(/^fastcgi_pass[ \t]+/, "", val); sub(/;.*/, "", val)
+                            if (fastcgi == "") fastcgi=val
+                        } else if (clean ~ /^ssl_certificate[ \t]+/) {
+                            val=clean; sub(/^ssl_certificate[ \t]+/, "", val); sub(/;.*/, "", val)
+                            if (sslcert == "") sslcert=val
+                        }
+
+                        if (depth < srv_depth) {
+                            print sname "|" listen "|" docroot "|" proxy "|" fastcgi "|" sslcert
+                            in_srv=0
+                        }
+                    }
+                }
+            ' "$conf" 2>/dev/null || true)
+
+            if [[ -n "$NGINX_BLOCKS" ]]; then
+                while IFS='|' read -r ng_dom ng_listen ng_root ng_proxy ng_fcgi ng_ssl; do
+                    [[ -z "$ng_dom" && -z "$ng_root" && -z "$ng_proxy" && -z "$ng_listen" ]] && continue
+                    NGINX_SITES_COUNT=$((NGINX_SITES_COUNT + 1))
+                    ng_dom=$(echo "$ng_dom" | trim_ws)
+                    ng_root=$(echo "$ng_root" | trim_ws)
+                    ng_proxy=$(echo "$ng_proxy" | trim_ws)
+                    ng_fcgi=$(echo "$ng_fcgi" | trim_ws)
+                    [[ -n "$ng_root" ]] && add_web_root "$ng_root"
+
+                    echo -e "      • Arquivo: ${FG_CYAN}$(basename "$conf")${NC}${ng_listen:+ [${DIM}${ng_listen}${NC}]} | Domínios: ${FG_YELLOW}${ng_dom:-_}${NC}"
+                    [[ -n "$ng_root" ]]  && echo -e "        ├─ Root:         ${FG_GREEN}${ng_root}${NC}"
+                    [[ -n "$ng_proxy" ]] && echo -e "        ├─ Proxy Reverso:${FG_CYAN} ${ng_proxy}${NC}"
+                    [[ -n "$ng_ssl" ]]   && echo -e "        ├─ Cert SSL:     ${DIM}${ng_ssl}${NC}"
+                    [[ -n "$ng_fcgi" ]]  && echo -e "        └─ PHP FastCGI:  ${FG_YELLOW}${ng_fcgi}${NC}"
+                    add_unique_item RESUMO_SITES_DETECTADOS "Nginx: ${ng_dom:-$(basename "$conf")} (${ng_root:-${ng_proxy:-N/A}})"
+                done <<< "$NGINX_BLOCKS"
+            elif [[ "$conf" != "/etc/nginx/nginx.conf" ]]; then
+                NGINX_SITES_COUNT=$((NGINX_SITES_COUNT + 1))
+                DOMAINS=$(grep -E "^\s*server_name\s+" "$conf" 2>/dev/null | sed -E 's/^\s*server_name\s+//; s/;//g' | trim_ws || true)
+                DOC_ROOT=$(grep -E "^\s*root\s+" "$conf" 2>/dev/null | sed -E 's/^\s*root\s+//; s/;//g' | head -n 1 | trim_ws || true)
+                PROXY_PASS=$(grep -E "^\s*proxy_pass\s+" "$conf" 2>/dev/null | sed -E 's/^\s*proxy_pass\s+//; s/;//g' | head -n 2 | trim_ws || true)
+                FASTCGI_PASS=$(grep -E "^\s*fastcgi_pass\s+" "$conf" 2>/dev/null | sed -E 's/^\s*fastcgi_pass\s+//; s/;//g' | head -n 1 | trim_ws || true)
+                [[ -n "$DOC_ROOT" ]] && add_web_root "$DOC_ROOT"
+                echo -e "      • Arquivo: ${FG_CYAN}$(basename "$conf")${NC} | Domínios: ${FG_YELLOW}${DOMAINS:-_}${NC}"
+                [[ -n "$DOC_ROOT" ]]     && echo -e "        ├─ Root:         ${FG_GREEN}${DOC_ROOT}${NC}"
+                [[ -n "$PROXY_PASS" ]]   && echo -e "        ├─ Proxy Reverso:${FG_CYAN} ${PROXY_PASS}${NC}"
+                [[ -n "$FASTCGI_PASS" ]] && echo -e "        └─ PHP FastCGI:  ${FG_YELLOW}${FASTCGI_PASS}${NC}"
+                add_unique_item RESUMO_SITES_DETECTADOS "Nginx: ${DOMAINS:-$(basename "$conf")} (${DOC_ROOT:-${PROXY_PASS:-N/A}})"
+            fi
+        done
+    fi
     (( NGINX_SITES_COUNT == 0 )) && echo -e "      • Nenhum Server Block ativo encontrado em /etc/nginx."
     echo -e ""
 fi
@@ -1264,8 +1552,8 @@ if [[ -d /etc/php ]]; then
             for pool_conf in "${php_dir}/fpm/pool.d/"*.conf; do
                 [[ -f "$pool_conf" ]] || continue
                 POOL_NAME=$(grep -E "^\[.*\]" "$pool_conf" 2>/dev/null | head -n 1 | tr -d '[]' || true)
-                POOL_LISTEN=$(grep -E "^\s*listen\s*=" "$pool_conf" 2>/dev/null | cut -d'=' -f2 | xargs || true)
-                POOL_USER=$(grep -E "^\s*user\s*=" "$pool_conf" 2>/dev/null | cut -d'=' -f2 | xargs || true)
+                POOL_LISTEN=$(grep -E "^\s*listen\s*=" "$pool_conf" 2>/dev/null | cut -d'=' -f2 | trim_ws || true)
+                POOL_USER=$(grep -E "^\s*user\s*=" "$pool_conf" 2>/dev/null | cut -d'=' -f2 | trim_ws || true)
                 echo -e "         ├─ Pool FPM [${FG_CYAN}${POOL_NAME:-www}${NC}]: Usuário=${POOL_USER:-www-data} | Listen=${FG_YELLOW}${POOL_LISTEN:-N/A}${NC}"
             done
         fi
@@ -1303,6 +1591,14 @@ if [[ -f /etc/php.ini ]] || [[ -d /etc/php-fpm.d ]] || [[ -d /etc/opt/remi ]]; t
 fi
 
 if (( PHP_ANY_FOUND == 1 )); then
+    if command -v php >/dev/null 2>&1; then
+        PHP_EXTS_ALL=$(php -m 2>/dev/null | grep -vE '^\[|^$' | sort -u || true)
+        if [[ -n "$PHP_EXTS_ALL" ]]; then
+            PHP_EXTS_CRIT=$(echo "$PHP_EXTS_ALL" | grep -iE '^(apcu|curl|dom|exif|fileinfo|gd|imagick|imap|intl|json|ldap|mbstring|mcrypt|mysqli|mysqlnd|opcache|openssl|pdo|pdo_mysql|pdo_pgsql|pdo_sqlite|pgsql|redis|simplexml|soap|sodium|sqlite3|xml|xmlwriter|xsl|zip|zlib|Zend OPcache)$' | tr '\n' ' ' | trim_ws || true)
+            PHP_EXTS_COUNT=$(echo "$PHP_EXTS_ALL" | wc -l | trim_ws)
+            echo -e "    • ${BOLD}Extensões PHP CLI Ativas (${PHP_EXTS_COUNT} total):${NC} ${DIM}${PHP_EXTS_CRIT:-$(echo "$PHP_EXTS_ALL" | head -n 15 | tr '\n' ' ' | trim_ws)}${NC}"
+        fi
+    fi
     if command -v dpkg-query >/dev/null 2>&1; then
         PHP_REPO_ORIGIN=$(apt-cache policy php-common 2>/dev/null | grep -A 1 "\*\*\*" | tail -n 1 | awk '{print $2, $3}' || true)
         [[ -n "$PHP_REPO_ORIGIN" ]] && log_item "Repositório PHP" "${FG_CYAN}${PHP_REPO_ORIGIN}${NC}"
@@ -1314,6 +1610,15 @@ if (( PHP_ANY_FOUND == 1 )); then
                     echo -e "      • ${FG_YELLOW}${upg_line}${NC}"
                 done <<< "$PHP_UPGRADABLE"
             fi
+        fi
+    elif [[ -n "${DNF_SIM:-}" || -n "${YUM_SIM:-}" ]]; then
+        RHEL_SIM="${DNF_SIM:-${YUM_SIM:-}}"
+        PHP_UPGRADABLE=$(echo "$RHEL_SIM" | awk 'NF>=3 && $1 ~ /^php/ {print $1 " -> " $2 " (" $3 ")"}' || true)
+        if [[ -n "$PHP_UPGRADABLE" ]]; then
+            print_alert_box "Há atualizações de pacotes PHP pendentes no DNF/YUM!"
+            while IFS= read -r upg_line; do
+                echo -e "      • ${FG_YELLOW}${upg_line}${NC}"
+            done <<< "$PHP_UPGRADABLE"
         fi
     fi
 else
@@ -1504,9 +1809,14 @@ audit_nextcloud_dir() {
         local dd_info=""
         if [[ -d "$nc_datadir" ]]; then
             local dd_size dd_df
-            dd_size=$(timeout 3 du -sh "$nc_datadir" 2>/dev/null | awk '{print $1}' || true)
-            dd_df=$(df -h "$nc_datadir" 2>/dev/null | awk 'NR==2 {print "Partição " $6 ": " $3 " usados de " $2 " (" $5 " cheio, Livre: " $4 ")"}' || true)
+            dd_size=$(safe_du "$nc_datadir")
+            dd_df=$(timeout 5 df -h "$nc_datadir" 2>/dev/null | awk 'NR==2 {print "Partição " $6 ": " $3 " usados de " $2 " (" $5 " cheio, Livre: " $4 ")"}' || true)
             dd_info="${dd_size:+ — Tamanho Dados: ${FG_YELLOW}${dd_size}${NC}}${dd_df:+ | ${DIM}${dd_df}${NC}}"
+            if [[ "$nc_dbtype" == *"sqlite"* ]]; then
+                local nc_sqlite_file
+                nc_sqlite_file=$(find "$nc_datadir" -maxdepth 2 -type f \( -name "*.db" -o -name "*.sqlite" \) 2>/dev/null | head -n 1 || true)
+                [[ -n "$nc_sqlite_file" ]] && add_unique_item SQLITE_DBS_FOUND "${nc_sqlite_file} (Nextcloud)"
+            fi
         else
             dd_info=" ${FG_RED}(Diretório não encontrado ou desmontado!)${NC}"
             add_alert "Diretório de dados do Nextcloud (${nc_datadir}) não foi encontrado ou está desmontado!"
@@ -1729,7 +2039,45 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
             add_unique_item RESUMO_SITES_DETECTADOS "${PKG_NAME}${PKG_VER:+ v$PKG_VER}: ${APP_DIR}"
             FOUND_APPS=$((FOUND_APPS + 1))
         fi
-    done < <(find "$base_dir" -maxdepth 3 -type f -name "composer.json" ! -path "*/vendor/*" ! -path "*/3rdparty/*" ! -path "*/apps/*" 2>/dev/null)
+    done < <(find "$base_dir" -maxdepth 3 -type f -name "composer.json" ! -path "*/vendor/*" ! -path "*/3rdparty/*" ! -path "*/apps/*" 2>/dev/null || true)
+
+    # Descoberta de projetos Node.js (package.json) em diretórios de aplicação
+    while IFS= read -r pkg_json; do
+        [[ -f "$pkg_json" ]] || continue
+        APP_DIR=$(dirname "$pkg_json")
+        mark_app_audited "$APP_DIR" || continue
+        NODE_APP_NAME=$(grep -m 1 -E '"name"\s*:' "$pkg_json" 2>/dev/null | cut -d'"' -f4 || true)
+        NODE_APP_VER=$(grep -m 1 -E '"version"\s*:' "$pkg_json" 2>/dev/null | cut -d'"' -f4 || true)
+        if [[ -n "$NODE_APP_NAME" ]]; then
+            echo -e "    • ${FG_GREEN}${BOLD}Aplicação Node.js (${NODE_APP_NAME}${NODE_APP_VER:+ v$NODE_APP_VER})${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+            add_role "App Node.js (${NODE_APP_NAME}${NODE_APP_VER:+ v$NODE_APP_VER})"
+            add_unique_item RESUMO_APPS_VERSOES "${NODE_APP_NAME}:${NODE_APP_VER:-Node}"
+            add_unique_item RESUMO_SITES_DETECTADOS "Node.js ${NODE_APP_NAME}${NODE_APP_VER:+ v$NODE_APP_VER}: ${APP_DIR}"
+            FOUND_APPS=$((FOUND_APPS + 1))
+        fi
+    done < <(find "$base_dir" -maxdepth 3 -type f -name "package.json" ! -path "*/node_modules/*" ! -path "*/vendor/*" ! -path "*/.git/*" 2>/dev/null || true)
+
+    # Descoberta de projetos Python (pyproject.toml / requirements.txt / manage.py)
+    while IFS= read -r py_marker; do
+        [[ -f "$py_marker" ]] || continue
+        APP_DIR=$(dirname "$py_marker")
+        mark_app_audited "$APP_DIR" || continue
+        PY_APP_NAME=$(basename "$APP_DIR")
+        PY_APP_VER=""
+        if [[ "$(basename "$py_marker")" == "pyproject.toml" ]]; then
+            P_NAME=$(awk -F'=' '/^[ \t]*name[ \t]*=/ {gsub(/^[ \t"'\'']+|[ \t"'\''\r]+$/,"",$2); print $2; exit}' "$py_marker" 2>/dev/null || true)
+            P_VER=$(awk -F'=' '/^[ \t]*version[ \t]*=/ {gsub(/^[ \t"'\'']+|[ \t"'\''\r]+$/,"",$2); print $2; exit}' "$py_marker" 2>/dev/null || true)
+            [[ -n "$P_NAME" ]] && PY_APP_NAME="$P_NAME"
+            [[ -n "$P_VER" ]] && PY_APP_VER="$P_VER"
+        fi
+        PY_KIND="Python"
+        [[ -f "${APP_DIR}/manage.py" ]] && PY_KIND="Python/Django"
+        echo -e "    • ${FG_GREEN}${BOLD}Aplicação ${PY_KIND} (${PY_APP_NAME}${PY_APP_VER:+ v$PY_APP_VER})${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+        add_role "App ${PY_KIND} (${PY_APP_NAME})"
+        add_unique_item RESUMO_APPS_VERSOES "${PY_APP_NAME}:${PY_APP_VER:-Python}"
+        add_unique_item RESUMO_SITES_DETECTADOS "${PY_KIND} (${PY_APP_NAME}): ${APP_DIR}"
+        FOUND_APPS=$((FOUND_APPS + 1))
+    done < <(find "$base_dir" -maxdepth 3 -type f \( -name "pyproject.toml" -o -name "requirements.txt" -o -name "manage.py" \) ! -path "*/venv/*" ! -path "*/.venv/*" ! -path "*/site-packages/*" ! -path "*/node_modules/*" ! -path "*/.git/*" 2>/dev/null || true)
     done
 fi
 
@@ -1762,7 +2110,15 @@ if [[ -n "$CONTAINER_ENGINE" ]]; then
     echo -e "\n    ${BOLD}Contêineres em Execução (${CONTAINER_ENGINE} ps):${NC}"
     $CONTAINER_ENGINE ps --format "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null | sed 's/^/      /' || true
 
-    STOPPED_CT=$($CONTAINER_ENGINE ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | xargs || true)
+    if [[ "$CONTAINER_ENGINE" == "docker" ]]; then
+        COMPOSE_STACKS=$(timeout 4 docker compose ls 2>/dev/null || true)
+        if [[ -n "$COMPOSE_STACKS" ]] && (( $(echo "$COMPOSE_STACKS" | wc -l) > 1 )); then
+            echo -e "\n    ${BOLD}Stacks Docker Compose Detectadas:${NC}"
+            echo "$COMPOSE_STACKS" | awk '{print "      " $0}'
+        fi
+    fi
+
+    STOPPED_CT=$($CONTAINER_ENGINE ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | trim_ws || true)
     [[ -n "$STOPPED_CT" ]] && echo -e "\n      • ${BOLD}Contêineres Parados:${NC} ${DIM}${STOPPED_CT}${NC}"
 
     RUNNING_IDS=$($CONTAINER_ENGINE ps -q 2>/dev/null || true)
@@ -1772,11 +2128,31 @@ if [[ -n "$CONTAINER_ENGINE" ]]; then
             [[ -z "$cid" ]] && continue
             CT_NAME=$($CONTAINER_ENGINE inspect --format '{{.Name}}' "$cid" 2>/dev/null | sed 's|^/||' || echo "$cid")
             CT_IMAGE=$($CONTAINER_ENGINE inspect --format '{{.Config.Image}}' "$cid" 2>/dev/null || echo "N/A")
+            CT_STATUS=$($CONTAINER_ENGINE inspect --format '{{.State.Status}}' "$cid" 2>/dev/null || echo "running")
+            CT_RESTARTS=$($CONTAINER_ENGINE inspect --format '{{.RestartCount}}' "$cid" 2>/dev/null || echo "0")
             CT_COMPOSE_DIR=$($CONTAINER_ENGINE inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$cid" 2>/dev/null || true)
-            CT_MOUNTS=$($CONTAINER_ENGINE inspect --format '{{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}' "$cid" 2>/dev/null | xargs || true)
-            CT_PORTS=$($CONTAINER_ENGINE port "$cid" 2>/dev/null | tr '\n' '; ' | sed 's/; $//' || true)
+            CT_MOUNTS=$($CONTAINER_ENGINE inspect --format '{{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}' "$cid" 2>/dev/null | trim_ws || true)
+            CT_PORTS_RAW=$($CONTAINER_ENGINE port "$cid" 2>/dev/null || true)
+            CT_PORTS=$(echo "$CT_PORTS_RAW" | tr '\n' '; ' | sed 's/; $//' || true)
 
-            echo -e "      ${FG_CYAN}${BOLD}▸ Container: ${CT_NAME}${NC} (${DIM}ID: ${cid} | Imagem: ${CT_IMAGE}${NC})"
+            if [[ -n "$CT_PORTS_RAW" ]]; then
+                while IFS= read -r cp_line; do
+                    if [[ "$cp_line" == *"0.0.0.0:"* || "$cp_line" == *"[::]:"* ]]; then
+                        add_unique_item DOCKER_PUBLIC_PORTS "${CT_NAME}: ${cp_line}"
+                    fi
+                done <<< "$CT_PORTS_RAW"
+            fi
+
+            if [[ "$CT_STATUS" == "restarting" ]] || { [[ "$CT_RESTARTS" =~ ^[0-9]+$ ]] && (( CT_RESTARTS > 3 )); }; then
+                add_alert "Container '${CT_NAME}' com instabilidade detectada (Estado: ${CT_STATUS} | Reinicializações: ${CT_RESTARTS})."
+            fi
+
+            CT_HEALTH_TAG="Estado: ${CT_STATUS} | Restarts: ${CT_RESTARTS}"
+            if [[ "$CT_RESTARTS" =~ ^[0-9]+$ ]] && (( CT_RESTARTS > 3 )); then
+                CT_HEALTH_TAG="Estado: ${CT_STATUS} | ${FG_RED}${BOLD}Restarts: ${CT_RESTARTS}${NC}"
+            fi
+
+            echo -e "      ${FG_CYAN}${BOLD}▸ Container: ${CT_NAME}${NC} (${DIM}ID: ${cid} | Imagem: ${CT_IMAGE}${NC} | ${CT_HEALTH_TAG})"
             [[ -n "$CT_COMPOSE_DIR" ]] && echo -e "        ├─ Projeto Compose: ${FG_GREEN}${CT_COMPOSE_DIR}${NC}"
             [[ -n "$CT_PORTS" ]]       && echo -e "        ├─ Portas Mapeadas: ${FG_YELLOW}${CT_PORTS}${NC}"
             [[ -n "$CT_MOUNTS" ]]      && echo -e "        ├─ Volumes / Bind:  ${DIM}${CT_MOUNTS}${NC}"
@@ -2028,6 +2404,24 @@ check_infra_service() {
 }
 
 check_infra_service "cloudflared"          "Conector Cloudflare Tunnel (cloudflared)"   "Conector Cloudflare Tunnel"
+for cf_cfg in /etc/cloudflared/config.yml /etc/cloudflared/config.yaml; do
+    [[ -r "$cf_cfg" ]] || continue
+    CF_INGRESS=$(awk '
+        /^[ \t]*-?[ \t]*hostname:/ {
+            h=$0; sub(/.*hostname:[ \t]*/, "", h); gsub(/["'\''\r ]/, "", h)
+        }
+        /^[ \t]*service:/ {
+            s=$0; sub(/.*service:[ \t]*/, "", s); gsub(/["'\''\r ]/, "", s)
+            if (h != "") { print h " -> " s; h="" } else if (s ~ /^http_status:/) { print "(fallback) -> " s }
+        }
+    ' "$cf_cfg" 2>/dev/null || true)
+    if [[ -n "$CF_INGRESS" ]]; then
+        echo -e "      └─ ${BOLD}Rotas Cloudflare Tunnel (${cf_cfg}):${NC}"
+        while IFS= read -r cf_route; do
+            [[ -n "$cf_route" ]] && echo -e "         ├─ ${FG_CYAN}${cf_route}${NC}"
+        done <<< "$CF_INGRESS"
+    fi
+done
 check_infra_service "ngrok"                "Túnel Reverso Ngrok"                        "Túnel Ngrok"
 check_infra_service "frpc"                 "Cliente Proxy Reverso FRP (frpc)"           "Túnel FRP Client"
 check_infra_service "frps"                 "Servidor Proxy Reverso FRP (frps)"          "Servidor FRP"
@@ -2057,6 +2451,9 @@ if [[ -r /etc/zabbix/zabbix_proxy.conf ]] && { [[ "$(get_service_status_plain za
     ZP_HOSTNAME=$(awk -F'=' '/^[ \t]*Hostname[ \t]*=/ {gsub(/^[ \t]+|[ \t\r]+$/,"",$2); print $2}' /etc/zabbix/zabbix_proxy.conf 2>/dev/null | tail -n 1 || true)
     ZP_DBNAME=$(awk -F'=' '/^[ \t]*DBName[ \t]*=/ {gsub(/^[ \t]+|[ \t\r]+$/,"",$2); print $2}' /etc/zabbix/zabbix_proxy.conf 2>/dev/null | tail -n 1 || true)
     echo -e "      └─ ${BOLD}Config Zabbix Proxy:${NC} Modo: ${FG_CYAN}${ZP_MODE_TXT}${NC}${ZP_HOSTNAME:+ | Hostname: ${FG_YELLOW}${ZP_HOSTNAME}${NC}}${ZP_SERVER:+ | Server: ${FG_GREEN}${ZP_SERVER}${NC}}${ZP_DBNAME:+ | DB: ${DIM}${ZP_DBNAME}${NC}}"
+    if [[ -n "$ZP_DBNAME" && "$ZP_DBNAME" == /* && -f "$ZP_DBNAME" ]]; then
+        add_unique_item SQLITE_DBS_FOUND "${ZP_DBNAME} (Zabbix Proxy)"
+    fi
 fi
 check_infra_service "zabbix-agent2"        "Agente de Monitoramento Zabbix Agent 2"     "Monitorado (Zabbix Agent 2)"
 check_infra_service "zabbix-agent"         "Agente de Monitoramento Zabbix Agent"       "Monitorado (Zabbix Agent)"
@@ -2140,8 +2537,11 @@ if command -v mariadb >/dev/null 2>&1 || command -v mysql >/dev/null 2>&1 || [[ 
 
     MYSQL_DATADIR="/var/lib/mysql"
     MYSQL_SIZE="N/A"
-    [[ -d "$MYSQL_DATADIR" ]] && MYSQL_SIZE=$(du -sh "$MYSQL_DATADIR" 2>/dev/null | awk '{print $1}' || echo "N/A")
-    MYSQL_BIND=$( (grep -RhE "^\s*bind-address\s*=" /etc/mysql/ /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null || true) | tail -n 1 | cut -d'=' -f2 | xargs || true )
+    if [[ -d "$MYSQL_DATADIR" ]]; then
+        MYSQL_SIZE=$(safe_du "$MYSQL_DATADIR")
+        [[ -z "$MYSQL_SIZE" ]] && MYSQL_SIZE="Omitido (--fast)"
+    fi
+    MYSQL_BIND=$( (grep -RhE "^\s*bind-address\s*=" /etc/mysql/ /etc/my.cnf /etc/my.cnf.d/ 2>/dev/null || true) | tail -n 1 | cut -d'=' -f2 | trim_ws || true )
     [[ -z "$MYSQL_BIND" ]] && MYSQL_BIND="Padrão (127.0.0.1)"
 
     log_success "MySQL / MariaDB (${DB_SVC}): ${BOLD}${DB_SHORT_VER}${NC} ${DIM}(${DB_VER})${NC} [$(get_service_status "$DB_SVC")]"
@@ -2174,7 +2574,7 @@ if command -v mariadb >/dev/null 2>&1 || command -v mysql >/dev/null 2>&1 || [[ 
             log_info "Nenhuma base de usuário encontrada ou acesso via socket local requer senha SQL."
         fi
 
-        MYSQL_USERS=$($DB_BIN --batch --skip-column-names -e "SELECT CONCAT(User, '@', Host) FROM mysql.user WHERE User NOT IN ('mariadb.sys','mysql.sys','mysql.session','mysql.infoschema') ORDER BY User;" 2>/dev/null | xargs || true)
+        MYSQL_USERS=$($DB_BIN --batch --skip-column-names -e "SELECT CONCAT(User, '@', Host) FROM mysql.user WHERE User NOT IN ('mariadb.sys','mysql.sys','mysql.session','mysql.infoschema') ORDER BY User;" 2>/dev/null | trim_ws || true)
         [[ -n "$MYSQL_USERS" ]] && echo -e "    • ${BOLD}Usuários SQL:${NC} ${DIM}${MYSQL_USERS}${NC}"
         if echo "$MYSQL_USERS" | grep -q "@%"; then
             add_alert "Existem usuários no MariaDB/MySQL com permissão de acesso remoto amplo ('@%')."
@@ -2194,7 +2594,11 @@ if command -v psql >/dev/null 2>&1 || [[ -d /etc/postgresql ]] || [[ -d /var/lib
     fi
     PG_SIZE="N/A"
     for pg_dir in /var/lib/postgresql /var/lib/pgsql; do
-        [[ -d "$pg_dir" ]] && PG_SIZE=$(du -sh "$pg_dir" 2>/dev/null | awk '{print $1}' || echo "N/A") && break
+        if [[ -d "$pg_dir" ]]; then
+            PG_SIZE=$(safe_du "$pg_dir")
+            [[ -z "$PG_SIZE" ]] && PG_SIZE="Omitido (--fast)"
+            break
+        fi
     done
 
     log_success "PostgreSQL (${PG_SVC}): ${BOLD}${PG_VER}${NC} [$(get_service_status "$PG_SVC")] (Tamanho em disco: ${FG_YELLOW}${PG_SIZE}${NC})"
@@ -2245,6 +2649,25 @@ for other_db in mongod mongodb firebird mssql-server elasticsearch rabbitmq-serv
         fi
     fi
 done
+
+# 5.4 - Bancos de Dados SQLite Detectados (Infraestrutura e Aplicações)
+for sqlite_cand in /var/lib/zabbix/*.db /var/lib/zabbix/*.sqlite /var/lib/grafana/grafana.db /etc/pihole/pihole-FTL.db; do
+    [[ -f "$sqlite_cand" ]] && add_unique_item SQLITE_DBS_FOUND "${sqlite_cand} (Sistema/Daemon)"
+done
+
+if (( ${#SQLITE_DBS_FOUND[@]} > 0 )); then
+    DB_ANY_FOUND=1
+    echo -e "\n  ${BOLD}5.4 Bancos de Dados SQLite Identificados:${NC}"
+    for sq_entry in "${SQLITE_DBS_FOUND[@]}"; do
+        sq_path="${sq_entry%% (*}"
+        sq_origin=""
+        [[ "$sq_entry" == *" ("* ]] && sq_origin=" (${sq_entry#* (}"
+        sq_size="N/A"
+        [[ -f "$sq_path" ]] && sq_size=$(du -h "$sq_path" 2>/dev/null | awk '{print $1}' || echo "N/A")
+        echo -e "    • ${FG_CYAN}${sq_path}${NC}${sq_origin} — Tamanho: ${FG_YELLOW}${sq_size}${NC}"
+    done
+    add_unique_item RESUMO_BANCOS_ATIVOS "SQLite(${#SQLITE_DBS_FOUND[@]} arquivo(s))"
+fi
 
 (( DB_ANY_FOUND == 0 )) && log_info "Nenhum SGBD instalado diretamente no host (verifique a subseção 4.5 de Contêineres)."
 
@@ -2334,6 +2757,13 @@ if (( FW_ACTIVE_ANY == 0 )); then
     add_alert "O servidor está com o Firewall de host INATIVO (UFW/Firewalld/IPTables sem regras de bloqueio na INPUT)."
 else
     log_success "Status Geral do Firewall: ${FG_GREEN}${BOLD}${FIREWALL_SUMMARY_STATE}${NC}"
+    if (( ${#DOCKER_PUBLIC_PORTS[@]} > 0 )); then
+        log_warning "Docker expõe portas diretamente em 0.0.0.0/[::] via NAT (contorna regras padrão de UFW/INPUT):"
+        for dp_item in "${DOCKER_PUBLIC_PORTS[@]}"; do
+            echo -e "      ├─ ${FG_YELLOW}${dp_item}${NC}"
+        done
+        add_alert "Docker publica ${#DOCKER_PUBLIC_PORTS[@]} porta(s) diretamente em 0.0.0.0/[::] (contornando filtros padrão da chain INPUT do ${FIREWALL_SUMMARY_STATE})."
+    fi
 fi
 
 # 6.2 - Segurança de Acesso Remoto (SSH), Fail2Ban, SELinux/AppArmor e Systemd Failed
@@ -2349,11 +2779,11 @@ if command -v sshd >/dev/null 2>&1 || [[ -r /etc/ssh/sshd_config ]]; then
     if [[ -n "$SSHD_T" ]]; then
         SSH_ROOT_LOGIN=$(echo "$SSHD_T" | awk '/^permitrootlogin / {print $2}' | head -n 1)
         SSH_PASS_AUTH=$(echo "$SSHD_T" | awk '/^passwordauthentication / {print $2}' | head -n 1)
-        SSH_PORT_CFG=$(echo "$SSHD_T" | awk '/^port / {print $2}' | xargs)
+        SSH_PORT_CFG=$(echo "$SSHD_T" | awk '/^port / {print $2}' | trim_ws)
     elif [[ -r /etc/ssh/sshd_config ]]; then
         SSH_ROOT_LOGIN=$( grep -h -iE "^\s*PermitRootLogin\s+" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | awk '{print $2}' | head -n 1 || true )
         SSH_PASS_AUTH=$( grep -h -iE "^\s*PasswordAuthentication\s+" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | awk '{print $2}' | head -n 1 || true )
-        SSH_PORT_CFG=$( grep -h -iE "^\s*Port\s+" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | awk '{print $2}' | xargs || true )
+        SSH_PORT_CFG=$( grep -h -iE "^\s*Port\s+" /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | awk '{print $2}' | trim_ws || true )
     fi
     log_item "Serviço OpenSSH" "Porta(s): ${FG_CYAN}${SSH_PORT_CFG:-22}${NC} | PermitRootLogin: ${FG_YELLOW}${SSH_ROOT_LOGIN:-padrão}${NC} | PasswordAuth: ${SSH_PASS_AUTH:-padrão}"
     [[ "$SSH_ROOT_LOGIN" == "yes" ]] && add_alert "SSH está com PermitRootLogin habilitado ('yes')."
@@ -2363,8 +2793,19 @@ if command -v fail2ban-client >/dev/null 2>&1; then
     F2B_STATUS=$(get_service_status fail2ban)
     log_item "Fail2Ban (IPS)" "${F2B_STATUS}"
     if [[ "$(get_service_status_plain fail2ban)" == "Ativo" ]] && (( IS_ROOT == 1 )); then
-        JAILS=$(fail2ban-client status 2>/dev/null | awk -F':' '/Jail list/ {print $2}' | xargs || true)
+        JAILS=$(fail2ban-client status 2>/dev/null | awk -F':' '/Jail list/ {print $2}' | trim_ws || true)
         log_item "Jails Ativas" "${FG_GREEN}${JAILS:-Nenhuma}${NC}"
+        if [[ -n "$JAILS" ]]; then
+            IFS=',' read -ra JAIL_ARR <<< "$JAILS"
+            for j_raw in "${JAIL_ARR[@]}"; do
+                j_name=$(echo "$j_raw" | trim_ws)
+                [[ -z "$j_name" ]] && continue
+                j_st=$(fail2ban-client status "$j_name" 2>/dev/null || true)
+                j_cur=$(echo "$j_st" | awk -F':' '/Currently banned/ {gsub(/[^0-9]/,"",$2); print $2}' | head -n 1 || echo "0")
+                j_tot=$(echo "$j_st" | awk -F':' '/Total banned/ {gsub(/[^0-9]/,"",$2); print $2}' | head -n 1 || echo "0")
+                echo -e "      ├─ Jail [${FG_CYAN}${j_name}${NC}]: Banidos agora: ${FG_YELLOW}${j_cur:-0}${NC} | Total histórico: ${DIM}${j_tot:-0}${NC}"
+            done
+        fi
     fi
 else
     log_item "Fail2Ban (IPS)" "Não instalado"
@@ -2382,7 +2823,7 @@ elif command -v aa-status >/dev/null 2>&1 && (( IS_ROOT == 1 )); then
 fi
 
 if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
-    FAILED_UNITS=$(systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}' | xargs || true)
+    FAILED_UNITS=$(systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}' | trim_ws || true)
     if [[ -n "$FAILED_UNITS" ]]; then
         log_warning "Serviços do Systemd em estado FAILED: ${FG_RED}${FAILED_UNITS}${NC}"
         add_alert "Unidades systemd com falha detectadas: ${FAILED_UNITS}"
@@ -2405,9 +2846,9 @@ if command -v ss >/dev/null 2>&1; then
     while IFS='|' read -r proto local_addr port proc_raw pid_num; do
         [[ -z "$proto" ]] && continue
         scope="LOCAL"
-        if [[ "$local_addr" == "0.0.0.0" || "$local_addr" == "[::]" || "$local_addr" == "*" ]]; then
+        if [[ "$local_addr" == "0.0.0.0" || "$local_addr" == "[::]" || "$local_addr" == "::" || "$local_addr" == "*" || "$local_addr" == "[::ffff:0.0.0.0]" ]]; then
             scope="PÚBLICO"
-        elif [[ "$local_addr" != 127.* && "$local_addr" != "[::1]" ]]; then
+        elif [[ "$local_addr" != 127.* && "$local_addr" != "[::1]" && "$local_addr" != "::1" && "$local_addr" != 127.0.0.* ]]; then
             scope="REDE/LAN"
         fi
 
@@ -2435,8 +2876,12 @@ if command -v ss >/dev/null 2>&1; then
         printf "    %-6s %-22s %-7s %-10s %-22s %s\n" \
             "$proto" "$local_addr" "$port" "$scope" "${proc_raw:-N/A}" "$extra_context"
 
-        if [[ "$scope" == "PÚBLICO" ]] && [[ "$port" =~ ^(3306|5432|6379|27017|11211|9200)$ ]]; then
-            add_alert "Porta sensível de banco/cache (${port}/${proto} - ${proc_raw}) está aberta em todas as interfaces (${local_addr})."
+        if [[ "$scope" == "PÚBLICO" ]] && [[ "$port" =~ ^(111|161|2049|2375|3306|3389|5432|5900|6379|9100|9200|10050|10051|11211|27017)$ ]]; then
+            if [[ "$port" == "2375" ]]; then
+                add_alert "CRÍTICO: Porta Docker API sem TLS (${port}/${proto} - ${proc_raw}) aberta publicamente em ${local_addr}!"
+            else
+                add_alert "Porta sensível de banco/gerência (${port}/${proto} - ${proc_raw}) está aberta em todas as interfaces (${local_addr})."
+            fi
         fi
     done < <(ss -tulpn 2>/dev/null | awk '$1 !~ /^(Netid|State)$/ {
         proto = $1
@@ -2444,10 +2889,16 @@ if command -v ss >/dev/null 2>&1; then
         proc_col = ""
         for (i=7; i<=NF; i++) proc_col = proc_col $i " "
 
-        n = split(local_full, parts, ":")
-        port = parts[n]
-        addr = substr(local_full, 1, length(local_full) - length(port) - 1)
-        if (addr == "" || addr == "*") addr = "0.0.0.0"
+        # Extrai porta e endereço suportando IPv4, [::]:port, :::port e interface%zone:port
+        if (match(local_full, /:[0-9]+$/)) {
+            port = substr(local_full, RSTART + 1)
+            addr = substr(local_full, 1, RSTART - 1)
+        } else {
+            port = "-"
+            addr = local_full
+        }
+        if (addr == "" || addr == "*" || addr == "0.0.0.0") addr = "0.0.0.0"
+        if (addr == "::" || addr == "[::]") addr = "[::]"
 
         proc_name = "-"
         pid = ""
@@ -2468,11 +2919,21 @@ fi
 # 7.2 - Endereçamento IP, Rotas, DNS, /etc/hosts e Conexões Estabelecidas
 echo -e "\n  ${BOLD}Configuração de Rede, Rotas e DNS:${NC}"
 DEFAULT_GATEWAY=$(ip route 2>/dev/null | awk '/^default/ {print $3 " (via " $5 ")"}' | head -n 1 || true)
-DNS_SERVERS=$(awk '/^nameserver/ {print $2}' /etc/resolv.conf 2>/dev/null | xargs || true)
-SEARCH_DOMAINS=$(awk '/^(search|domain)/ {$1=""; print $0}' /etc/resolv.conf 2>/dev/null | xargs || true)
+DNS_SERVERS=$(awk '/^nameserver/ {print $2}' /etc/resolv.conf 2>/dev/null | trim_ws || true)
+SEARCH_DOMAINS=$(awk '/^(search|domain)/ {$1=""; print $0}' /etc/resolv.conf 2>/dev/null | trim_ws || true)
 if command -v resolvectl >/dev/null 2>&1; then
-    RESOLVED_DNS=$(resolvectl dns 2>/dev/null | awk -F': ' 'NF>1 && $2!="" {print $2}' | xargs || true)
+    RESOLVED_DNS=$(resolvectl dns 2>/dev/null | awk -F': ' 'NF>1 && $2!="" {print $2}' | trim_ws || true)
     [[ -n "$RESOLVED_DNS" ]] && DNS_SERVERS="${DNS_SERVERS} (Upstream: ${RESOLVED_DNS})"
+fi
+DNS_TEST_STR="Não testado"
+if command -v getent >/dev/null 2>&1; then
+    DNS_TEST_IP=$(timeout 2 getent hosts deb.debian.org 2>/dev/null | awk '{print $1}' | head -n 1 || true)
+    if [[ -n "$DNS_TEST_IP" ]]; then
+        DNS_TEST_STR="${FG_GREEN}OK (deb.debian.org -> ${DNS_TEST_IP})${NC}"
+    else
+        DNS_TEST_STR="${FG_RED}FALHA ao resolver deb.debian.org (timeout 2s)${NC}"
+        add_alert "Resolução DNS externa falhou no teste rápido (getent hosts deb.debian.org)."
+    fi
 fi
 PUBLIC_IP="Não detectado / Sem saída HTTPS"
 if command -v curl >/dev/null 2>&1; then
@@ -2483,6 +2944,7 @@ PRIMARY_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ip -4 route get 1.1.1
 log_item "IP Local Principal"  "${FG_GREEN}${PRIMARY_IP:-Nenhum}${NC}"
 log_item "Gateway Padrão"      "${DEFAULT_GATEWAY:-Nenhum}"
 log_item "Servidores DNS"      "${DNS_SERVERS:-Nenhum}${SEARCH_DOMAINS:+ (Domínio Busca: $SEARCH_DOMAINS)}"
+log_item "Teste Resolução DNS" "${DNS_TEST_STR}"
 log_item "IP Público de Saída" "${FG_CYAN}${PUBLIC_IP}${NC}"
 
 if command -v ip >/dev/null 2>&1; then
@@ -2558,7 +3020,13 @@ find /etc/cron.d /etc/cron.daily /etc/cron.hourly -maxdepth 1 -type f ! -name ".
 
 if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
     echo -e "\n  ${BOLD}Systemd Timers Ativos:${NC}"
-    systemctl list-timers --no-legend --plain 2>/dev/null | awk '{printf "    • %-35s -> Aciona: %s\n", $(NF-1), $NF}' || true
+    systemctl list-timers --no-legend --plain 2>/dev/null | awk '{
+        timer=""; acts="";
+        for(i=1; i<=NF; i++) {
+            if ($i ~ /\.timer$/) { timer=$i; if (i<NF) acts=$NF; break }
+        }
+        if (timer != "") printf "    • %-35s -> Aciona: %s\n", timer, (acts ? acts : "N/A")
+    }' || true
 fi
 
 # 8.2 - Scripts Administrativos Locais e Arquivos de Backup/Dump
@@ -2574,7 +3042,8 @@ BACKUP_ARCHIVES=$(find /var/backups /backup /backups /root /home -maxdepth 3 -ty
 if [[ -n "$BACKUP_ARCHIVES" ]]; then
     echo -e "\n  ${BOLD}Arquivos de Dump / Backup Localizados no Disco:${NC}"
     while IFS= read -r ba; do
-        BA_SIZE=$(du -sh "$ba" 2>/dev/null | awk '{print $1}' || echo "N/A")
+        BA_SIZE=$(safe_du "$ba")
+        [[ -z "$BA_SIZE" ]] && BA_SIZE="N/A"
         echo -e "    • ${FG_CYAN}${ba}${NC} (${BA_SIZE})"
     done <<< "$BACKUP_ARCHIVES"
 fi
