@@ -95,6 +95,7 @@ if (( OPT_NO_COLOR == 0 )); then
     FG_RED='\033[31m'
     FG_GREEN='\033[32m'
     FG_YELLOW='\033[33m'
+    FG_BLUE='\033[94m'
     FG_CYAN='\033[36m'
     FG_WHITE='\033[37m'
 else
@@ -104,6 +105,7 @@ else
     FG_RED=''
     FG_GREEN=''
     FG_YELLOW=''
+    FG_BLUE=''
     FG_CYAN=''
     FG_WHITE=''
 fi
@@ -140,7 +142,7 @@ draw_separator() {
 print_header() {
     local title="$1"
     echo -e ""
-    echo -e "${FG_CYAN}${BOLD}❯ ${FG_WHITE}${title}${NC}"
+    echo -e "${FG_BLUE}${BOLD}${ARROW} ${title}${NC}"
     draw_separator
 }
 
