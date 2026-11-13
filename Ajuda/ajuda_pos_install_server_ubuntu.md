@@ -21,7 +21,7 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 | `/etc/audit/rules.d/server_security.rules` | Regras de auditoria de contas, sudoers, SSH, rede e persistência. |
 | `/etc/pos-install-server/` | Aliases compartilhados e configuração opcional do Vim. |
 | `/usr/local/share/pos-install-server/vim/2.5` | Plugins opcionais fixados por commit, compartilhados e pertencentes a root. |
-| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, CPU, RAM, Disco, IP, UFW). |
+| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, Sistema, Data de instalação, Uptime, RAM, Disco, IP, UFW). |
 | `/etc/profile.d/motd_banner.sh` | Disparador automático do banner no login interativo via SSH ou console local. |
 | `/etc/fail2ban/jail.d/99-pos-install-server.local` | Jaula SSH do script. `jail.local` e outras jaulas são preservadas. |
 | `/etc/default/ufw` | Configurações do firewall UFW (incluindo suporte a IPv6 ativo `IPV6=yes`). |

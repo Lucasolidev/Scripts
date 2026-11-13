@@ -21,7 +21,7 @@
 # 11. Gerencia somente o grupo operacional informado, preservando maiúsculas/minúsculas, e usuários com barreiras operacionais no sudoers, sem isolamento contra administradores.
 # 12. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH detectadas e Zabbix Agent (10050/tcp).
 # 13. Opcionalmente personaliza o editor Vim com tema Sonokai, Airline e plugins fixados por commit com suporte multi-usuário (/root, /etc/skel, /home).
-# 14. Instala o Banner dinâmico de Boas-Vindas no login (/usr/local/bin/motd_banner.sh integrado ao /etc/profile.d e /etc/bash.bashrc) com Hostname, Sistema, Kernel, Uptime, RAM, Discos, IPs e Status do Firewall UFW.
+# 14. Instala o Banner dinâmico de Boas-Vindas no login (/usr/local/bin/motd_banner.sh integrado ao /etc/profile.d e /etc/bash.bashrc) com Hostname, Sistema, Kernel, Data de instalação, Uptime, RAM, Discos, IPs e Status do Firewall UFW.
 # 15. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 
@@ -1311,13 +1311,134 @@ cat > "$LOG_DIR/motd_banner.sh" <<'EOF'
 # ==============================================================================
 
 # Executa apenas se a saída padrão for um terminal interativo (evita quebrar scp/sftp/rsync)
-[ -t 1 ] || exit 0
+[ "${1:-}" = "--force" ] || [ -t 1 ] || exit 0
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
 HOSTNAME=$(hostname 2>/dev/null || uname -n)
 SISTEMA=$(lsb_release -ds 2>/dev/null || grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || echo "Debian GNU/Linux")
 KERNEL=$(uname -r)
+
+get_file_epoch() {
+  local target="$1" ts=""
+  [ -e "$target" ] || return 1
+  ts=$(stat -c '%W' -- "$target" 2>/dev/null)
+  if ! [[ "$ts" =~ ^[0-9]+$ ]] || [ "$ts" -le 0 ]; then
+    ts=$(stat -c '%Y' -- "$target" 2>/dev/null)
+  fi
+  if [[ "$ts" =~ ^[0-9]+$ ]] && [ "$ts" -ge 946684800 ]; then
+    printf '%s\n' "$ts"
+    return 0
+  fi
+  return 1
+}
+
+get_earliest_ssh_host_epoch() {
+  local f="" ts="" min_ts=""
+  for f in /etc/ssh/ssh_host_*_key.pub /etc/ssh/ssh_host_*_key; do
+    [ -e "$f" ] || continue
+    if ts=$(get_file_epoch "$f"); then
+      if [ -z "$min_ts" ] || [ "$ts" -lt "$min_ts" ]; then
+        min_ts="$ts"
+      fi
+    fi
+  done
+  [ -n "$min_ts" ] || return 1
+  printf '%s\n' "$min_ts"
+}
+
+get_fs_root_epoch() {
+  local root_dev="" tune_raw="" ts=""
+  root_dev=$(findmnt -no SOURCE / 2>/dev/null)
+  if [ -n "$root_dev" ] && [ -r "$root_dev" ] && command -v tune2fs >/dev/null 2>&1; then
+    tune_raw=$(LC_ALL=C tune2fs -l "$root_dev" 2>/dev/null | awk -F':[[:space:]]+' '/^Filesystem created:/ {print $2; exit}')
+    if [ -n "$tune_raw" ]; then
+      ts=$(LC_ALL=C date -d "$tune_raw" +%s 2>/dev/null)
+      if [[ "$ts" =~ ^[0-9]+$ ]] && [ "$ts" -ge 946684800 ]; then
+        printf '%s\n' "$ts"
+        return 0
+      fi
+    fi
+  fi
+  get_file_epoch /
+}
+
+get_install_info() {
+  local virt_container="" is_wsl=0 is_container=0
+  local fs_ts="" inst_ts="" mach_ts="" ssh_ts="" boot_ts="" chosen_ts="" origem=""
+  local date_str="" today_epoch="" inst_day_epoch="" dias=0 dias_txt=""
+
+  if grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null || [ -e /proc/sys/fs/binfmt_misc/WSLInterop ]; then
+    is_wsl=1
+  elif virt_container=$(systemd-detect-virt --container 2>/dev/null); then
+    is_container=1
+  fi
+
+  fs_ts=$(get_fs_root_epoch || true)
+  inst_ts=$(get_file_epoch /var/log/installer || true)
+  mach_ts=$(get_file_epoch /etc/machine-id || true)
+  ssh_ts=$(get_earliest_ssh_host_epoch || true)
+  boot_ts="${mach_ts:-$ssh_ts}"
+
+  if [ "$is_wsl" -eq 1 ]; then
+    chosen_ts="${boot_ts:-$fs_ts}"
+    origem="Primeiro boot WSL"
+  elif [ "$is_container" -eq 1 ]; then
+    chosen_ts="${boot_ts:-$fs_ts}"
+    if [ "$virt_container" = "lxc" ]; then
+      origem="Primeiro boot LXC"
+    else
+      origem="Primeiro boot contêiner"
+    fi
+  elif [ -n "$inst_ts" ]; then
+    if [ -n "$boot_ts" ] && [ "$boot_ts" -gt $((inst_ts + 86400)) ]; then
+      chosen_ts="$boot_ts"
+      origem="Primeiro boot / Template"
+    else
+      chosen_ts="$inst_ts"
+      origem="VM/Físico"
+    fi
+  elif [ -n "$fs_ts" ] && [ -n "$boot_ts" ]; then
+    if [ "$boot_ts" -gt $((fs_ts + 3600)) ]; then
+      chosen_ts="$boot_ts"
+      origem="Primeiro boot / Template"
+    else
+      chosen_ts="$fs_ts"
+      origem="VM/Físico"
+    fi
+  elif [ -n "$fs_ts" ]; then
+    chosen_ts="$fs_ts"
+    origem="VM/Físico"
+  elif [ -n "$boot_ts" ]; then
+    chosen_ts="$boot_ts"
+    origem="Primeiro boot"
+  fi
+
+  if [ -z "$chosen_ts" ]; then
+    printf 'Não identificado\n'
+    return 0
+  fi
+
+  date_str=$(date -d "@$chosen_ts" '+%d/%m/%Y' 2>/dev/null || printf '')
+  today_epoch=$(date -d "$(date '+%Y-%m-%d' 2>/dev/null)" +%s 2>/dev/null || printf '')
+  inst_day_epoch=$(date -d "$(date -d "@$chosen_ts" '+%Y-%m-%d' 2>/dev/null)" +%s 2>/dev/null || printf '')
+  if [ -n "$date_str" ] && [[ "$today_epoch" =~ ^[0-9]+$ ]] && [[ "$inst_day_epoch" =~ ^[0-9]+$ ]]; then
+    dias=$(( (today_epoch - inst_day_epoch) / 86400 ))
+    [ "$dias" -lt 0 ] && dias=0
+    case "$dias" in
+      0) dias_txt="hoje" ;;
+      1) dias_txt="há 1 dia" ;;
+      *) dias_txt="há ${dias} dias" ;;
+    esac
+    printf '%s (%s | %s)\n' "$date_str" "$dias_txt" "$origem"
+  elif [ -n "$date_str" ]; then
+    printf '%s (%s)\n' "$date_str" "$origem"
+  else
+    printf 'Não identificado\n'
+  fi
+}
+
+INSTALADO_EM=$(get_install_info)
 UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
 RAM_USO=$(free -h 2>/dev/null | awk '/^Mem:/ {print "Usado: " $3 " / Total: " $2 " (Livre: " $7 ")"}')
 SWAP_USO=$(free -h 2>/dev/null | awk '/^Swap:/ { if ($2 == "0B" || $2 == "0" || $2 == "") print "Desativada (0B)"; else print "Usado: " $3 " / Total: " $2 " (Livre: " $4 ")" }')
@@ -1326,6 +1447,7 @@ echo -e "\033[1;36m=============================================================
 echo -e "  \033[1;32m📌 VOCÊ CONECTOU EM:\033[0m"
 printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Hostname:" "${HOSTNAME}"
 printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m \033[2m(Kernel %s)\033[0m\n" "Sistema:" "${SISTEMA}" "${KERNEL}"
+printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Instalado em:" "${INSTALADO_EM}"
 printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Uptime:" "${UPTIME}"
 printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória RAM:" "${RAM_USO}"
 printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória SWAP:" "${SWAP_USO:-Desativada (0B)}"

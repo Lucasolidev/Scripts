@@ -21,7 +21,7 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 | `/etc/audit/rules.d/server_security.rules` | Regras ativas de auditoria do Auditd (contas, sudoers, SSH, rede `/etc/network` e persistência). |
 | `/etc/pos-install-server/` | Aliases compartilhados do Shell e configurações centralizadas do Vim. |
 | `/usr/local/share/pos-install-server/vim/2.5` | Plugins opcionais fixados por commit (Sonokai, Airline, Polyglot, Devicons). |
-| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, OS, RAM, Discos, IPs, Firewall). |
+| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, OS, Data de instalação, RAM, Discos, IPs, Firewall). |
 | `/etc/profile.d/motd_banner.sh` | Disparador automático do banner no login interativo via SSH ou console local. |
 | `/etc/fail2ban/jail.d/99-pos-install-server.local` | Jaula SSH gerenciada com backend `systemd` e proteção contra ataques de força bruta. |
 | `/etc/default/ufw` | Configurações do firewall UFW (incluindo suporte a IPv6 ativo `IPV6=yes`). |
@@ -293,6 +293,7 @@ Disponíveis para todos os usuários com login interativo no Bash:
 #### Banner Dinâmico no Login (`motd_banner.sh`)
 Exibe no login de console e SSH:
 * Hostname, Sistema Operacional (`Debian GNU/Linux 12/13`) e Kernel
+* Data aproximada de instalação ou primeiro boot do SO (VM/Físico, Template, LXC ou WSL)
 * Uptime detalhado do servidor
 * Memória RAM e SWAP em uso/livre
 * Utilização de todas as partições montadas

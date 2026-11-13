@@ -100,6 +100,12 @@ wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/install_apc_powe
 
 
 
+### 8. Instalador e Atualizador do Banner Dinâmico (`install_motd_banner.sh`)
+Instala ou atualiza de forma autônoma (sem alterar pacotes APT) apenas o **Banner Dinâmico de Boas-Vindas** (`/usr/local/bin/motd_banner.sh`, `/etc/profile.d/motd_banner.sh`, `/etc/bash.bashrc` e comando rápido `motd`) em servidores **Ubuntu** e **Debian** (VMs, servidores físicos, contêineres LXC e WSL). Exibe Hostname, Sistema, Kernel, Data de instalação ou primeiro boot, Uptime, RAM, SWAP, Discos, IPs e Status do Firewall UFW:
+```bash
+wget https://raw.githubusercontent.com/Lucasolidev/Scripts/main/install_motd_banner.sh -O install_motd_banner.sh && sudo chmod +x install_motd_banner.sh && sudo ./install_motd_banner.sh
+```
+
 ---
 
 ## 📐 Padrões de Código e Templates
