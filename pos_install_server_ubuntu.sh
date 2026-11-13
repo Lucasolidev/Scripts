@@ -21,7 +21,7 @@
 # 11. Gerencia somente o grupo operacional informado, preservando maiúsculas/minúsculas, e usuários com barreiras operacionais no sudoers, sem isolamento contra administradores.
 # 12. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH detectadas e Zabbix Agent (10050/tcp).
 # 13. Opcionalmente personaliza o editor Vim com tema Sonokai, Airline e plugins fixados por commit com suporte multi-usuário (/root, /etc/skel, /home).
-# 14. Instala o Banner dinâmico de Boas-Vindas no login (/usr/local/bin/motd_banner.sh integrado ao /etc/profile.d e /etc/bash.bashrc) com Hostname, Sistema, Kernel, Data de instalação, Uptime, RAM, Discos, IPs e Status do Firewall UFW.
+# 14. Instala o Banner dinâmico de Boas-Vindas no login (/usr/local/bin/motd_banner.sh integrado ao /etc/profile.d e /etc/bash.bashrc) com Hostname, Sistema, Kernel, Data de instalação, Uptime, barras de RAM/SWAP/Discos, IPs, UFW e Reboot Pendente.
 # 15. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 
@@ -1322,7 +1322,41 @@ cat > "$LOG_DIR/motd_banner.sh" <<'EOF'
 # Executa apenas se a saída padrão for um terminal interativo (evita quebrar scp/sftp/rsync)
 [ "${1:-}" = "--force" ] || [ -t 1 ] || exit 0
 
+export LC_ALL=C.UTF-8
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
+print_row_color() {
+  local label="$1" color="$2" val="$3" extra_dim="${4:-}"
+  local pad=$((19 - ${#label}))
+  [ "$pad" -lt 1 ] && pad=1
+  if [ -n "$extra_dim" ]; then
+    printf "     \033[1m%s%*s\033[0m %b%s\033[0m \033[2m%s\033[0m\n" "$label" "$pad" "" "$color" "$val" "$extra_dim"
+  else
+    printf "     \033[1m%s%*s\033[0m %b%s\033[0m\n" "$label" "$pad" "" "$color" "$val"
+  fi
+}
+
+print_row_bar() {
+  local label="$1" pct="$2" detail="$3"
+  local filled=0 empty=0 bar="" i=0 bar_color="\033[32m"
+  local pad=$((19 - ${#label}))
+  [ "$pad" -lt 1 ] && pad=1
+  [ "$pct" -lt 0 ] && pct=0
+  [ "$pct" -gt 100 ] && pct=100
+  filled=$(( (pct + 5) / 10 ))
+  [ "$pct" -gt 0 ] && [ "$filled" -eq 0 ] && filled=1
+  [ "$filled" -gt 10 ] && filled=10
+  empty=$((10 - filled))
+  for ((i=0; i<filled; i++)); do bar="${bar}█"; done
+  for ((i=0; i<empty; i++)); do bar="${bar}░"; done
+  if [ "$pct" -ge 90 ]; then
+    bar_color="\033[1;31m"
+  elif [ "$pct" -ge 75 ]; then
+    bar_color="\033[1;33m"
+  fi
+  printf "     \033[1m%s%*s\033[0m %b[%s] %2d%%\033[0m \033[36m(%s)\033[0m\n" \
+    "$label" "$pad" "" "$bar_color" "$bar" "$pct" "$detail"
+}
 
 HOSTNAME=$(hostname 2>/dev/null || uname -n)
 SISTEMA=$(lsb_release -ds 2>/dev/null || grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || echo "Linux")
@@ -1449,17 +1483,34 @@ get_install_info() {
 
 INSTALADO_EM=$(get_install_info)
 UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
-RAM_USO=$(free -h 2>/dev/null | awk '/^Mem:/ {print "Usado: " $3 " / Total: " $2 " (Livre: " $7 ")"}')
-SWAP_USO=$(free -h 2>/dev/null | awk '/^Swap:/ { if ($2 == "0B" || $2 == "0" || $2 == "") print "Desativada (0B)"; else print "Usado: " $3 " / Total: " $2 " (Livre: " $4 ")" }')
+
+read -r MEM_USED MEM_TOTAL MEM_AVAIL <<< "$(free -h 2>/dev/null | awk '/^Mem:/ {print $3, $2, $7}')"
+read -r MEM_B_TOTAL MEM_B_USED <<< "$(free -b 2>/dev/null | awk '/^Mem:/ {print $2, $3}')"
+MEM_PCT=0
+if [[ "${MEM_B_TOTAL:-}" =~ ^[0-9]+$ ]] && [[ "${MEM_B_USED:-}" =~ ^[0-9]+$ ]] && [ "$MEM_B_TOTAL" -gt 0 ]; then
+  MEM_PCT=$(( (MEM_B_USED * 100) / MEM_B_TOTAL ))
+fi
+
+read -r SWAP_USED SWAP_TOTAL SWAP_FREE <<< "$(free -h 2>/dev/null | awk '/^Swap:/ {print $3, $2, $4}')"
+read -r SWAP_B_TOTAL SWAP_B_USED <<< "$(free -b 2>/dev/null | awk '/^Swap:/ {print $2, $3}')"
 
 echo -e "\033[1;36m================================================================\033[0m"
 echo -e "  \033[1;32m📌 VOCÊ CONECTOU EM:\033[0m"
-printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Hostname:" "${HOSTNAME}"
-printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m \033[2m(Kernel %s)\033[0m\n" "Sistema:" "${SISTEMA}" "${KERNEL}"
-printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Instalado em:" "${INSTALADO_EM}"
-printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Uptime:" "${UPTIME}"
-printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória RAM:" "${RAM_USO}"
-printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Memória SWAP:" "${SWAP_USO:-Desativada (0B)}"
+print_row_color "Hostname:" "\033[36m" "${HOSTNAME}"
+print_row_color "Sistema:" "\033[36m" "${SISTEMA}" "(Kernel ${KERNEL})"
+print_row_color "Instalado em:" "\033[36m" "${INSTALADO_EM}"
+print_row_color "Uptime:" "\033[36m" "${UPTIME}"
+if [ -n "${MEM_TOTAL:-}" ]; then
+  print_row_bar "Memória RAM:" "$MEM_PCT" "${MEM_USED} / ${MEM_TOTAL} | Livre: ${MEM_AVAIL:-N/A}"
+else
+  print_row_color "Memória RAM:" "\033[36m" "N/A"
+fi
+if [[ "${SWAP_B_TOTAL:-}" =~ ^[0-9]+$ ]] && [ "$SWAP_B_TOTAL" -gt 0 ]; then
+  SWAP_PCT=$(( (${SWAP_B_USED:-0} * 100) / SWAP_B_TOTAL ))
+  print_row_bar "Memória SWAP:" "$SWAP_PCT" "${SWAP_USED:-0B} / ${SWAP_TOTAL:-0B} | Livre: ${SWAP_FREE:-0B}"
+else
+  print_row_color "Memória SWAP:" "\033[36m" "Desativada (0B)"
+fi
 
 # Partições / Discos Físicos Montados
 DISCOS_ENCONTRADOS=0
@@ -1469,14 +1520,24 @@ if [ -n "$DISCOS_RAW" ]; then
     if [ -n "$mountpoint" ]; then
       DISCOS_ENCONTRADOS=1
       lbl="Disco (${mountpoint}):"
-      printf "     \033[1m%-18s\033[0m \033[36mUsado: %s / Total: %s (Livre: %s | %s)\033[0m\n" "$lbl" "$used" "$total" "$free" "$perc"
+      pct_num="${perc%%%}"
+      if [[ "$pct_num" =~ ^[0-9]+$ ]]; then
+        print_row_bar "$lbl" "$pct_num" "${used} / ${total} | Livre: ${free}"
+      else
+        print_row_color "$lbl" "\033[36m" "Usado: ${used} / Total: ${total} (Livre: ${free} | ${perc})"
+      fi
     fi
   done <<< "$DISCOS_RAW"
 fi
 
 if [ "$DISCOS_ENCONTRADOS" -eq 0 ]; then
-  ROOT_DF=$(df -h / 2>/dev/null | awk 'NR==2 {print "Usado: " $3 " / Total: " $2 " (Livre: " $4 " | " $5 ")"}')
-  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "Disco (/):" "${ROOT_DF}"
+  read -r r_used r_total r_free r_perc <<< "$(df -hP / 2>/dev/null | awk 'NR==2 {print $3, $2, $4, $5}')"
+  r_pct_num="${r_perc%%%}"
+  if [[ "${r_pct_num:-}" =~ ^[0-9]+$ ]]; then
+    print_row_bar "Disco (/):" "$r_pct_num" "${r_used} / ${r_total} | Livre: ${r_free}"
+  else
+    print_row_color "Disco (/):" "\033[36m" "Usado: ${r_used:-N/A} / Total: ${r_total:-N/A} (Livre: ${r_free:-N/A})"
+  fi
 fi
 
 # Interfaces de Rede e Endereços IPv4
@@ -1486,26 +1547,40 @@ if [ -n "$IPS_RAW" ]; then
   while read -r iface ip_addr; do
     if [ -n "$iface" ] && [ -n "$ip_addr" ]; then
       IPS_ENCONTRADOS=1
-      lbl="IP (${iface}):"
-      printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "$lbl" "$ip_addr"
+      print_row_color "IP (${iface}):" "\033[36m" "$ip_addr"
     fi
   done <<< "$IPS_RAW"
 fi
 
 if [ "$IPS_ENCONTRADOS" -eq 0 ]; then
   IP_FALLBACK=$(hostname -I 2>/dev/null | awk '{print $1}')
-  printf "     \033[1m%-18s\033[0m \033[36m%s\033[0m\n" "IP Local:" "${IP_FALLBACK:-N/A}"
+  print_row_color "IP Local:" "\033[36m" "${IP_FALLBACK:-N/A}"
 fi
 
 # Status do Firewall UFW
 if (grep -qs -i "^ENABLED=yes" /etc/ufw/ufw.conf 2>/dev/null && systemctl is-active --quiet ufw 2>/dev/null) || (ufw status 2>/dev/null | grep -qi "^Status:[[:space:]]*active"); then
-  UFW_STATUS_TXT="\033[1;32mAtivo\033[0m"
+  UFW_COLOR="\033[1;32m"
+  UFW_TXT="Ativo"
 elif command -v ufw >/dev/null 2>&1 || [ -x /usr/sbin/ufw ] || [ -x /sbin/ufw ] || [ -f /etc/default/ufw ] || [ -f /etc/ufw/ufw.conf ]; then
-  UFW_STATUS_TXT="\033[1;33mInativo\033[0m"
+  UFW_COLOR="\033[1;33m"
+  UFW_TXT="Inativo"
 else
-  UFW_STATUS_TXT="\033[1;33mNão Instalado\033[0m"
+  UFW_COLOR="\033[1;33m"
+  UFW_TXT="Não Instalado"
 fi
-printf "     \033[1m%-18s\033[0m %b\n" "Firewall UFW:" "${UFW_STATUS_TXT}"
+print_row_color "Firewall UFW:" "$UFW_COLOR" "$UFW_TXT"
+
+# Status de Reboot Pendente
+if [ -e /var/run/reboot-required ]; then
+  if [ -r /var/run/reboot-required.pkgs ] && grep -q 'linux-image' /var/run/reboot-required.pkgs 2>/dev/null; then
+    REBOOT_TXT="Sim (atualização de kernel aguardando reinício)"
+  else
+    REBOOT_TXT="Sim (atualização pendente aguardando reinício)"
+  fi
+  print_row_color "Reboot Pendente:" "\033[1;33m" "$REBOOT_TXT"
+else
+  print_row_color "Reboot Pendente:" "\033[32m" "Não"
+fi
 
 echo -e "\033[1;36m================================================================\033[0m\n"
 EOF

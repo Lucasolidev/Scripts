@@ -295,7 +295,7 @@ Exibe no login de console e SSH:
 * Hostname, Sistema Operacional (`Debian GNU/Linux 12/13`) e Kernel
 * Data aproximada de instalação ou primeiro boot do SO (VM/Físico, Template, LXC ou WSL)
 * Uptime detalhado do servidor
-* Memória RAM e SWAP em uso/livre
-* Utilização de todas as partições montadas
+* Memória RAM e SWAP com barra de uso percentual e alerta por cor
+* Utilização de todas as partições montadas com barra percentual e alerta por cor
 * IPs locais de todas as interfaces físicas ativas
-* Status em tempo real do Firewall UFW
+* Status em tempo real do Firewall UFW e aviso de Reboot Pendente (`/var/run/reboot-required`)
