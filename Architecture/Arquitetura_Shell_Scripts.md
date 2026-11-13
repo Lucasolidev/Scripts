@@ -5,7 +5,7 @@
 > 1. **Paleta de Cores e Estilos (ANSI)**:
 >    Defina no topo do arquivo a paleta de cores padrão utilizando as variáveis:
 >    * `NC` (reset/sem cor), `BOLD` (negrito), `DIM` (estilo suave)
->    * Cores de Fonte (`FG_CYAN`, `FG_YELLOW`, `FG_GREEN`, `FG_RED`, `FG_WHITE`)
+>    * Cores de Fonte (`FG_BLUE` `\033[94m` — Azul Brilhante para títulos de seção, `FG_CYAN` `\033[36m`, `FG_YELLOW`, `FG_GREEN`, `FG_RED`, `FG_WHITE`)
 >    * Símbolo indicador `ARROW="❯"`
 > 
 > 2. **Funções Auxiliares de Visual**:
@@ -17,7 +17,7 @@
 >    print_header() {
 >        local title="$1"
 >        echo -e ""
->        echo -e "${FG_CYAN}${BOLD}❯ ${title}${NC}"
+>        echo -e "${FG_BLUE}${BOLD}${ARROW} ${title}${NC}"
 >        draw_separator
 >    }
 >    get_service_status() {
