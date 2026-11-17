@@ -683,39 +683,91 @@ ps -eo pid,user,%cpu,%mem,comm --sort=-%mem 2>/dev/null | head -n 6 | awk '
 ' || true
 
 # ==============================================================================
-# SEÇÃO 2 - USUÁRIOS ATIVOS, GRUPOS PERTENCENTES, SUDOERS E DIRETÓRIO (LDAP/AD)
+# SEÇÃO 2 - USUÁRIOS (ATIVOS, BLOQUEADOS E DESATIVADOS), GRUPOS, SUDOERS E LDAP/AD
 # ==============================================================================
-print_header "2. USUÁRIOS ATIVOS, GRUPOS PERTENCENTES, SUDOERS E AUTENTICAÇÃO (LDAP/AD)"
+print_header "2. USUÁRIOS (ATIVOS, BLOQUEADOS E DESATIVADOS), GRUPOS, SUDOERS E AUTENTICAÇÃO"
 
-# 2.1 - Usuários Ativos com Shell de Login e todos os Grupos aos quais pertencem
-echo -e "  ${BOLD}Usuários Ativos no Sistema (Com Shell de Login) e Grupos a que Pertencem:${NC}"
-ACTIVE_USERS_COUNT=0
-while IFS=: read -r u_name _ u_uid _ _ u_home u_shell; do
-    [[ -z "$u_name" ]] && continue
-    if (( u_uid == 0 || (u_uid >= 1000 && u_uid < 65534) )) && [[ ! "$u_shell" =~ (nologin|false|sync|halt|shutdown)$ ]]; then
-        ACTIVE_USERS_COUNT=$((ACTIVE_USERS_COUNT + 1))
-        U_GROUPS=$(id -Gn "$u_name" 2>/dev/null | tr ' ' ', ' || echo "N/A")
-        PASS_STATE="Não verificado"
-        if (( IS_ROOT == 1 )) && command -v passwd >/dev/null 2>&1; then
-            P_RAW=$(passwd -S "$u_name" 2>/dev/null | awk '{print $2}' || true)
-            case "$P_RAW" in
-                P|PS) PASS_STATE="${FG_GREEN}Conta Ativa (Com Senha)${NC}" ;;
-                L|LK) PASS_STATE="${FG_RED}Conta Bloqueada (Locked)${NC}" ;;
-                NP)   PASS_STATE="${FG_YELLOW}Sem Senha Definida${NC}" ;;
-                *)    PASS_STATE="${P_RAW:-Ativa}" ;;
+get_user_auth_status() {
+    local u_name="$1"
+    local p_state="Não verificado (requer root)"
+    if (( IS_ROOT == 1 )); then
+        local p_raw=""
+        if command -v passwd >/dev/null 2>&1; then
+            p_raw=$(passwd -S "$u_name" 2>/dev/null | awk '{print $2}' || true)
+            case "$p_raw" in
+                P|PS) p_state="${FG_GREEN}Conta Ativa (Com Senha)${NC}" ;;
+                L|LK) p_state="${FG_RED}Conta Bloqueada (Locked)${NC}" ;;
+                NP)   p_state="${FG_YELLOW}Sem Senha Definida${NC}" ;;
+                *)    p_state="${p_raw:-Ativa}" ;;
             esac
         fi
-        SSH_KEYS_INFO="Nenhuma"
-        if [[ -r "${u_home}/.ssh/authorized_keys" ]]; then
-            K_COUNT=$(awk '/^(ssh-|ecdsa-)/ {c++} END {print c+0}' "${u_home}/.ssh/authorized_keys" 2>/dev/null || echo 0)
-            K_COUNT="${K_COUNT%%[^0-9]*}"
-            (( ${K_COUNT:-0} > 0 )) && SSH_KEYS_INFO="${FG_GREEN}${K_COUNT} chave(s) SSH autorizada(s)${NC}"
+        local exp_days="" today_days="" exp_fmt=""
+        exp_days=$(getent shadow "$u_name" 2>/dev/null | cut -d: -f8 || true)
+        if [[ -z "$exp_days" && -r /etc/shadow ]]; then
+            exp_days=$(awk -F: -v u="$u_name" '$1==u {print $8; exit}' /etc/shadow 2>/dev/null || true)
         fi
+        if [[ "$exp_days" =~ ^[0-9]+$ ]]; then
+            today_days=$(( $(date +%s) / 86400 ))
+            if (( exp_days > 0 )); then
+                exp_fmt=$(date -u -d "1970-01-01 +${exp_days} days" +%d/%m/%Y 2>/dev/null || printf 'dia %s' "$exp_days")
+            else
+                exp_fmt="início epoch"
+            fi
+            if (( exp_days <= today_days )); then
+                p_state="${p_state} | ${FG_RED}${BOLD}EXPIRADA (${exp_fmt})${NC}"
+            else
+                p_state="${p_state} | ${FG_YELLOW}Expira: ${exp_fmt}${NC}"
+            fi
+        fi
+    fi
+    printf '%s' "$p_state"
+}
+
+get_user_ssh_keys_info() {
+    local u_home="$1"
+    local ssh_info="Nenhuma"
+    if [[ -r "${u_home}/.ssh/authorized_keys" ]]; then
+        local k_count
+        k_count=$(awk '/^(ssh-|ecdsa-|sk-)/ {c++} END {print c+0}' "${u_home}/.ssh/authorized_keys" 2>/dev/null || echo 0)
+        k_count="${k_count%%[^0-9]*}"
+        (( ${k_count:-0} > 0 )) && ssh_info="${FG_GREEN}${k_count} chave(s) SSH autorizada(s)${NC}"
+    fi
+    printf '%s' "$ssh_info"
+}
+
+# 2.1 - Usuários Ativos (com Shell de Login) e Usuários Humanos Desativados/Bloqueados
+echo -e "  ${BOLD}Usuários com Shell de Login (Ativos e Bloqueados por Senha/Expiração):${NC}"
+ACTIVE_USERS_COUNT=0
+DISABLED_SHELL_USERS=()
+while IFS=: read -r u_name _ u_uid _ _ u_home u_shell; do
+    [[ -z "$u_name" ]] && continue
+    if (( u_uid == 0 || (u_uid >= 1000 && u_uid < 65534) )) && [[ -n "$u_shell" ]] && [[ ! "$u_shell" =~ (nologin|false|sync|halt|shutdown)$ ]]; then
+        ACTIVE_USERS_COUNT=$((ACTIVE_USERS_COUNT + 1))
+        U_GROUPS=$(id -Gn "$u_name" 2>/dev/null | tr ' ' ', ' || echo "N/A")
+        PASS_STATE=$(get_user_auth_status "$u_name")
+        SSH_KEYS_INFO=$(get_user_ssh_keys_info "$u_home")
         echo -e "    • Usuário: ${FG_CYAN}${BOLD}${u_name}${NC} (UID: ${u_uid}) | Status: ${PASS_STATE} | Home: ${u_home} | Shell: ${DIM}${u_shell}${NC}"
         echo -e "      ├─ ${BOLD}Grupos a que pertence:${NC} ${FG_YELLOW}${U_GROUPS}${NC}"
         echo -e "      └─ ${BOLD}Chaves SSH:${NC}            ${SSH_KEYS_INFO}"
+    elif (( u_uid >= 1000 && u_uid < 65534 )); then
+        DISABLED_SHELL_USERS+=("${u_name}|${u_uid}|${u_home}|${u_shell:-sem-shell}")
     fi
 done < /etc/passwd
+
+echo -e "\n  ${BOLD}Usuários Não-Sistema (UID >= 1000) com Shell Desativado (nologin/false):${NC}"
+if (( ${#DISABLED_SHELL_USERS[@]} > 0 )); then
+    for du_entry in "${DISABLED_SHELL_USERS[@]}"; do
+        IFS='|' read -r du_name du_uid du_home du_shell <<< "$du_entry"
+        DU_GROUPS=$(id -Gn "$du_name" 2>/dev/null | tr ' ' ', ' || echo "N/A")
+        DU_PASS_STATE=$(get_user_auth_status "$du_name")
+        DU_SSH_KEYS=$(get_user_ssh_keys_info "$du_home")
+        echo -e "    • Usuário: ${FG_YELLOW}${BOLD}${du_name}${NC} (UID: ${du_uid}) | ${FG_RED}Shell Desativado${NC} (${DIM}${du_shell}${NC}) | Status Senha/Conta: ${DU_PASS_STATE}"
+        echo -e "      ├─ ${BOLD}Home / Grupos:${NC} ${du_home} | Grupos: ${FG_YELLOW}${DU_GROUPS}${NC}"
+        echo -e "      └─ ${BOLD}Chaves SSH:${NC}    ${DU_SSH_KEYS}"
+    done
+else
+    echo -e "    • Nenhum usuário não-sistema (UID >= 1000) com shell desativado encontrado."
+fi
 
 # 2.2 - Quem são os Sudos? (Grupos Administrativos e Regras em /etc/sudoers)
 echo -e "\n  ${BOLD}Quem são os Sudos? (Grupos de Administração: sudo, wheel, admin, adm, docker, lxd):${NC}"
