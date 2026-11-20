@@ -998,6 +998,7 @@ if [[ -n "$KERN_LOG_SRC" ]]; then
 else
     log_info "Logs do kernel (journalctl -k / dmesg) indisponíveis ou restritos neste ambiente/container."
 fi
+return 0
 }
 
 # ==============================================================================
@@ -1253,7 +1254,10 @@ if [[ -r /etc/krb5.conf ]]; then
     fi
 fi
 
-(( DIR_AUTH_FOUND == 0 )) && echo -e "    • Autenticação exclusivamente local (/etc/passwd e /etc/shadow) — Nenhuma integração LDAP/AD ativa detectada."
+if (( DIR_AUTH_FOUND == 0 )); then
+    echo -e "    • Autenticação exclusivamente local (/etc/passwd e /etc/shadow) — Nenhuma integração LDAP/AD ativa detectada."
+fi
+return 0
 }
 
 # ==============================================================================
@@ -1498,7 +1502,10 @@ if command -v smbd >/dev/null 2>&1 || [[ -f /etc/samba/smb.conf ]]; then
         fi
     fi
 fi
-(( SMB_FOUND == 0 )) && echo -e "    • Nenhum compartilhamento Samba/CIFS (cliente ou servidor) ativo neste host."
+if (( SMB_FOUND == 0 )); then
+    echo -e "    • Nenhum compartilhamento Samba/CIFS (cliente ou servidor) ativo neste host."
+fi
+return 0
 }
 
 # ==============================================================================
@@ -3158,6 +3165,7 @@ if [[ -n "$LOCAL_BINS" || -n "$OPT_BINS" ]]; then
         done <<< "$OPT_BINS"
     fi
 fi
+return 0
 }
 
 # ==============================================================================
@@ -3322,7 +3330,10 @@ if (( ${#SQLITE_DBS_FOUND[@]} > 0 )); then
     add_unique_item RESUMO_BANCOS_ATIVOS "SQLite(${#SQLITE_DBS_FOUND[@]} arquivo(s))"
 fi
 
-(( DB_ANY_FOUND == 0 )) && log_info "Nenhum SGBD instalado diretamente no host (verifique a subseção 4.5 de Contêineres)."
+if (( DB_ANY_FOUND == 0 )); then
+    log_info "Nenhum SGBD instalado diretamente no host (verifique a subseção 4.5 de Contêineres)."
+fi
+return 0
 }
 
 # ==============================================================================
@@ -3486,6 +3497,7 @@ if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
         log_item "Systemd Failed Units" "${FG_GREEN}Nenhuma (0 falhas)${NC}"
     fi
 fi
+return 0
 }
 
 # ==============================================================================
@@ -3637,6 +3649,7 @@ if command -v ss >/dev/null 2>&1; then
         done <<< "$ESTAB_CONNS"
     fi
 fi
+return 0
 }
 
 # ==============================================================================
@@ -3710,6 +3723,7 @@ if [[ -n "$BACKUP_ARCHIVES" ]]; then
         echo -e "    • ${FG_CYAN}${ba}${NC} (${BA_SIZE})"
     done <<< "$BACKUP_ARCHIVES"
 fi
+return 0
 }
 
 # ==============================================================================
