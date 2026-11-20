@@ -172,6 +172,135 @@ safe_du() {
     printf '%s' "${res:-N/A (>5s)}"
 }
 
+_get_file_epoch() {
+    local target="$1" ts=""
+    [[ -e "$target" ]] || return 1
+    ts=$(stat -c '%W' -- "$target" 2>/dev/null || true)
+    if ! [[ "$ts" =~ ^[0-9]+$ ]] || (( ts <= 0 )); then
+        ts=$(stat -c '%Y' -- "$target" 2>/dev/null || true)
+    fi
+    if [[ "$ts" =~ ^[0-9]+$ ]] && (( ts >= 946684800 )); then
+        printf '%s\n' "$ts"
+        return 0
+    fi
+    return 1
+}
+
+_get_earliest_ssh_host_epoch() {
+    local f="" ts="" min_ts=""
+    for f in /etc/ssh/ssh_host_*_key.pub /etc/ssh/ssh_host_*_key; do
+        [[ -e "$f" ]] || continue
+        if ts=$(_get_file_epoch "$f"); then
+            if [[ -z "$min_ts" ]] || (( ts < min_ts )); then
+                min_ts="$ts"
+            fi
+        fi
+    done
+    [[ -n "$min_ts" ]] || return 1
+    printf '%s\n' "$min_ts"
+}
+
+_get_fs_root_epoch() {
+    local root_dev="" tune_raw="" ts=""
+    root_dev=$(findmnt -no SOURCE / 2>/dev/null || true)
+    if [[ -n "$root_dev" && -r "$root_dev" ]] && command -v tune2fs >/dev/null 2>&1; then
+        tune_raw=$(LC_ALL=C tune2fs -l "$root_dev" 2>/dev/null | awk -F':[[:space:]]+' '/^Filesystem created:/ {print $2; exit}' || true)
+        if [[ -n "$tune_raw" ]]; then
+            ts=$(LC_ALL=C date -d "$tune_raw" +%s 2>/dev/null || true)
+            if [[ "$ts" =~ ^[0-9]+$ ]] && (( ts >= 946684800 )); then
+                printf '%s\n' "$ts"
+                return 0
+            fi
+        fi
+    fi
+    _get_file_epoch /
+}
+
+get_os_install_info() {
+    local virt_container="" is_wsl=0 is_container=0
+    local fs_ts="" inst_ts="" mach_ts="" ssh_ts="" boot_ts="" chosen_ts="" origem=""
+    local date_str="" today_epoch="" inst_day_epoch="" dias=0 dias_txt=""
+
+    if grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null || [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]]; then
+        is_wsl=1
+    elif virt_container=$(systemd-detect-virt --container 2>/dev/null) && [[ -n "$virt_container" && "$virt_container" != "none" ]]; then
+        is_container=1
+    fi
+
+    fs_ts=$(_get_fs_root_epoch || true)
+    inst_ts=$(_get_file_epoch /var/log/installer || true)
+    if [[ -z "$inst_ts" && -e /root/anaconda-ks.cfg ]]; then
+        inst_ts=$(_get_file_epoch /root/anaconda-ks.cfg || true)
+    fi
+    if [[ -z "$inst_ts" ]] && command -v rpm >/dev/null 2>&1; then
+        local rpm_ts=""
+        rpm_ts=$(rpm -q --qf '%{INSTALLTIME}\n' basesystem 2>/dev/null | head -n 1 || true)
+        if [[ "$rpm_ts" =~ ^[0-9]+$ ]] && (( rpm_ts >= 946684800 )); then
+            inst_ts="$rpm_ts"
+        fi
+    fi
+    mach_ts=$(_get_file_epoch /etc/machine-id || true)
+    ssh_ts=$(_get_earliest_ssh_host_epoch || true)
+    boot_ts="${mach_ts:-$ssh_ts}"
+
+    if (( is_wsl == 1 )); then
+        chosen_ts="${boot_ts:-$fs_ts}"
+        origem="Primeiro boot WSL"
+    elif (( is_container == 1 )); then
+        chosen_ts="${boot_ts:-$fs_ts}"
+        if [[ "$virt_container" == "lxc" ]]; then
+            origem="Primeiro boot LXC"
+        else
+            origem="Primeiro boot contêiner"
+        fi
+    elif [[ -n "$inst_ts" ]]; then
+        if [[ -n "$boot_ts" ]] && (( boot_ts > inst_ts + 86400 )); then
+            chosen_ts="$boot_ts"
+            origem="Primeiro boot / Template"
+        else
+            chosen_ts="$inst_ts"
+            origem="VM/Físico"
+        fi
+    elif [[ -n "$fs_ts" && -n "$boot_ts" ]]; then
+        if (( boot_ts > fs_ts + 3600 )); then
+            chosen_ts="$boot_ts"
+            origem="Primeiro boot / Template"
+        else
+            chosen_ts="$fs_ts"
+            origem="VM/Físico"
+        fi
+    elif [[ -n "$fs_ts" ]]; then
+        chosen_ts="$fs_ts"
+        origem="VM/Físico"
+    elif [[ -n "$boot_ts" ]]; then
+        chosen_ts="$boot_ts"
+        origem="Primeiro boot"
+    fi
+
+    if [[ -z "$chosen_ts" ]]; then
+        printf 'Não identificado'
+        return 0
+    fi
+
+    date_str=$(date -d "@$chosen_ts" '+%d/%m/%Y' 2>/dev/null || true)
+    today_epoch=$(date -d "$(date '+%Y-%m-%d' 2>/dev/null)" +%s 2>/dev/null || true)
+    inst_day_epoch=$(date -d "$(date -d "@$chosen_ts" '+%Y-%m-%d' 2>/dev/null)" +%s 2>/dev/null || true)
+    if [[ -n "$date_str" && "$today_epoch" =~ ^[0-9]+$ && "$inst_day_epoch" =~ ^[0-9]+$ ]]; then
+        dias=$(( (today_epoch - inst_day_epoch) / 86400 ))
+        (( dias < 0 )) && dias=0
+        case "$dias" in
+            0) dias_txt="hoje" ;;
+            1) dias_txt="há 1 dia" ;;
+            *) dias_txt="há ${dias} dias" ;;
+        esac
+        printf '%s (%s | %s)' "$date_str" "$dias_txt" "$origem"
+    elif [[ -n "$date_str" ]]; then
+        printf '%s (%s)' "$date_str" "$origem"
+    else
+        printf 'Não identificado'
+    fi
+}
+
 draw_separator() {
     echo -e "${DIM}${FG_CYAN}────────────────────────────────────────────────────────────────${NC}"
 }
@@ -268,6 +397,7 @@ CUSTOM_SYSTEMD_UNITS=()
 
 OS_NAME="Não verificado (Seção 1 omitida)"
 OS_FAMILY="generic"
+OS_INSTALLED_AT="Não verificado (Seção 1 omitida)"
 KERNEL_VER=$(uname -r 2>/dev/null || echo "N/A")
 VIRT_TYPE="Não verificado"
 DETECTED_VIRT="none"
@@ -394,6 +524,7 @@ write_json_summary() {
   "public_ip": "$(_json_escape "${PUBLIC_IP:-}")",
   "os": "$(_json_escape "${OS_NAME:-}")",
   "os_family": "$(_json_escape "${OS_FAMILY:-}")",
+  "os_installed_at": "$(_json_escape "${OS_INSTALLED_AT:-}")",
   "kernel": "$(_json_escape "${KERNEL_VER:-}")",
   "virtualization": "$(_json_escape "${VIRT_TYPE:-}")",
   "updates_pending": ${PENDING_UPDATES_COUNT:-0},
@@ -701,7 +832,9 @@ MEM_AVAIL=$(free -h 2>/dev/null | awk '/^Mem:/ {print $7}')
 SWAP_TOTAL=$(free -h 2>/dev/null | awk '/^Swap:/ {print $2}')
 SWAP_USED=$(free -h 2>/dev/null | awk '/^Swap:/ {print $3}')
 
+OS_INSTALLED_AT=$(get_os_install_info)
 log_item "Sistema Operacional" "${FG_GREEN}${BOLD}${OS_NAME}${NC} (${ARCH} | Família: ${OS_FAMILY^^})"
+log_item "Instalado em (SO)"   "${FG_CYAN}${OS_INSTALLED_AT}${NC}"
 if (( OS_EOL_FLAG == 1 )); then
     log_warning "Atenção: ${OS_NAME} atingiu End-of-Life (EOL — sem suporte oficial padrão de segurança)!"
     add_critical_alert "Sistema Operacional (${OS_NAME}) está em End-of-Life (EOL — sem atualizações oficiais de segurança)."
@@ -3643,6 +3776,7 @@ if (( ${#PACOTES_INSTALADOS[@]} > 0 )); then
 fi
 
 print_summary "1. Sistema Operacional:"     "${OS_NAME} (Kernel ${KERNEL_VER})" "$FG_CYAN"
+print_summary "   Instalado em (SO):"       "${OS_INSTALLED_AT}" "$FG_CYAN"
 print_summary "   Status de Atualização:"   "${OS_UPDATE_STATUS_STR}" "$UPDATES_SUMMARY_COLOR"
 print_summary "   Aguardando Reboot?"       "${REBOOT_NEEDED}${REBOOT_REASON:+ ($REBOOT_REASON)}" "$REBOOT_SUMMARY_COLOR"
 print_summary "2. Usuários com Sudo:"       "${SUDO_USERS_STR}" "$FG_YELLOW"
