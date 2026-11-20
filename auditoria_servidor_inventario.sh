@@ -1,17 +1,17 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 3.0
+# Version: 3.1
 # ------------------------------------------------
-VERSION="3.0"
+VERSION="3.1"
 # ==============================================================================
 # AUDITORIA, VARREDURA E INVENTÁRIO 360° DO SERVIDOR LINUX (MULTI-DISTRO)
 # ==============================================================================
 # Script: auditoria_servidor_inventario.sh
 # Descrição: Raio-X completo e 100% passivo (somente leitura) organizado por:
-#            1. Sistema Operacional, Atualizações Pendentes e Reboot Pendente;
-#            2. Usuários Ativos, Grupos Pertencentes, Sudos e LDAP/AD;
-#            3. Armazenamento, Inodes, RAID/ZFS, FSTAB, NFS e SAMBA;
-#            4. Aplicações, Web (Apache/Nginx), Certbot, PHP, Runtimes, CMSs, Node/Python e Containers;
+#            1. Sistema Operacional (EOL), Guest Agent (ESXi/Proxmox), Kernel/OOM e Reboot;
+#            2. Usuários (Ativos, Bloqueados, Expirados, Shell Desativado), Sudos e LDAP/AD;
+#            3. Armazenamento, Inodes, Partições RO, RAID/ZFS, SMART (bare-metal), FSTAB, NFS e SAMBA;
+#            4. Aplicações, Web (Apache/Nginx), Certbot + SSL Externos, PHP, Runtimes, Apps e Containers;
 #            5. Bancos de Dados (MySQL/MariaDB, PostgreSQL, Redis, Mongo, SQLite);
 #            6. Firewall (Ativo/Inativo, Docker Bypass), Regras, SSH, Fail2Ban e Segurança;
 #            7. Portas Abertas (LISTEN), Rede, DNS, /etc/hosts e Conexões Ativas;
@@ -52,6 +52,8 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 OPT_NO_COLOR=0
 OPT_FAST=0
 OPT_JSON=0
+OPT_NO_NET=0
+OPT_SECTIONS=""
 
 while (( $# > 0 )); do
     case "$1" in
@@ -67,15 +69,42 @@ while (( $# > 0 )); do
             OPT_JSON=1
             shift
             ;;
+        --no-net|--offline)
+            OPT_NO_NET=1
+            shift
+            ;;
+        --section|--sections)
+            if (( $# < 2 )) || [[ -z "${2:-}" ]]; then
+                echo "Erro: --section exige uma lista de números de 1 a 8 (ex: --section 1,2,6)" >&2
+                exit 2
+            fi
+            OPT_SECTIONS="${2// /}"
+            if [[ ! "$OPT_SECTIONS" =~ ^[1-8](,[1-8])*$ ]]; then
+                echo "Erro: formato inválido em --section '$2' (use números de 1 a 8 separados por vírgula, ex: 1,4,6)" >&2
+                exit 2
+            fi
+            shift 2
+            ;;
+        --section=*|--sections=*)
+            OPT_SECTIONS="${1#*=}"
+            OPT_SECTIONS="${OPT_SECTIONS// /}"
+            if [[ ! "$OPT_SECTIONS" =~ ^[1-8](,[1-8])*$ ]]; then
+                echo "Erro: formato inválido em --section '${OPT_SECTIONS}' (use números de 1 a 8 separados por vírgula, ex: 1,4,6)" >&2
+                exit 2
+            fi
+            shift
+            ;;
         -h|--help)
             cat <<EOF
 Uso: sudo ./$(basename "$0") [OPÇÕES]
 
 Opções disponíveis:
-  --fast, --no-du      Pula cálculos de tamanho (du -sh) em diretórios grandes
-  --json               Exporta também resumo estruturado em JSON na Home
-  --plain, --no-color  Desativa cores ANSI na saída do terminal
-  -h, --help           Exibe esta ajuda e sai
+  --fast, --no-du          Pula cálculos de tamanho (du -sh) em diretórios grandes
+  --json                   Exporta também resumo estruturado em JSON na Home
+  --no-net, --offline      Pula consultas externas (IP público e teste DNS externo)
+  --section 1,2,6          Executa somente as seções indicadas (1 a 8) + Resumo
+  --plain, --no-color      Desativa cores ANSI na saída do terminal
+  -h, --help               Exibe esta ajuda e sai
 EOF
             exit 0
             ;;
@@ -87,6 +116,12 @@ EOF
 done
 [[ -n "${NO_COLOR:-}" ]] && OPT_NO_COLOR=1
 
+section_enabled() {
+    local sec="$1"
+    [[ -z "${OPT_SECTIONS:-}" ]] && return 0
+    [[ ",${OPT_SECTIONS}," == *",${sec},"* ]]
+}
+
 # 1.1 - PALETA DE CORES E ESTILOS (ANSI)
 if (( OPT_NO_COLOR == 0 )); then
     NC='\033[0m'
@@ -97,6 +132,7 @@ if (( OPT_NO_COLOR == 0 )); then
     FG_YELLOW='\033[33m'
     FG_BLUE='\033[94m'
     FG_CYAN='\033[36m'
+    # shellcheck disable=SC2034
     FG_WHITE='\033[37m'
 else
     NC=''
@@ -107,6 +143,7 @@ else
     FG_YELLOW=''
     FG_BLUE=''
     FG_CYAN=''
+    # shellcheck disable=SC2034
     FG_WHITE=''
 fi
 
@@ -202,8 +239,9 @@ print_summary() {
     printf '  %b%s%*s%b%b%s%b\n' "$BOLD" "$label" "$padding" '' "$NC" "$color" "$val" "$NC"
 }
 
-# Arrays acumuladoras para o Resumo Executivo e Descoberta
+# Arrays acumuladoras e valores padrão para o Resumo Executivo, JSON e Descoberta
 PAPEIS_DETECTADOS=()
+ALERTAS_CRITICOS=()
 ALERTAS_AUDITORIA=()
 RESUMO_APPS_VERSOES=()
 RESUMO_PHP_VERSOES=()
@@ -221,6 +259,28 @@ SCAN_DIRS=()
 RENEW_MECHANISMS=()
 DOCKER_PUBLIC_PORTS=()
 SQLITE_DBS_FOUND=()
+EXTRA_SSL_CERTS=()
+DISABLED_USERS_SUMMARY=()
+# shellcheck disable=SC2034
+REPOS_TERCEIROS=()
+# shellcheck disable=SC2034
+CUSTOM_SYSTEMD_UNITS=()
+
+OS_NAME="Não verificado (Seção 1 omitida)"
+OS_FAMILY="generic"
+KERNEL_VER=$(uname -r 2>/dev/null || echo "N/A")
+VIRT_TYPE="Não verificado"
+DETECTED_VIRT="none"
+OS_UPDATE_STATUS_STR="Não verificado (Seção 1 omitida)"
+PENDING_UPDATES_COUNT=0
+REBOOT_NEEDED="Não"
+REBOOT_REASON=""
+FIREWALL_SUMMARY_STATE="Não verificado (Seção 6 omitida)"
+PRIMARY_IP=""
+PUBLIC_IP="Não verificado"
+APT_SIM=""
+DNF_SIM=""
+YUM_SIM=""
 
 add_role() {
     local role="$1"
@@ -233,8 +293,24 @@ add_role() {
     PAPEIS_DETECTADOS+=("$role")
 }
 
+add_critical_alert() {
+    local msg="$1" a
+    if (( ${#ALERTAS_CRITICOS[@]} > 0 )); then
+        for a in "${ALERTAS_CRITICOS[@]}"; do
+            [[ "$a" == "$msg" ]] && return 0
+        done
+    fi
+    ALERTAS_CRITICOS+=("$msg")
+}
+
 add_alert() {
-    ALERTAS_AUDITORIA+=("$1")
+    local msg="$1" a
+    if (( ${#ALERTAS_AUDITORIA[@]} > 0 )); then
+        for a in "${ALERTAS_AUDITORIA[@]}"; do
+            [[ "$a" == "$msg" ]] && return 0
+        done
+    fi
+    ALERTAS_AUDITORIA+=("$msg")
 }
 
 add_unique_item() {
@@ -294,6 +370,19 @@ _json_array() {
 write_json_summary() {
     local out_file="$1"
     local fqdn_val
+    local -a all_alerts=()
+    if (( ${#ALERTAS_CRITICOS[@]} > 0 )); then
+        local ac
+        for ac in "${ALERTAS_CRITICOS[@]}"; do
+            all_alerts+=("[CRITICO] ${ac}")
+        done
+    fi
+    if (( ${#ALERTAS_AUDITORIA[@]} > 0 )); then
+        local aw
+        for aw in "${ALERTAS_AUDITORIA[@]}"; do
+            all_alerts+=("${aw}")
+        done
+    fi
     fqdn_val=$(hostname -f 2>/dev/null || hostname 2>/dev/null || uname -n 2>/dev/null || echo "")
     cat > "$out_file" <<EOF
 {
@@ -315,12 +404,19 @@ write_json_summary() {
   "apps": $(_json_array RESUMO_APPS_VERSOES),
   "php": $(_json_array RESUMO_PHP_VERSOES),
   "databases": $(_json_array RESUMO_BANCOS_ATIVOS),
+  "sqlite_dbs": $(_json_array SQLITE_DBS_FOUND),
   "containers": $(_json_array RESUMO_CONTAINERS_ATIVOS),
+  "docker_public_ports": $(_json_array DOCKER_PUBLIC_PORTS),
   "sites": $(_json_array RESUMO_SITES_DETECTADOS),
   "sudo_users": $(_json_array RESUMO_USUARIOS_SUDO),
   "sudo_groups": $(_json_array RESUMO_GRUPOS_SUDO),
+  "disabled_users": $(_json_array DISABLED_USERS_SUMMARY),
+  "third_party_repos": $(_json_array REPOS_TERCEIROS),
+  "custom_systemd_units": $(_json_array CUSTOM_SYSTEMD_UNITS),
   "storage_net": $(_json_array RESUMO_STORAGE_REDE),
-  "alerts": $(_json_array ALERTAS_AUDITORIA)
+  "alerts_critical": $(_json_array ALERTAS_CRITICOS),
+  "alerts_warning": $(_json_array ALERTAS_AUDITORIA),
+  "alerts": $(_json_array all_alerts)
 }
 EOF
 }
@@ -497,14 +593,18 @@ echo -e "  ${DIM}Modo de Execução:${NC}  100% Passivo / Somente Leitura (Nenhu
 # ==============================================================================
 # SEÇÃO 1 - SISTEMA OPERACIONAL, HARDWARE, ATUALIZAÇÕES PENDENTES E REBOOT
 # ==============================================================================
+secao_1_sistema() {
 print_header "1. SISTEMA OPERACIONAL, ATUALIZAÇÕES PENDENTES E REINICIALIZAÇÃO"
 
 # 1.1 - Identificação da Distribuição (Ubuntu, Debian, RHEL, CentOS, Rocky, Alma, SUSE, Alpine)
 OS_NAME="Desconhecido"
 OS_FAMILY="generic"
+OS_ID_RAW=""
+OS_VER_ID=""
 if [[ -r /etc/os-release ]]; then
     OS_NAME=$(sed -n 's/^PRETTY_NAME=//p' /etc/os-release | tr -d '"'\''')
     OS_ID_RAW=$(sed -n 's/^ID=//p' /etc/os-release | tr -d '"'\''' | tr '[:upper:]' '[:lower:]')
+    OS_VER_ID=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | tr -d '"'\''')
     OS_LIKE_RAW=$(sed -n 's/^ID_LIKE=//p' /etc/os-release | tr -d '"'\''' | tr '[:upper:]' '[:lower:]')
     if [[ "$OS_ID_RAW" =~ ^(debian|ubuntu|kali|linuxmint|raspbian|proxmox)$ ]] || [[ "$OS_LIKE_RAW" == *debian* ]]; then
         OS_FAMILY="debian"
@@ -523,6 +623,31 @@ elif [[ -f /etc/debian_version ]]; then
     OS_FAMILY="debian"
 fi
 
+# Verificação de End-of-Life (EOL) do Sistema Operacional
+OS_EOL_FLAG=0
+case "$OS_ID_RAW" in
+    ubuntu)
+        if [[ "$OS_VER_ID" =~ ^(12\.|14\.|16\.|18\.|19\.|20\.|21\.|22\.10|23\.|24\.10|25\.) ]]; then
+            OS_EOL_FLAG=1
+        fi
+        ;;
+    debian)
+        if [[ "$OS_VER_ID" =~ ^([1-9]|10|11)(\.|$) ]]; then
+            OS_EOL_FLAG=1
+        fi
+        ;;
+    centos)
+        if [[ "$OS_VER_ID" =~ ^(6|7|8)(\.|$) ]]; then
+            OS_EOL_FLAG=1
+        fi
+        ;;
+    rhel|rocky|almalinux|ol)
+        if [[ "$OS_VER_ID" =~ ^(6|7)(\.|$) ]]; then
+            OS_EOL_FLAG=1
+        fi
+        ;;
+esac
+
 KERNEL_VER=$(uname -r)
 ARCH=$(uname -m)
 UPTIME_STR=$(uptime -p 2>/dev/null || uptime)
@@ -531,11 +656,14 @@ LOAD_AVG=$(awk '{print $1 ", " $2 ", " $3}' /proc/loadavg 2>/dev/null || echo "N
 
 # 1.2 - Identidade Física / Hypervisor / Fabricante / UUID
 VIRT_TYPE="Físico / Bare-Metal"
+DETECTED_VIRT="none"
 if grep -qiE '(microsoft|wsl)' /proc/sys/kernel/osrelease 2>/dev/null; then
     VIRT_TYPE="WSL (Windows Subsystem for Linux)"
+    DETECTED_VIRT="wsl"
 elif command -v systemd-detect-virt >/dev/null 2>&1; then
-    DETECTED_VIRT=$(systemd-detect-virt 2>/dev/null || true)
-    [[ -n "$DETECTED_VIRT" && "$DETECTED_VIRT" != "none" ]] && VIRT_TYPE="Virtualizado / Container (${DETECTED_VIRT})"
+    DETECTED_VIRT=$(systemd-detect-virt 2>/dev/null || echo "none")
+    [[ -z "$DETECTED_VIRT" ]] && DETECTED_VIRT="none"
+    [[ "$DETECTED_VIRT" != "none" ]] && VIRT_TYPE="Virtualizado / Container (${DETECTED_VIRT})"
 fi
 
 SYS_VENDOR=""
@@ -574,7 +702,26 @@ SWAP_TOTAL=$(free -h 2>/dev/null | awk '/^Swap:/ {print $2}')
 SWAP_USED=$(free -h 2>/dev/null | awk '/^Swap:/ {print $3}')
 
 log_item "Sistema Operacional" "${FG_GREEN}${BOLD}${OS_NAME}${NC} (${ARCH} | Família: ${OS_FAMILY^^})"
+if (( OS_EOL_FLAG == 1 )); then
+    log_warning "Atenção: ${OS_NAME} atingiu End-of-Life (EOL — sem suporte oficial padrão de segurança)!"
+    add_critical_alert "Sistema Operacional (${OS_NAME}) está em End-of-Life (EOL — sem atualizações oficiais de segurança)."
+fi
 log_item "Ambiente / Host"     "${FG_CYAN}${VIRT_TYPE}${NC} — Hardware/VM: ${BOLD}${HW_IDENTITY}${NC}"
+if [[ "$DETECTED_VIRT" == "vmware" ]]; then
+    if [[ "$(get_service_status_plain open-vm-tools)" == "Ativo" || "$(get_service_status_plain vmtoolsd)" == "Ativo" ]] || pgrep -x vmtoolsd >/dev/null 2>&1; then
+        log_item "Guest Agent (ESXi)" "${FG_GREEN}Ativo (open-vm-tools / vmtoolsd)${NC}"
+    else
+        log_warning "VM VMware/ESXi sem Guest Agent (open-vm-tools) ativo!"
+        add_alert "VM VMware/ESXi sem Guest Agent (open-vm-tools) ativo — recomendado para snapshots consistentes e shutdown limpo."
+    fi
+elif [[ "$DETECTED_VIRT" =~ ^(kvm|qemu)$ ]]; then
+    if [[ "$(get_service_status_plain qemu-guest-agent)" == "Ativo" ]] || pgrep -x qemu-ga >/dev/null 2>&1; then
+        log_item "Guest Agent (Proxmox/KVM)" "${FG_GREEN}Ativo (qemu-guest-agent)${NC}"
+    else
+        log_warning "VM KVM/Proxmox sem Guest Agent (qemu-guest-agent) ativo!"
+        add_alert "VM KVM/Proxmox sem Guest Agent (qemu-guest-agent) ativo — recomendado para backups consistentes e exibição de IP."
+    fi
+fi
 [[ -n "$PRODUCT_UUID" || -n "$PRODUCT_SERIAL" ]] && log_item "UUID / Serial VM" "UUID: ${FG_CYAN}${PRODUCT_UUID:-Requer root}${NC} | Serial: ${PRODUCT_SERIAL:-Requer root}"
 log_item "Kernel em Execução"  "${KERNEL_VER}"
 log_item "Tempo de Atividade"  "${UPTIME_STR} (Último Boot: ${LAST_BOOT} | Load Avg: ${LOAD_AVG})"
@@ -682,9 +829,48 @@ ps -eo pid,user,%cpu,%mem,comm --sort=-%mem 2>/dev/null | head -n 6 | awk '
     NR>1  {printf "    %-8s %-14s %-8s %-8s %s\n", $1, $2, $3, $4, $5}
 ' || true
 
+# 1.6 - Saúde do Kernel (OOM Killer e Erros Críticos de Storage/Filesystem nas últimas 24h)
+echo -e "\n  ${BOLD}Saúde do Kernel (OOM Killer e Erros de I/O / Filesystem — últimas 24h):${NC}"
+KERN_LOG_SRC=""
+if command -v journalctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+    KERN_LOG_SRC=$(timeout 4 journalctl -k --since "24 hours ago" --no-pager 2>/dev/null || true)
+fi
+if [[ -z "$KERN_LOG_SRC" ]] && command -v dmesg >/dev/null 2>&1; then
+    KERN_LOG_SRC=$(timeout 3 dmesg -T 2>/dev/null || timeout 3 dmesg 2>/dev/null || true)
+fi
+
+if [[ -n "$KERN_LOG_SRC" ]]; then
+    OOM_HITS=$(echo "$KERN_LOG_SRC" | grep -iE "Out of memory:|Killed process [0-9]+|oom-killer" | tail -n 5 || true)
+    FS_ERR_HITS=$(echo "$KERN_LOG_SRC" | grep -iE "EXT4-fs error|XFS.*(error|Corruption)|I/O error|Remounting filesystem read-only|blk_update_request" | tail -n 5 || true)
+
+    if [[ -n "$OOM_HITS" ]]; then
+        log_warning "Eventos de OOM Killer (falta de memória) detectados nos logs do kernel!"
+        while IFS= read -r oom_l; do
+            [[ -n "$oom_l" ]] && echo -e "      ├─ ${FG_RED}${oom_l:0:120}${NC}"
+        done <<< "$OOM_HITS"
+        add_critical_alert "Kernel OOM Killer encerrou processo(s) por falta de memória recentemente (verifique RAM/Swap)."
+    else
+        log_success "OOM Killer: Nenhum processo encerrado por falta de memória."
+    fi
+
+    if [[ -n "$FS_ERR_HITS" ]]; then
+        log_warning "Erros críticos de disco/storage/filesystem detectados nos logs do kernel!"
+        while IFS= read -r fse_l; do
+            [[ -n "$fse_l" ]] && echo -e "      ├─ ${FG_RED}${fse_l:0:120}${NC}"
+        done <<< "$FS_ERR_HITS"
+        add_critical_alert "Erros críticos de I/O ou filesystem detectados nos logs do kernel (verificar storage/datastore)."
+    else
+        log_success "Erros de I/O / Filesystem (Kernel): Nenhum erro crítico recente."
+    fi
+else
+    log_info "Logs do kernel (journalctl -k / dmesg) indisponíveis ou restritos neste ambiente/container."
+fi
+}
+
 # ==============================================================================
 # SEÇÃO 2 - USUÁRIOS (ATIVOS, BLOQUEADOS E DESATIVADOS), GRUPOS, SUDOERS E LDAP/AD
 # ==============================================================================
+secao_2_usuarios() {
 print_header "2. USUÁRIOS (ATIVOS, BLOQUEADOS E DESATIVADOS), GRUPOS, SUDOERS E AUTENTICAÇÃO"
 
 get_user_auth_status() {
@@ -741,6 +927,9 @@ ACTIVE_USERS_COUNT=0
 DISABLED_SHELL_USERS=()
 while IFS=: read -r u_name _ u_uid _ _ u_home u_shell; do
     [[ -z "$u_name" ]] && continue
+    if (( u_uid == 0 )) && [[ "$u_name" != "root" ]]; then
+        add_critical_alert "Conta adicional com UID 0 (equivalente a root) detectada em /etc/passwd: '${u_name}'."
+    fi
     if (( u_uid == 0 || (u_uid >= 1000 && u_uid < 65534) )) && [[ -n "$u_shell" ]] && [[ ! "$u_shell" =~ (nologin|false|sync|halt|shutdown)$ ]]; then
         ACTIVE_USERS_COUNT=$((ACTIVE_USERS_COUNT + 1))
         U_GROUPS=$(id -Gn "$u_name" 2>/dev/null | tr ' ' ', ' || echo "N/A")
@@ -749,6 +938,20 @@ while IFS=: read -r u_name _ u_uid _ _ u_home u_shell; do
         echo -e "    • Usuário: ${FG_CYAN}${BOLD}${u_name}${NC} (UID: ${u_uid}) | Status: ${PASS_STATE} | Home: ${u_home} | Shell: ${DIM}${u_shell}${NC}"
         echo -e "      ├─ ${BOLD}Grupos a que pertence:${NC} ${FG_YELLOW}${U_GROUPS}${NC}"
         echo -e "      └─ ${BOLD}Chaves SSH:${NC}            ${SSH_KEYS_INFO}"
+        if [[ "$PASS_STATE" == *"Sem Senha Definida"* ]]; then
+            add_critical_alert "Usuário '${u_name}' com shell de login ativo (${u_shell}) está SEM SENHA definida (NP)."
+        fi
+        if [[ "$PASS_STATE" == *"Conta Bloqueada"* || "$PASS_STATE" == *"EXPIRADA"* ]]; then
+            if [[ "$u_name" != "root" || "$PASS_STATE" == *"EXPIRADA"* ]]; then
+                add_unique_item DISABLED_USERS_SUMMARY "${u_name} (UID:${u_uid}, Locked/Expirada)"
+            fi
+            if [[ "$u_name" != "root" && "$SSH_KEYS_INFO" != "Nenhuma" ]]; then
+                add_alert "Conta bloqueada/expirada '${u_name}' ainda possui chave(s) SSH autorizada(s) em ${u_home}/.ssh/authorized_keys."
+            fi
+            if [[ "$u_name" != "root" && "$U_GROUPS" =~ (^|[[:space:],])(sudo|wheel|admin|docker|lxd)([[:space:],]|$) ]]; then
+                add_alert "Conta bloqueada/expirada '${u_name}' ainda pertence a grupo privilegiado (${U_GROUPS})."
+            fi
+        fi
     elif (( u_uid >= 1000 && u_uid < 65534 )); then
         DISABLED_SHELL_USERS+=("${u_name}|${u_uid}|${u_home}|${u_shell:-sem-shell}")
     fi
@@ -761,9 +964,16 @@ if (( ${#DISABLED_SHELL_USERS[@]} > 0 )); then
         DU_GROUPS=$(id -Gn "$du_name" 2>/dev/null | tr ' ' ', ' || echo "N/A")
         DU_PASS_STATE=$(get_user_auth_status "$du_name")
         DU_SSH_KEYS=$(get_user_ssh_keys_info "$du_home")
+        add_unique_item DISABLED_USERS_SUMMARY "${du_name} (UID:${du_uid}, Shell:${du_shell})"
         echo -e "    • Usuário: ${FG_YELLOW}${BOLD}${du_name}${NC} (UID: ${du_uid}) | ${FG_RED}Shell Desativado${NC} (${DIM}${du_shell}${NC}) | Status Senha/Conta: ${DU_PASS_STATE}"
         echo -e "      ├─ ${BOLD}Home / Grupos:${NC} ${du_home} | Grupos: ${FG_YELLOW}${DU_GROUPS}${NC}"
         echo -e "      └─ ${BOLD}Chaves SSH:${NC}    ${DU_SSH_KEYS}"
+        if [[ "$DU_SSH_KEYS" != "Nenhuma" ]]; then
+            add_alert "Usuário com shell desativado '${du_name}' ainda mantém chave(s) SSH em ${du_home}/.ssh/authorized_keys."
+        fi
+        if [[ "$DU_GROUPS" =~ (^|[[:space:],])(sudo|wheel|admin|docker|lxd)([[:space:],]|$) ]]; then
+            add_alert "Usuário com shell desativado '${du_name}' ainda pertence a grupo privilegiado (${DU_GROUPS})."
+        fi
     done
 else
     echo -e "    • Nenhum usuário não-sistema (UID >= 1000) com shell desativado encontrado."
@@ -811,6 +1021,9 @@ if [[ -r /etc/sudoers ]]; then
             SUDO_RULES_COUNT=$((SUDO_RULES_COUNT + 1))
             ENTITY=$(echo "$s_line" | awk '{print $1}')
             echo -e "    • [${FG_CYAN}$(basename "$s_file")${NC}] ${BOLD}${ENTITY}${NC} -> ${DIM}${s_line}${NC}"
+            if echo "$s_line" | grep -qE "NOPASSWD:[[:space:]]*ALL"; then
+                add_alert "Regra sudo sem senha (NOPASSWD: ALL) ativa para '${ENTITY}' em $(basename "$s_file")."
+            fi
             if [[ "$ENTITY" == %* ]]; then
                 GRP_CLEAN="${ENTITY#%}"
                 GRP_MEM=$(getent group "$GRP_CLEAN" 2>/dev/null | cut -d: -f4 | tr ',' ' ' | trim_ws || true)
@@ -908,10 +1121,12 @@ if [[ -r /etc/krb5.conf ]]; then
 fi
 
 (( DIR_AUTH_FOUND == 0 )) && echo -e "    • Autenticação exclusivamente local (/etc/passwd e /etc/shadow) — Nenhuma integração LDAP/AD ativa detectada."
+}
 
 # ==============================================================================
 # SEÇÃO 3 - ARMAZENAMENTO, UNIDADES NO FSTAB, NFS E SAMBA (CLIENTE E SERVIDOR)
 # ==============================================================================
+secao_3_armazenamento() {
 print_header "3. ARMAZENAMENTO, UNIDADES NO FSTAB, NFS E SAMBA (CLIENTE E SERVIDOR)"
 
 # 3.1 - Partições Montadas, Uso de Espaço, Inodes e RAID/ZFS
@@ -951,12 +1166,29 @@ if (( INODE_HIGH_FOUND == 0 )); then
     log_success "Uso de Inodes (df -Pi): Normal (todas as partições abaixo de 85%)"
 fi
 
+# Verificação de partições locais montadas inesperadamente em somente leitura (ro)
+RO_MOUNTS_FOUND=0
+if [[ -r /proc/mounts ]]; then
+    while IFS=' ' read -r m_dev m_pt m_fs m_opts _ _; do
+        [[ "$m_fs" =~ ^(ext2|ext3|ext4|xfs|btrfs|zfs)$ ]] || continue
+        [[ "$m_pt" == /snap/* || "$m_pt" == /boot/efi || "$m_pt" == /cdrom* || "$m_pt" == /media/* || "$m_pt" == /mnt/wsl* || "$m_pt" == /usr/lib/wsl* ]] && continue
+        if [[ ",${m_opts}," == *",ro,"* ]]; then
+            RO_MOUNTS_FOUND=1
+            log_warning "Partição ${m_pt} (${m_dev} | ${m_fs}) está montada em modo SOMENTE LEITURA (ro)!"
+            add_critical_alert "Partição ${m_pt} (${m_fs}) montada em SOMENTE LEITURA (ro) — possível falha de disco/datastore."
+        fi
+    done < /proc/mounts
+fi
+if (( RO_MOUNTS_FOUND == 0 )); then
+    log_success "Integridade de Montagem (RW/RO): Todas as partições locais graváveis estão em modo RW"
+fi
+
 if [[ -r /proc/mdstat ]] && grep -qE "^md[0-9]+" /proc/mdstat 2>/dev/null; then
     echo -e "\n  ${BOLD}Status de Software RAID (/proc/mdstat):${NC}"
     grep -E "^(Personalities|md[0-9]+|.*\[[U_]+\])" /proc/mdstat 2>/dev/null | sed 's/^/    /' || true
     if grep -qE "\[[U_]*_[U_]*\]" /proc/mdstat 2>/dev/null; then
         log_warning "Software RAID (mdadm) DEGRADADO detectado em /proc/mdstat!"
-        add_alert "Software RAID (mdadm) com disco falho/degradado em /proc/mdstat."
+        add_critical_alert "Software RAID (mdadm) com disco falho/degradado em /proc/mdstat."
     else
         log_success "Software RAID (mdadm): Saudável (todos os arrays sincronizados)"
     fi
@@ -969,8 +1201,29 @@ if command -v zpool >/dev/null 2>&1; then
         echo "$ZFS_HEALTH" | awk '{print "    " $0}'
         if ! echo "$ZFS_HEALTH" | grep -qiE "all pools are healthy|no pools available"; then
             log_warning "Atenção: Pool ZFS reportou estado degradado/com erros!"
-            add_alert "Pool ZFS reportando estado degradado ou erros (verifique zpool status)."
+            add_critical_alert "Pool ZFS reportando estado degradado ou erros (verifique zpool status)."
         fi
+    fi
+fi
+
+# S.M.A.R.T. apenas em servidores físicos / bare-metal (ignorado em VMs ESXi/Proxmox e containers)
+if [[ "$DETECTED_VIRT" == "none" ]] && (( IS_ROOT == 1 )) && command -v smartctl >/dev/null 2>&1; then
+    SMART_DEVS=$(lsblk -dn -o NAME,TYPE 2>/dev/null | awk '$2=="disk" {print "/dev/" $1}' || true)
+    if [[ -n "$SMART_DEVS" ]]; then
+        echo -e "\n  ${BOLD}Saúde Física S.M.A.R.T. dos Discos (Bare-Metal):${NC}"
+        while IFS= read -r s_dev; do
+            [[ -b "$s_dev" ]] || continue
+            SMART_OUT=$(timeout 4 smartctl -H "$s_dev" 2>/dev/null || true)
+            SMART_STATUS=$(echo "$SMART_OUT" | awk -F':' '/overall-health|SMART Health Status/ {gsub(/^[ \t]+|[ \t\r]+$/,"",$2); print $2; exit}' || true)
+            if [[ -n "$SMART_STATUS" ]]; then
+                if echo "$SMART_STATUS" | grep -qiE "PASSED|OK"; then
+                    echo -e "    • ${FG_CYAN}${s_dev}${NC}: ${FG_GREEN}${SMART_STATUS}${NC}"
+                else
+                    echo -e "    • ${FG_CYAN}${s_dev}${NC}: ${FG_RED}${BOLD}${SMART_STATUS}${NC}"
+                    add_critical_alert "Disco físico ${s_dev} reportou falha S.M.A.R.T.: ${SMART_STATUS}!"
+                fi
+            fi
+        done <<< "$SMART_DEVS"
     fi
 fi
 
@@ -1113,10 +1366,12 @@ if command -v smbd >/dev/null 2>&1 || [[ -f /etc/samba/smb.conf ]]; then
     fi
 fi
 (( SMB_FOUND == 0 )) && echo -e "    • Nenhum compartilhamento Samba/CIFS (cliente ou servidor) ativo neste host."
+}
 
 # ==============================================================================
 # SEÇÃO 4 - APLICAÇÕES, WEB, PHP, RUNTIMES, CMSS E CONTAINERS (QUAIS E VERSÕES)
 # ==============================================================================
+secao_4_aplicacoes() {
 print_header "4. APLICAÇÕES, SERVIDORES WEB, PHP, RUNTIMES E CONTAINERS (QUAIS E VERSÕES)"
 
 # 4.1 - Servidores Web, Proxies Reversos e Balanceadores (Quais e Versões)
@@ -1226,7 +1481,10 @@ if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
                     add_web_root "$vh_root"
                 fi
                 [[ -n "$vh_proxy" ]]   && echo -e "        ├─ ProxyPass:    ${FG_CYAN}${vh_proxy}${NC}"
-                [[ -n "$vh_ssl" ]]     && echo -e "        ├─ Cert SSL:     ${DIM}${vh_ssl}${NC}"
+                if [[ -n "$vh_ssl" ]]; then
+                    echo -e "        ├─ Cert SSL:     ${DIM}${vh_ssl}${NC}"
+                    [[ -f "$vh_ssl" && "$vh_ssl" != /etc/letsencrypt/* ]] && add_unique_item EXTRA_SSL_CERTS "${vh_ssl}|Apache:${vh_name:-$(basename "$vhost_file")}"
+                fi
                 [[ -n "$VH_PHP_FPM" ]] && echo -e "        └─ Handler PHP:  ${FG_YELLOW}${VH_PHP_FPM}${NC}"
                 add_unique_item RESUMO_SITES_DETECTADOS "Apache: ${vh_name:-$(basename "$vhost_file")} (${vh_root:-${vh_proxy:-N/A}})"
             done <<< "$VH_BLOCKS"
@@ -1348,7 +1606,10 @@ if command -v nginx >/dev/null 2>&1; then
                     echo -e "      • Arquivo: ${FG_CYAN}$(basename "$conf")${NC}${ng_listen:+ [${DIM}${ng_listen}${NC}]} | Domínios: ${FG_YELLOW}${ng_dom:-_}${NC}"
                     [[ -n "$ng_root" ]]  && echo -e "        ├─ Root:         ${FG_GREEN}${ng_root}${NC}"
                     [[ -n "$ng_proxy" ]] && echo -e "        ├─ Proxy Reverso:${FG_CYAN} ${ng_proxy}${NC}"
-                    [[ -n "$ng_ssl" ]]   && echo -e "        ├─ Cert SSL:     ${DIM}${ng_ssl}${NC}"
+                    if [[ -n "$ng_ssl" ]]; then
+                        echo -e "        ├─ Cert SSL:     ${DIM}${ng_ssl}${NC}"
+                        [[ -f "$ng_ssl" && "$ng_ssl" != /etc/letsencrypt/* ]] && add_unique_item EXTRA_SSL_CERTS "${ng_ssl}|Nginx:${ng_dom:-$(basename "$conf")}"
+                    fi
                     [[ -n "$ng_fcgi" ]]  && echo -e "        └─ PHP FastCGI:  ${FG_YELLOW}${ng_fcgi}${NC}"
                     add_unique_item RESUMO_SITES_DETECTADOS "Nginx: ${ng_dom:-$(basename "$conf")} (${ng_root:-${ng_proxy:-N/A}})"
                 done <<< "$NGINX_BLOCKS"
@@ -1509,7 +1770,7 @@ if [[ -d /etc/letsencrypt/live ]] && command -v openssl >/dev/null 2>&1; then
         VAL_STATUS_STR=""
         if (( DAYS_LEFT < 0 )); then
             VAL_STATUS_STR="${FG_RED}${BOLD}EXPIRADO há $(( -DAYS_LEFT )) dia(s)${NC} (Expirou em: ${END_DATE})"
-            add_alert "Certificado SSL '${CERT_DOMAIN}' está EXPIRADO desde ${END_DATE}!"
+            add_critical_alert "Certificado SSL '${CERT_DOMAIN}' está EXPIRADO desde ${END_DATE}!"
         elif (( DAYS_LEFT < 15 )); then
             VAL_STATUS_STR="${FG_YELLOW}${BOLD}EXPIRA EM BREVE (${DAYS_LEFT} dia(s) restantes)${NC} (Expira em: ${END_DATE})"
             add_alert "Certificado SSL '${CERT_DOMAIN}' expira em ${DAYS_LEFT} dias (${END_DATE})."
@@ -1532,6 +1793,35 @@ if [[ -d /etc/letsencrypt/live ]] && command -v openssl >/dev/null 2>&1; then
         else
             echo -e "        └─ ${BOLD}Config de Renovação:${NC}     ${FG_YELLOW}Arquivo ${RENEWAL_CONF} não encontrado${NC}"
         fi
+    done
+fi
+
+# Auditoria de Certificados SSL/TLS Externos (fora do Certbot, referenciados em VirtualHosts Apache/Nginx)
+if (( ${#EXTRA_SSL_CERTS[@]} > 0 )) && command -v openssl >/dev/null 2>&1; then
+    echo -e "\n    ${BOLD}Certificados SSL/TLS Externos (Fora do Certbot — Apache/Nginx):${NC}"
+    for xcert_entry in "${EXTRA_SSL_CERTS[@]}"; do
+        xcert_path="${xcert_entry%%|*}"
+        xcert_src="${xcert_entry#*|}"
+        [[ -r "$xcert_path" ]] || continue
+        X_END=$(openssl x509 -enddate -noout -in "$xcert_path" 2>/dev/null | cut -d'=' -f2 || true)
+        [[ -z "$X_END" ]] && continue
+        X_SUBJ=$(openssl x509 -subject -noout -in "$xcert_path" 2>/dev/null | sed -E 's/^subject=[ \t]*//; s/[ \t]+$//' || true)
+        X_ISSUER=$(openssl x509 -issuer -noout -in "$xcert_path" 2>/dev/null | sed -E 's/^issuer=[ \t]*//; s/[ \t]+$//' || true)
+        X_END_EP=$(date -d "$X_END" +%s 2>/dev/null || echo 0)
+        X_NOW_EP=$(date +%s)
+        X_DAYS=$(( (X_END_EP - X_NOW_EP) / 86400 ))
+        if (( X_DAYS < 0 )); then
+            X_STAT="${FG_RED}${BOLD}EXPIRADO há $(( -X_DAYS )) dia(s)${NC} (Expirou em: ${X_END})"
+            add_critical_alert "Certificado SSL externo (${xcert_src} -> ${xcert_path}) está EXPIRADO desde ${X_END}!"
+        elif (( X_DAYS < 15 )); then
+            X_STAT="${FG_YELLOW}${BOLD}EXPIRA EM BREVE (${X_DAYS} dia(s) restantes)${NC} (Expira em: ${X_END})"
+            add_alert "Certificado SSL externo (${xcert_src} -> ${xcert_path}) expira em ${X_DAYS} dias (${X_END})."
+        else
+            X_STAT="${FG_GREEN}${BOLD}VÁLIDO (${X_DAYS} dias restantes)${NC} — Expira: ${X_END}"
+        fi
+        echo -e "      • ${FG_CYAN}${BOLD}[${xcert_src}]${NC} ${xcert_path} — Status: ${X_STAT}"
+        echo -e "        ├─ ${BOLD}Titular (Subject):${NC} ${FG_YELLOW}${X_SUBJ:-N/A}${NC}"
+        echo -e "        └─ ${BOLD}Emissor:${NC}           ${DIM}${X_ISSUER:-N/A}${NC}"
     done
 fi
 
@@ -1966,14 +2256,19 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
         mark_app_audited "$APP_DIR" || continue
         APP_NAME_ENV=""
         DB_NAME_ENV=""
+        LARAVEL_VER=""
         if [[ -f "${APP_DIR}/.env" ]]; then
             APP_NAME_ENV=$(awk -F'=' '/^APP_NAME=/ {gsub(/["'\'']/,"",$2); print $2}' "${APP_DIR}/.env" 2>/dev/null | head -n 1 || true)
             DB_NAME_ENV=$(awk -F'=' '/^DB_DATABASE=/ {gsub(/["'\'']/,"",$2); print $2}' "${APP_DIR}/.env" 2>/dev/null | head -n 1 || true)
         fi
-        echo -e "    • ${FG_GREEN}${BOLD}Laravel (${APP_NAME_ENV:-App PHP})${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${DB_NAME_ENV:+ (Banco: ${FG_YELLOW}${DB_NAME_ENV}${NC})}"
-        add_role "App Laravel (${APP_NAME_ENV:-PHP})"
-        add_unique_item RESUMO_APPS_VERSOES "Laravel(${APP_NAME_ENV:-App})"
-        add_unique_item RESUMO_SITES_DETECTADOS "Laravel (${APP_NAME_ENV:-App}): ${APP_DIR}"
+        if [[ -r "${APP_DIR}/composer.lock" ]]; then
+            LARAVEL_VER=$(awk '/"name"[ \t]*:[ \t]*"laravel\/framework"/ {f=1} f && /"version"[ \t]*:/ {gsub(/.*"version"[ \t]*:[ \t]*"|".*/, ""); print; exit}' "${APP_DIR}/composer.lock" 2>/dev/null || true)
+            LARAVEL_VER="${LARAVEL_VER#[vV]}"
+        fi
+        echo -e "    • ${FG_GREEN}${BOLD}Laravel${LARAVEL_VER:+ v${LARAVEL_VER}} (${APP_NAME_ENV:-App PHP})${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${DB_NAME_ENV:+ (Banco: ${FG_YELLOW}${DB_NAME_ENV}${NC})}"
+        add_role "App Laravel${LARAVEL_VER:+ ${LARAVEL_VER}} (${APP_NAME_ENV:-PHP})"
+        add_unique_item RESUMO_APPS_VERSOES "Laravel:${LARAVEL_VER:-${APP_NAME_ENV:-App}}"
+        add_unique_item RESUMO_SITES_DETECTADOS "Laravel${LARAVEL_VER:+ v${LARAVEL_VER}} (${APP_NAME_ENV:-App}): ${APP_DIR}"
         FOUND_APPS=$((FOUND_APPS + 1))
     done < <(find "$base_dir" -maxdepth 5 -type f -name "artisan" 2>/dev/null)
 
@@ -1996,17 +2291,24 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
             */zabbix.php)
                 APP_DIR=$(dirname "$special_marker")
                 mark_app_audited "$APP_DIR" || continue
-                echo -e "    • ${FG_GREEN}${BOLD}Zabbix Web Frontend${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
-                add_role "Zabbix Frontend Web"
-                add_unique_item RESUMO_SITES_DETECTADOS "Zabbix Frontend: ${APP_DIR}"
+                ZBX_WEB_VER=""
+                if [[ -r "${APP_DIR}/include/defines.inc.php" ]]; then
+                    ZBX_WEB_VER=$(grep -E "define\(['\"]ZABBIX_VERSION['\"]" "${APP_DIR}/include/defines.inc.php" 2>/dev/null | sed -E "s/.*['\"]ZABBIX_VERSION['\"][[:space:]]*,[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | head -n 1 || true)
+                fi
+                echo -e "    • ${FG_GREEN}${BOLD}Zabbix Web Frontend${ZBX_WEB_VER:+ v${ZBX_WEB_VER}}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                add_role "Zabbix Frontend Web${ZBX_WEB_VER:+ (${ZBX_WEB_VER})}"
+                add_unique_item RESUMO_APPS_VERSOES "Zabbix-Web:${ZBX_WEB_VER:-Frontend}"
+                add_unique_item RESUMO_SITES_DETECTADOS "Zabbix Frontend${ZBX_WEB_VER:+ v${ZBX_WEB_VER}}: ${APP_DIR}"
                 FOUND_APPS=$((FOUND_APPS + 1))
                 ;;
             */core/lib/Drupal.php)
                 APP_DIR=$(dirname "$(dirname "$(dirname "$special_marker")")")
                 mark_app_audited "$APP_DIR" || continue
-                echo -e "    • ${FG_GREEN}${BOLD}CMS Drupal${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
-                add_role "Hospedagem Drupal"
-                add_unique_item RESUMO_SITES_DETECTADOS "Drupal: ${APP_DIR}"
+                DRUPAL_VER=$(grep -E "const[[:space:]]+VERSION[[:space:]]*=" "$special_marker" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | head -n 1 || true)
+                echo -e "    • ${FG_GREEN}${BOLD}CMS Drupal${DRUPAL_VER:+ v${DRUPAL_VER}}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                add_role "Hospedagem Drupal${DRUPAL_VER:+ (${DRUPAL_VER})}"
+                add_unique_item RESUMO_APPS_VERSOES "Drupal:${DRUPAL_VER:-CMS}"
+                add_unique_item RESUMO_SITES_DETECTADOS "Drupal${DRUPAL_VER:+ v${DRUPAL_VER}}: ${APP_DIR}"
                 FOUND_APPS=$((FOUND_APPS + 1))
                 ;;
             */vtigerversion.php)
@@ -2560,11 +2862,175 @@ if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
         sub(/^[ \t]+/, "", $0);
         print unit "|" $0
     }' || true)
+
+    # Unidades Systemd customizadas criadas localmente em /etc/systemd/system/*.service (mesmo se paradas/oneshot)
+    CUSTOM_UNIT_COUNT=0
+    for cu_file in /etc/systemd/system/*.service; do
+        [[ -f "$cu_file" && ! -L "$cu_file" ]] || continue
+        cu_name=$(basename "$cu_file")
+        cu_state=$(get_service_status "${cu_name%.service}")
+        cu_enabled=$(systemctl is-enabled "$cu_name" 2>/dev/null || echo "static")
+        cu_exec=$(awk -F'=' '/^[ \t]*ExecStart[ \t]*=/ {sub(/^[^=]+=/,""); print; exit}' "$cu_file" 2>/dev/null | trim_ws || true)
+        CUSTOM_UNIT_COUNT=$((CUSTOM_UNIT_COUNT + 1))
+        (( CUSTOM_UNIT_COUNT == 1 )) && echo -e "\n    ${BOLD}Serviços Systemd Customizados (/etc/systemd/system/*.service — Inclui Parados/Oneshot):${NC}"
+        echo -e "      • ${FG_CYAN}${BOLD}${cu_name}${NC} [${cu_state} | Boot: ${FG_YELLOW}${cu_enabled}${NC}]${cu_exec:+ -> ${DIM}${cu_exec:0:95}${NC}}"
+        add_unique_item CUSTOM_SYSTEMD_UNITS "${cu_name} (${cu_enabled}${cu_exec:+: ${cu_exec:0:80}})"
+    done
 fi
+
+# Gerenciadores de processos fora do Systemd (Supervisor e PM2 — leitura 100% passiva)
+if [[ -d /etc/supervisor/conf.d || -d /etc/supervisord.d ]] || pgrep -x supervisord >/dev/null 2>&1; then
+    echo -e "\n    ${BOLD}Supervisor (Programas Gerenciados):${NC}"
+    if pgrep -x supervisord >/dev/null 2>&1 && command -v supervisorctl >/dev/null 2>&1; then
+        timeout 3 supervisorctl status 2>/dev/null | awk '{print "      • " $0}' || true
+    fi
+    for sup_f in /etc/supervisor/conf.d/*.conf /etc/supervisord.d/*.ini /etc/supervisord.d/*.conf; do
+        [[ -r "$sup_f" ]] || continue
+        SUP_PROGS=$(awk '
+            /^\[program:/ { sub(/^\[program:/,""); sub(/\].*/,""); prog=$0; cmd=""; dir="" }
+            /^[ \t]*command[ \t]*=/ { sub(/^[^=]+=[ \t]*/,""); cmd=$0 }
+            /^[ \t]*directory[ \t]*=/ { sub(/^[^=]+=[ \t]*/,""); dir=$0 }
+            prog != "" && cmd != "" { print prog " -> " cmd (dir ? " (dir: " dir ")" : ""); prog=""; cmd=""; dir="" }
+        ' "$sup_f" 2>/dev/null || true)
+        if [[ -n "$SUP_PROGS" ]]; then
+            while IFS= read -r sp_l; do
+                [[ -n "$sp_l" ]] && echo -e "      ├─ [${FG_CYAN}$(basename "$sup_f")${NC}] ${FG_YELLOW}${sp_l}${NC}"
+            done <<< "$SUP_PROGS"
+        fi
+    done
+fi
+
+PM2_PROCS=$(pgrep -fa "PM2" 2>/dev/null | grep -v "grep" || true)
+PM2_DUMPS=()
+for pm2_d in /root/.pm2/dump.pm2 /home/*/.pm2/dump.pm2; do
+    [[ -r "$pm2_d" ]] && PM2_DUMPS+=("$pm2_d")
+done
+if [[ -n "$PM2_PROCS" ]] || (( ${#PM2_DUMPS[@]} > 0 )); then
+    echo -e "\n    ${BOLD}PM2 (Gerenciador de Processos Node.js — Inspeção Passiva):${NC}"
+    [[ -n "$PM2_PROCS" ]] && echo -e "      • ${FG_GREEN}Daemon PM2 em execução${NC}"
+    if (( ${#PM2_DUMPS[@]} > 0 )); then
+        for pd_file in "${PM2_DUMPS[@]}"; do
+            PM2_APPS=$(grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]+"|"pm_exec_path"[[:space:]]*:[[:space:]]*"[^"]+"' "$pd_file" 2>/dev/null | paste - - 2>/dev/null | sed -E 's/"name"[[:space:]]*:[[:space:]]*"([^"]+)"[[:space:]]*"pm_exec_path"[[:space:]]*:[[:space:]]*"([^"]+)"/\1 -> \2/' || true)
+            if [[ -n "$PM2_APPS" ]]; then
+                while IFS= read -r pma; do
+                    [[ -n "$pma" ]] && echo -e "      ├─ [${DIM}${pd_file}${NC}] ${FG_CYAN}${pma}${NC}"
+                done <<< "$PM2_APPS"
+            else
+                echo -e "      ├─ Dump localizado: ${DIM}${pd_file}${NC}"
+            fi
+        done
+    fi
+fi
+
+# 4.7 - Inventário de Migração (Repositórios de Terceiros, Snaps/Flatpaks, Pacotes Manuais e Binários Locais)
+echo -e "\n  ${BOLD}4.7 Inventário de Migração (Repositórios Externos, Snaps, Pacotes Manuais e Binários Locais):${NC}"
+
+# 4.7.1 - Repositórios de Terceiros (APT / DNF / YUM)
+REPO_3P_COUNT=0
+if [[ -d /etc/apt/sources.list.d ]]; then
+    for rf in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+        [[ -r "$rf" ]] || continue
+        rf_base=$(basename "$rf")
+        [[ "$rf_base" == "ubuntu.sources" || "$rf_base" == "debian.sources" ]] && continue
+        rf_uris=$(grep -vE '^[ \t]*#|^[ \t]*$' "$rf" 2>/dev/null | grep -oE 'https?://[^[:space:]]+' | sort -u | head -n 2 | tr '\n' ' ' | trim_ws || true)
+        if [[ -n "$rf_uris" ]]; then
+            REPO_3P_COUNT=$((REPO_3P_COUNT + 1))
+            (( REPO_3P_COUNT == 1 )) && echo -e "    • ${BOLD}Repositórios APT de Terceiros (/etc/apt/sources.list.d):${NC}"
+            echo -e "      ├─ ${FG_CYAN}${rf_base}${NC}: ${DIM}${rf_uris}${NC}"
+            add_unique_item REPOS_TERCEIROS "${rf_base}: ${rf_uris}"
+        fi
+    done
+elif [[ -d /etc/yum.repos.d ]]; then
+    for rf in /etc/yum.repos.d/*.repo; do
+        [[ -r "$rf" ]] || continue
+        rf_base=$(basename "$rf")
+        if grep -qiE '^[ \t]*enabled[ \t]*=[ \t]*1' "$rf" 2>/dev/null; then
+            rf_uris=$(grep -iE '^[ \t]*(baseurl|mirrorlist|metalink)[ \t]*=' "$rf" 2>/dev/null | head -n 2 | cut -d'=' -f2- | tr '\n' ' ' | trim_ws || true)
+            REPO_3P_COUNT=$((REPO_3P_COUNT + 1))
+            (( REPO_3P_COUNT == 1 )) && echo -e "    • ${BOLD}Repositórios YUM/DNF Ativos (/etc/yum.repos.d):${NC}"
+            echo -e "      ├─ ${FG_CYAN}${rf_base}${NC}: ${DIM}${rf_uris:-Ativo}${NC}"
+            add_unique_item REPOS_TERCEIROS "${rf_base}: ${rf_uris:-Ativo}"
+        fi
+    done
+fi
+(( REPO_3P_COUNT == 0 )) && echo -e "    • Repositórios de Terceiros: Nenhum repositório externo adicional detectado."
+
+# 4.7.2 - Pacotes Snap e Flatpak
+if command -v snap >/dev/null 2>&1; then
+    SNAP_LIST=$(timeout 4 snap list 2>/dev/null | awk 'NR>1 {print $1 "|" $2 "|" $4}' || true)
+    if [[ -n "$SNAP_LIST" ]]; then
+        echo -e "    • ${BOLD}Pacotes Snap Instalados:${NC}"
+        while IFS='|' read -r sn_name sn_ver sn_track; do
+            [[ -z "$sn_name" ]] && continue
+            echo -e "      ├─ ${FG_CYAN}${sn_name}${NC} (${FG_YELLOW}v${sn_ver}${NC} | Canal: ${DIM}${sn_track}${NC})"
+            if [[ ! "$sn_name" =~ ^(bare|core|core[0-9]+|snapd|lxd)$ ]]; then
+                add_unique_item RESUMO_APPS_VERSOES "Snap-${sn_name}:${sn_ver}"
+            fi
+        done <<< "$SNAP_LIST"
+    fi
+fi
+
+if command -v flatpak >/dev/null 2>&1; then
+    FP_LIST=$(timeout 4 flatpak list --app --columns=name,application,version 2>/dev/null || true)
+    if [[ -n "$FP_LIST" ]]; then
+        echo -e "    • ${BOLD}Aplicações Flatpak Instaladas:${NC}"
+        while IFS= read -r fp_l; do
+            [[ -n "$fp_l" ]] && echo -e "      ├─ ${FG_CYAN}${fp_l}${NC}"
+        done <<< "$FP_LIST"
+    fi
+fi
+
+# 4.7.3 - Utilitários / Pacotes Instalados Manualmente (Visão de Migração)
+if command -v apt-mark >/dev/null 2>&1 && command -v dpkg-query >/dev/null 2>&1; then
+    MANUAL_ALL=$(apt-mark showmanual 2>/dev/null | sort -u || true)
+    if [[ -n "$MANUAL_ALL" ]]; then
+        MANUAL_TOTAL=$(echo "$MANUAL_ALL" | wc -l | trim_ws)
+        MANUAL_FILTERED=$(echo "$MANUAL_ALL" | grep -vE '^(lib|linux-|ubuntu-|debian-|base-|bsd|coreutils|dash|bash|diffutils|dpkg|e2fs|findutils|gcc-|g\+\+|grep|gzip|hostname|init|iproute|iputils|kbd|kmod|locales|login|lsb-|mawk|mount|ncurses|netbase|passwd|perl|procps|sed|sensible-|systemd|sysv|tar|tzdata|udev|util-linux|vim-tiny|whiptail|zlib|fonts-|language-pack-|man-db|manpages|adduser|apt|ca-certificates|console-setup|cron|dbus|dmidecode|eject|fdisk|gnupg|gpg|grub-|hdparm|info|install-info|isc-dhcp-client|less|logrotate|lshw|lsof|nano|netplan|networkd-dispatcher|ntfs-3g|openssh-client|os-prober|parted|pciutils|plymouth|polkitd|psmisc|python3-minimal|readline-common|rsyslog|shim-signed|snapd|sudo|ufw|unattended-upgrades|usbutils|uuid-runtime|xdg-user-dirs|xkb-data|xxd)' | head -n 40 || true)
+        if [[ -n "$MANUAL_FILTERED" ]]; then
+            MANUAL_WITH_VER=""
+            while IFS= read -r mp; do
+                [[ -z "$mp" ]] && continue
+                mp_v=$(_get_pkg_ver "$mp")
+                MANUAL_WITH_VER="${MANUAL_WITH_VER:+${MANUAL_WITH_VER}, }${mp}${mp_v:+ (${mp_v})}"
+            done <<< "$MANUAL_FILTERED"
+            echo -e "    • ${BOLD}Pacotes Manuais Relevantes (APT — ${MANUAL_TOTAL} manuais no total, Top 40 utilitários/apps):${NC}"
+            echo -e "      └─ ${DIM}${MANUAL_WITH_VER}${NC}"
+        fi
+    fi
+elif command -v dnf >/dev/null 2>&1; then
+    DNF_USER_PKGS=$(timeout 6 dnf repoquery --userinstalled --qf '%{name} (%{version})' 2>/dev/null | grep -vE '^(kernel|glibc|systemd|basesystem|filesystem|coreutils|bash|dnf|rpm|selinux|grub2|dracut|NetworkManager|openssh-clients|sudo|chrony|firewalld)' | head -n 40 | paste -sd ', ' - || true)
+    if [[ -n "$DNF_USER_PKGS" ]]; then
+        echo -e "    • ${BOLD}Pacotes Instalados pelo Usuário (DNF — Top 40):${NC}"
+        echo -e "      └─ ${DIM}${DNF_USER_PKGS}${NC}"
+    fi
+fi
+
+# 4.7.4 - Binários Executáveis Locais e JARs Instalados Manualmente (/usr/local/bin, /usr/local/sbin, /opt)
+LOCAL_BINS=$(find /usr/local/bin /usr/local/sbin -maxdepth 2 -type f -executable ! -name "*.sh" ! -name "*.py" 2>/dev/null | sort -u | head -n 25 || true)
+OPT_BINS=$(find /opt -maxdepth 2 -type f \( -executable -o -name "*.jar" \) ! -name "*.sh" ! -name "*.py" ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/venv/*" 2>/dev/null | sort -u | head -n 20 || true)
+if [[ -n "$LOCAL_BINS" || -n "$OPT_BINS" ]]; then
+    echo -e "    • ${BOLD}Binários Executáveis / JARs Instalados Manualmente (/usr/local/bin, /usr/local/sbin, /opt):${NC}"
+    if [[ -n "$LOCAL_BINS" ]]; then
+        while IFS= read -r lb; do
+            [[ -z "$lb" ]] && continue
+            lb_sz=$(du -h "$lb" 2>/dev/null | awk '{print $1}' || echo "N/A")
+            echo -e "      ├─ ${FG_CYAN}${lb}${NC} (${DIM}${lb_sz}${NC})"
+        done <<< "$LOCAL_BINS"
+    fi
+    if [[ -n "$OPT_BINS" ]]; then
+        while IFS= read -r ob; do
+            [[ -z "$ob" ]] && continue
+            ob_sz=$(du -h "$ob" 2>/dev/null | awk '{print $1}' || echo "N/A")
+            echo -e "      ├─ ${FG_YELLOW}${ob}${NC} (${DIM}${ob_sz}${NC})"
+        done <<< "$OPT_BINS"
+    fi
+fi
+}
 
 # ==============================================================================
 # SEÇÃO 5 - BANCOS DE DADOS (QUAIS, VERSÕES, CONFIGURAÇÕES E BASES EXISTENTES)
 # ==============================================================================
+secao_5_bancos() {
 print_header "5. BANCOS DE DADOS (QUAIS, VERSÕES, DATADIR, TAMANHO E BASES EXISTENTES)"
 
 DB_ANY_FOUND=0
@@ -2724,10 +3190,12 @@ if (( ${#SQLITE_DBS_FOUND[@]} > 0 )); then
 fi
 
 (( DB_ANY_FOUND == 0 )) && log_info "Nenhum SGBD instalado diretamente no host (verifique a subseção 4.5 de Contêineres)."
+}
 
 # ==============================================================================
 # SEÇÃO 6 - FIREWALL (ATIVO OU INATIVO), REGRAS CONFIGURADAS E SEGURANÇA
 # ==============================================================================
+secao_6_firewall() {
 print_header "6. FIREWALL (ATIVO OU INATIVO), REGRAS CONFIGURADAS E SEGURANÇA"
 
 # 6.1 - Status do Firewall e Listagem das Regras (UFW, Firewalld, NFTables, IPTables)
@@ -2885,10 +3353,12 @@ if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
         log_item "Systemd Failed Units" "${FG_GREEN}Nenhuma (0 falhas)${NC}"
     fi
 fi
+}
 
 # ==============================================================================
 # SEÇÃO 7 - PORTAS ABERTAS (LISTEN), REDE, /ETC/HOSTS E CONEXÕES ATIVAS
 # ==============================================================================
+secao_7_rede() {
 print_header "7. PORTAS ABERTAS (LISTEN), REDE, /ETC/HOSTS E CONEXÕES ATIVAS"
 
 # 7.1 - Tabela de Portas Abertas (TCP/UDP) com PID, Serviço e CWD
@@ -2932,7 +3402,7 @@ if command -v ss >/dev/null 2>&1; then
 
         if [[ "$scope" == "PÚBLICO" ]] && [[ "$port" =~ ^(111|161|2049|2375|3306|3389|5432|5900|6379|9100|9200|10050|10051|11211|27017)$ ]]; then
             if [[ "$port" == "2375" ]]; then
-                add_alert "CRÍTICO: Porta Docker API sem TLS (${port}/${proto} - ${proc_raw}) aberta publicamente em ${local_addr}!"
+                add_critical_alert "Porta Docker API sem TLS (${port}/${proto} - ${proc_raw}) aberta publicamente em ${local_addr}!"
             else
                 add_alert "Porta sensível de banco/gerência (${port}/${proto} - ${proc_raw}) está aberta em todas as interfaces (${local_addr})."
             fi
@@ -2980,7 +3450,9 @@ if command -v resolvectl >/dev/null 2>&1; then
     [[ -n "$RESOLVED_DNS" ]] && DNS_SERVERS="${DNS_SERVERS} (Upstream: ${RESOLVED_DNS})"
 fi
 DNS_TEST_STR="Não testado"
-if command -v getent >/dev/null 2>&1; then
+if (( OPT_NO_NET == 1 )); then
+    DNS_TEST_STR="${DIM}Pulado (--no-net)${NC}"
+elif command -v getent >/dev/null 2>&1; then
     DNS_TEST_IP=$(timeout 2 getent hosts deb.debian.org 2>/dev/null | awk '{print $1}' | head -n 1 || true)
     if [[ -n "$DNS_TEST_IP" ]]; then
         DNS_TEST_STR="${FG_GREEN}OK (deb.debian.org -> ${DNS_TEST_IP})${NC}"
@@ -2990,7 +3462,9 @@ if command -v getent >/dev/null 2>&1; then
     fi
 fi
 PUBLIC_IP="Não detectado / Sem saída HTTPS"
-if command -v curl >/dev/null 2>&1; then
+if (( OPT_NO_NET == 1 )); then
+    PUBLIC_IP="Pulado (--no-net)"
+elif command -v curl >/dev/null 2>&1; then
     PUBLIC_IP=$(curl -4 -fsS --connect-timeout 2 --max-time 3 https://ifconfig.me 2>/dev/null || echo "Não detectado")
 fi
 PRIMARY_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -n 1 || echo "N/A")
@@ -3030,10 +3504,12 @@ if command -v ss >/dev/null 2>&1; then
         done <<< "$ESTAB_CONNS"
     fi
 fi
+}
 
 # ==============================================================================
 # SEÇÃO 8 - AUTOMAÇÃO, AGENDAMENTOS (CRON/TIMERS), SCRIPTS E BACKUPS LOCAIS
 # ==============================================================================
+secao_8_automacao() {
 print_header "8. AUTOMAÇÃO, AGENDAMENTOS (CRON / TIMERS), SCRIPTS E BACKUPS LOCAIS"
 
 # 8.1 - Crontabs e Systemd Timers
@@ -3101,10 +3577,12 @@ if [[ -n "$BACKUP_ARCHIVES" ]]; then
         echo -e "    • ${FG_CYAN}${ba}${NC} (${BA_SIZE})"
     done <<< "$BACKUP_ARCHIVES"
 fi
+}
 
 # ==============================================================================
 # RESUMO EXECUTIVO DO INVENTÁRIO (PAINEL CONSOLIDADO NA ORDEM SOLICITADA)
 # ==============================================================================
+resumo_executivo() {
 print_header "RESUMO DA INSTALAÇÃO E DIAGNÓSTICO DO SERVIDOR"
 
 ROLES_STR="Servidor Linux Genérico / Sem Serviços de Rede Ativos"
@@ -3169,6 +3647,10 @@ print_summary "   Status de Atualização:"   "${OS_UPDATE_STATUS_STR}" "$UPDATE
 print_summary "   Aguardando Reboot?"       "${REBOOT_NEEDED}${REBOOT_REASON:+ ($REBOOT_REASON)}" "$REBOOT_SUMMARY_COLOR"
 print_summary "2. Usuários com Sudo:"       "${SUDO_USERS_STR}" "$FG_YELLOW"
 print_summary "   Grupos com Sudo:"         "${SUDO_GROUPS_STR}" "$FG_CYAN"
+if (( ${#DISABLED_USERS_SUMMARY[@]} > 0 )); then
+    DISABLED_USERS_STR=$(printf '%s, ' "${DISABLED_USERS_SUMMARY[@]}" | sed 's/, $//')
+    print_summary "   Contas Desativadas:"      "${DISABLED_USERS_STR}" "$FG_YELLOW"
+fi
 print_summary "3. NFS / Samba / LDAP:"      "${STORAGE_REDE_STR}" "$FG_CYAN"
 print_summary "4. Papel do Servidor:"       "${ROLES_STR}" "$FG_YELLOW"
 print_summary "   Aplicações e Versões:"    "${APPS_SUMMARY_STR}" "$FG_GREEN"
@@ -3196,13 +3678,38 @@ if (( ${#RESUMO_SITES_DETECTADOS[@]} > 0 )); then
     done
 fi
 
-if (( ${#ALERTAS_AUDITORIA[@]} > 0 )); then
-    echo -e "\n  ${BOLD}${FG_YELLOW}⚠ PONTOS DE ATENÇÃO E RECOMENDAÇÕES (${#ALERTAS_AUDITORIA[@]}):${NC}"
-    for alerta in "${ALERTAS_AUDITORIA[@]}"; do
-        echo -e "    ${FG_YELLOW}[!]${NC} ${alerta}"
-    done
+TOTAL_ALERTS=$(( ${#ALERTAS_CRITICOS[@]} + ${#ALERTAS_AUDITORIA[@]} ))
+if (( TOTAL_ALERTS > 0 )); then
+    echo -e "\n  ${BOLD}${FG_YELLOW}⚠ PONTOS DE ATENÇÃO E RECOMENDAÇÕES (${TOTAL_ALERTS} — Críticos: ${#ALERTAS_CRITICOS[@]} | Atenção: ${#ALERTAS_AUDITORIA[@]}):${NC}"
+    if (( ${#ALERTAS_CRITICOS[@]} > 0 )); then
+        for crit_a in "${ALERTAS_CRITICOS[@]}"; do
+            echo -e "    ${FG_RED}${BOLD}[CRÍTICO]${NC} ${FG_RED}${crit_a}${NC}"
+        done
+    fi
+    if (( ${#ALERTAS_AUDITORIA[@]} > 0 )); then
+        for alerta in "${ALERTAS_AUDITORIA[@]}"; do
+            echo -e "    ${FG_YELLOW}[ATENÇÃO]${NC} ${alerta}"
+        done
+    fi
 else
-    echo -e "\n  ${FG_GREEN}[+] Nenhum alerta crítico imediato detectado durante a varredura.${NC}"
+    echo -e "\n  ${FG_GREEN}[+] Nenhum alerta crítico ou ponto de atenção imediato detectado durante a varredura.${NC}"
 fi
+}
 
+# ==============================================================================
+# ORQUESTRADOR PRINCIPAL (EXECUÇÃO MODULAR POR SEÇÃO)
+# ==============================================================================
+main() {
+    if section_enabled 1; then secao_1_sistema; fi
+    if section_enabled 2; then secao_2_usuarios; fi
+    if section_enabled 3; then secao_3_armazenamento; fi
+    if section_enabled 4; then secao_4_aplicacoes; fi
+    if section_enabled 5; then secao_5_bancos; fi
+    if section_enabled 6; then secao_6_firewall; fi
+    if section_enabled 7; then secao_7_rede; fi
+    if section_enabled 8; then secao_8_automacao; fi
+    resumo_executivo
+}
+
+main
 exit 0
