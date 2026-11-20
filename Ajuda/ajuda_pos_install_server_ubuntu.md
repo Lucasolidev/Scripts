@@ -6,7 +6,7 @@
 ![Vim](https://img.shields.io/badge/Vim-019733?style=flat&logo=vim&logoColor=white)
 ![Versão](https://img.shields.io/badge/Script-2.5-0078D4?style=flat)
 
-Guia operacional rápido, referência de configurações e *cheat sheet* completo para servidores configurados com o script [`pos_install_server_ubuntu.sh`](../pos_install_server_ubuntu.sh). **Versão 2.5, destinada ao Ubuntu Server 24.04 e 26.04 com systemd. Instalação e reexecução testadas na Ubuntu-26.04-Teste em WSL; auditoria do kernel e hardening de `/dev/shm` ainda exigem VM convencional. O Ubuntu 24.04 permanece sem homologação dinâmica nesta entrega.** Contém os comandos práticos dos utilitários de **diagnóstico**, **rede**, **segurança (Lynis/Fail2Ban/UFW)**, **desempenho** e **produtividade**.
+Guia operacional rápido, referência de configurações e *cheat sheet* completo para servidores configurados com o script [`pos_install_server_ubuntu.sh`](../pos_install_server_ubuntu.sh). **Versão 2.5, destinada ao Ubuntu Server 24.04 e 26.04 com systemd. Instalação e reexecução testadas na Ubuntu-26.04-Teste em WSL; auditoria do kernel e hardening de `/dev/shm` ainda exigem VM convencional. O Ubuntu 24.04 permanece sem homologação dinâmica nesta entrega.** Contém os comandos práticos dos utilitários de **diagnóstico**, **rede**, **segurança (Fail2Ban/UFW/Auditd)**, **desempenho** e **produtividade**.
 
 ---
 
@@ -24,12 +24,11 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 | `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, Sistema, Data de instalação, Uptime, barras de RAM/SWAP/Disco, IP, UFW e Reboot Pendente). |
 | `/etc/profile.d/motd_banner.sh` | Disparador automático do banner no login interativo via SSH ou console local. |
 | `/etc/fail2ban/jail.d/99-pos-install-server.local` | Jaula SSH do script. `jail.local` e outras jaulas são preservadas. |
-| `/etc/default/ufw` | Configurações do firewall UFW (incluindo suporte a IPv6 ativo `IPV6=yes`). |
+| `/etc/default/ufw` | Configurações do firewall UFW (`IPV6=yes` quando IPv6 está disponível no kernel; `IPV6=no` caso contrário). |
 | `/etc/default/keyboard` | Mapeamento dual de layout de teclado (`ABNT2` + `US-International`). |
-| `/etc/sudoers.d/grupo_*` | Administração ampla com bloqueios de operações diretas para grupos operacionais. |
+| `/etc/sudoers.d/grupo_*` | Administração ampla com bloqueios de operações diretas para grupos operacionais (protege automaticamente todos os membros do grupo `sudo`). |
 | `/root/.vimrc` / `/etc/skel/.vimrc` | Recebem chamada ao perfil compartilhado apenas se não existir configuração anterior e se a opção Vim for aceita. |
 | `/var/log/sysstat/` | Diretório onde o `sysstat` armazena o histórico diário de métricas de CPU, RAM e I/O. |
-| `/var/log/lynis.log` | Relatório completo e detalhado da última auditoria de segurança gerada pelo Lynis. |
 
 ---
 
@@ -136,7 +135,7 @@ As dependências essenciais são `locales`, `openssh-server`, `sudo`, `fail2ban`
 
 | Pacote | Para que serve | O que o script faz com ele |
 | :--- | :--- | :--- |
-| `software-properties-common` | Fornece ferramentas para administrar repositórios APT, incluindo `add-apt-repository`. | Instala o suporte e habilita o repositório `universe` do Ubuntu. Não adiciona PPA de terceiros. |
+| `software-properties-common` | Fornece ferramentas para administrar repositórios APT, incluindo `add-apt-repository`. | Instalado somente se o repositório `universe` ainda não estiver habilitado no APT. Não adiciona PPA de terceiros. |
 | `locales` | Gera definições de idioma e codificação usadas para exibir/processar textos, datas e números. | Gera `en_US.UTF-8` e `pt_BR.UTF-8`, com inglês UTF-8 como padrão. |
 | `openssh-server` | Permite acesso remoto ao terminal e transferência por mecanismos como SFTP/SCP através do SSH. | Configura e valida o servidor SSH, incluindo a política de root; identifica as portas para firewall e Fail2Ban. |
 | `sudo` | Permite executar comandos com privilégios administrativos conforme a política sudoers; fornece `visudo` para validar essa política. | Vincula administradores ao grupo sudo e aplica a regra do grupo operacional solicitado. A implementação efetiva pode ser sudo-rs. |
@@ -156,7 +155,6 @@ As dependências essenciais são `locales`, `openssh-server`, `sudo`, `fail2ban`
 | `iotop` | Mostra quais processos estão lendo/escrevendo em disco. | Disponibiliza para investigar gargalos de entrada/saída. A coleta depende dos recursos/permissões do kernel. |
 | `sysstat` | Fornece ferramentas como `sar`, `iostat` e `pidstat` para estatísticas de CPU, memória, disco e processos, incluindo histórico. | Define `ENABLED="true"` quando existe `/etc/default/sysstat` e habilita/inicia o serviço; a frequência de coleta segue a configuração do pacote. |
 | `ncdu` | Mostra o espaço usado pelas pastas e permite navegar pelos maiores consumidores. | Disponibiliza para análise manual de disco; não executa limpeza automática. |
-| `lynis` | Examina a configuração do Linux e apresenta recomendações de segurança e hardening. | Disponibiliza para auditoria manual. Não executa a auditoria nem aplica automaticamente suas recomendações. |
 
 #### Rede, conectividade e consultas
 
@@ -402,27 +400,9 @@ dig -x 8.8.8.8 +short
 
 ---
 
-## 🛡️ 6. Auditoria de Segurança, Hardening e Firewall
+## 🛡️ 6. Segurança, Hardening e Firewall
 
-### 6.1 Auditoria Completa de Segurança e Hardening Index (`lynis`)
-O **Lynis** faz uma varredura profunda de conformidade, configurações de kernel, permissões e vulnerabilidades:
-```bash
-# Executa a auditoria completa do servidor com pausas interativas
-sudo lynis audit system
-
-# Executa a auditoria completa de forma direta (Modo Rápido / Relatório)
-sudo lynis audit system -Q
-
-# Consultar todos os AVISOS (Warnings) e SUGESTÕES (Suggestions) gerados
-sudo grep -E "Warning:|Suggestion:" /var/log/lynis.log
-
-# Ver detalhes e solução recomendada de um item específico (ex: NETW-2705 ou AUTH-9230)
-sudo lynis show details NETW-2705
-```
-
----
-
-### 6.2 Prevenção de Força Bruta no SSH (`fail2ban`)
+### 6.1 Prevenção de Força Bruta no SSH (`fail2ban`)
 ```bash
 # Verifica o status da jaula do SSH e quantidade de IPs banidos
 sudo fail2ban-client status sshd
@@ -439,7 +419,7 @@ sudo tail -f /var/log/fail2ban.log
 
 ---
 
-### 6.3 Gerenciamento do Firewall (`ufw`)
+### 6.2 Gerenciamento do Firewall (`ufw`)
 ```bash
 # Exibe as regras ativas numeradas
 sudo ufw status numbered
@@ -460,7 +440,7 @@ sudo ufw reload
 
 ---
 
-### 6.4 Atualizações automáticas (`unattended-upgrades`)
+### 6.3 Atualizações automáticas (`unattended-upgrades`)
 
 O script grava `APT::Periodic::Update-Package-Lists "1"` e `APT::Periodic::Unattended-Upgrade "1"` em `/etc/apt/apt.conf.d/20auto-upgrades`. O valor `1` habilita a política diária. As origens permitidas continuam definidas pela distribuição, normalmente em `/etc/apt/apt.conf.d/50unattended-upgrades`; isso não equivale a atualizar automaticamente todos os pacotes de qualquer repositório.
 

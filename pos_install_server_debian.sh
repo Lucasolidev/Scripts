@@ -10,7 +10,7 @@
 # O que este script faz (Descrição e Auditoria de Funções):
 # 1. Valida privilégios de execução (Root ou Sudo) e captura logs de auditoria em /root e na Home.
 # 2. Atualiza os repositórios APT e aplica patches de segurança do sistema (opcional).
-# 3. Instala utilitários vitais (curl, vim, ncdu, btop, htop, tmux, fail2ban, auditd, audispd-plugins, bind9-dnsutils, net-tools, unattended-upgrades, mtr, iperf3, nmap, tcpdump, iotop, jq, tree, rsync, unzip, 7zip, sysstat, lynis, acl, systemd-timesyncd).
+# 3. Instala utilitários vitais (curl, vim, ncdu, btop, htop, tmux, fail2ban, auditd, audispd-plugins, bind9-dnsutils, net-tools, unattended-upgrades, mtr, iperf3, nmap, tcpdump, iotop, jq, tree, rsync, unzip, 7zip, sysstat, acl, systemd-timesyncd).
 # 4. Ajusta locales (en_US/pt_BR UTF-8), fuso horário (America/Sao_Paulo + NTP) e layout de teclado (ABNT2 + US-Intl).
 # 5. Aplica e verifica flags noexec,nosuid,nodev em /dev/shm (redução da execução direta, não isolamento de root).
 # 6. Configura aliases de produtividade e segurança no Shell (ll='ls -alFh', rm, cp, mv, df, free, ports, myip, update, clean, reload).
@@ -359,24 +359,42 @@ if ! is_wsl && ! systemd-detect-virt --container --quiet; then
     PACOTES_ESSENCIAIS+=(auditd audispd-plugins)
 fi
 PACOTE_7ZIP=7zip
-PACOTES=("${PACOTES_ESSENCIAIS[@]}" curl ncdu btop htop tmux bind9-dnsutils net-tools vim mtr-tiny iperf3 nmap tcpdump iotop jq tree rsync unzip "$PACOTE_7ZIP" sysstat lynis acl)
-[[ "$CONFIGURAR_VIM" != S ]] || PACOTES+=(git ca-certificates)
+PACOTES_OPCIONAIS=(curl ncdu btop htop tmux bind9-dnsutils net-tools vim mtr-tiny iperf3 nmap tcpdump iotop jq tree rsync unzip "$PACOTE_7ZIP" sysstat acl)
+[[ "$CONFIGURAR_VIM" != S ]] || PACOTES_OPCIONAIS+=(git ca-certificates)
 
 if ! VIRT_TYPE=$(systemd-detect-virt 2>/dev/null); then VIRT_TYPE=none; fi
-case "$VIRT_TYPE" in kvm|qemu|bochs) PACOTES+=(qemu-guest-agent) ;; vmware) PACOTES+=(open-vm-tools) ;; esac
+case "$VIRT_TYPE" in kvm|qemu|bochs) PACOTES_OPCIONAIS+=(qemu-guest-agent) ;; vmware) PACOTES_OPCIONAIS+=(open-vm-tools) ;; esac
 
-for pacote in "${PACOTES[@]}"; do
-    log_info "Instalando/verificando: $pacote"
-    if apt-get -o DPkg::Lock::Timeout=120 install -y "$pacote" > "$LOG_DIR/apt.log" 2>&1; then
-        PACOTES_INSTALADOS+=("$pacote")
-        log_success "Pacote disponível: $pacote"
-    else
-        case " ${PACOTES_ESSENCIAIS[*]} " in
-            *" $pacote "*) fatal "Dependência essencial indisponível: $pacote. Verifique /var/log/apt e os repositórios." ;;
-            *) pendencia "Utilitário opcional não instalado: $pacote" ;;
-        esac
-    fi
-done
+log_info "Instalando/verificando dependências essenciais (${#PACOTES_ESSENCIAIS[@]} pacotes)..."
+if apt-get -o DPkg::Lock::Timeout=120 install -y "${PACOTES_ESSENCIAIS[@]}" > "$LOG_DIR/apt.log" 2>&1; then
+    PACOTES_INSTALADOS+=("${PACOTES_ESSENCIAIS[@]}")
+    log_success "Dependências essenciais disponíveis."
+else
+    log_warning "Instalação em lote das dependências essenciais falhou; identificando pacote individualmente..."
+    for pacote in "${PACOTES_ESSENCIAIS[@]}"; do
+        if apt-get -o DPkg::Lock::Timeout=120 install -y "$pacote" > "$LOG_DIR/apt.log" 2>&1; then
+            PACOTES_INSTALADOS+=("$pacote")
+        else
+            fatal "Dependência essencial indisponível: $pacote. Verifique /var/log/apt e os repositórios."
+        fi
+    done
+fi
+
+log_info "Instalando/verificando utilitários operacionais (${#PACOTES_OPCIONAIS[@]} pacotes)..."
+if apt-get -o DPkg::Lock::Timeout=120 install -y "${PACOTES_OPCIONAIS[@]}" > "$LOG_DIR/apt.log" 2>&1; then
+    PACOTES_INSTALADOS+=("${PACOTES_OPCIONAIS[@]}")
+    log_success "Utilitários operacionais disponíveis."
+else
+    log_warning "Um ou mais utilitários opcionais falharam no lote; instalando individualmente..."
+    for pacote in "${PACOTES_OPCIONAIS[@]}"; do
+        if apt-get -o DPkg::Lock::Timeout=120 install -y "$pacote" > "$LOG_DIR/apt.log" 2>&1; then
+            PACOTES_INSTALADOS+=("$pacote")
+            log_success "Pacote disponível: $pacote"
+        else
+            pendencia "Utilitário opcional não instalado: $pacote"
+        fi
+    done
+fi
 
 # 3.1 - Verificação e garantia de conta de serviço sshd
 if ! getent passwd sshd >/dev/null; then
@@ -540,15 +558,27 @@ if (( ${#GRUPOS_AUDITADOS[@]} )); then
             fatal "Arquivo $ARQ_SUDO não corresponde ao grupo exato '$grp'; revise a regra anterior antes de continuar."
         fi
         SUDOERS_TMP="$LOG_DIR/sudoers"
+        ADMINS_PROTEGIDOS_RAW=(root administrador)
+        if [[ -n "$ADMIN_EXTRA_USER" ]]; then ADMINS_PROTEGIDOS_RAW+=("$ADMIN_EXTRA_USER"); fi
+        SUDO_MEMBERS=$(getent group sudo 2>/dev/null | cut -d: -f4 || true)
+        if [[ -n "$SUDO_MEMBERS" ]]; then
+            IFS=',' read -r -a SUDO_MEMBER_ARR <<< "$SUDO_MEMBERS"
+            for adm_m in "${SUDO_MEMBER_ARR[@]}"; do
+                if [[ "$adm_m" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+                    ADMINS_PROTEGIDOS_RAW+=("$adm_m")
+                fi
+            done
+        fi
+        mapfile -t ADMINS_PROTEGIDOS < <(printf '%s\n' "${ADMINS_PROTEGIDOS_RAW[@]}" | sort -u)
         {
             printf '# Gerenciado por pos_install_server %s.\n' "$VERSION"
             printf '# Administracao ampla: negacoes sao barreiras operacionais, NAO isolamento.\n'
             printf '# passwd sem sudo continua disponivel para alterar a propria senha.\n'
             printf '%%%s ALL=(ALL:ALL) ALL' "$grp"
-            printf ', !/usr/bin/passwd root, !/usr/bin/passwd administrador, !/usr/bin/passwd ""'
-            if [[ -n "$ADMIN_EXTRA_USER" ]]; then
-                printf ', !/usr/bin/passwd %s' "$ADMIN_EXTRA_USER"
-            fi
+            printf ', !/usr/bin/passwd ""'
+            for adm_prot in "${ADMINS_PROTEGIDOS[@]}"; do
+                printf ', !/usr/bin/passwd %s' "$adm_prot"
+            done
             printf ', !/usr/sbin/visudo, !/usr/sbin/usermod, !/usr/bin/gpasswd, !/usr/bin/su, !/usr/bin/sudo'
             for editor in /usr/bin/nano /usr/bin/vi /usr/bin/vim /usr/bin/vim.tiny /usr/bin/editor; do
                 for alvo in "${ALVOS_EDITORES[@]}"; do
@@ -609,7 +639,12 @@ elif [[ "$ADMIN_SSH_PREEXISTENTE" == S ]] && id "$ADMIN_SSH_VALIDADO" >/dev/null
      id -nG "$ADMIN_SSH_VALIDADO" | tr ' ' '\n' | grep -qx sudo; then
     ADMIN_SHELL=$(getent passwd "$ADMIN_SSH_VALIDADO" | cut -d: -f7)
     ADMIN_STATE=$(passwd -S "$ADMIN_SSH_VALIDADO" | awk '{print $2}')
-    if [[ "$ADMIN_SHELL" == /bin/bash && "$ADMIN_STATE" == P ]] &&
+    ADMIN_SHELL_OK=N
+    case "$ADMIN_SHELL" in
+        /bin/bash|/usr/bin/bash|/bin/zsh|/usr/bin/zsh|/bin/sh|/usr/bin/sh|/bin/dash|/usr/bin/dash|/usr/bin/fish)
+            [[ -x "$ADMIN_SHELL" ]] && ADMIN_SHELL_OK=S ;;
+    esac
+    if [[ "$ADMIN_SHELL_OK" == S && "$ADMIN_STATE" == P ]] &&
        sudo -l -U "$ADMIN_SSH_VALIDADO" >/dev/null 2>&1; then
         ROOT_POLICY=no
         CHANGE_ROOT=S
@@ -935,12 +970,21 @@ if [[ "$HABILITAR_UFW" == S ]]; then
         ufw allow "$port/tcp" comment 'Acesso SSH Remoto' >/dev/null
     done
     ufw allow 10050/tcp comment 'Zabbix Agent Port' >/dev/null
-    awk '!/^IPV6=/ {print} END {print "IPV6=yes"}' /etc/default/ufw > "$LOG_DIR/ufw-default"
+    if [[ -f /proc/net/if_inet6 ]]; then
+        UFW_IPV6=yes
+    else
+        UFW_IPV6=no
+        log_warning "IPv6 não detectado no kernel (/proc/net/if_inet6 ausente); configurando UFW com IPV6=no."
+    fi
+    awk -v ipv6="$UFW_IPV6" '!/^IPV6=/ {print} END {print "IPV6=" ipv6}' /etc/default/ufw > "$LOG_DIR/ufw-default"
     install_config "$LOG_DIR/ufw-default" /etc/default/ufw
-    ufw --force enable
-    ufw reload
-    ufw status | grep -q '^Status: active' || fatal "Firewall não confirmou estado ativo."
-    log_success "UFW ativo; SSH $SSH_PORTS_CSV e Zabbix 10050/tcp liberados."
+    if ufw --force enable && ufw reload && ufw status | grep -q '^Status: active'; then
+        log_success "UFW ativo (IPV6=$UFW_IPV6); SSH $SSH_PORTS_CSV e Zabbix 10050/tcp liberados."
+    elif is_wsl || systemd-detect-virt --container --quiet; then
+        pendencia "UFW não pôde ser ativado neste contêiner/WSL (verifique suporte netfilter ou use firewall do host)."
+    else
+        fatal "Firewall não confirmou estado ativo."
+    fi
 else log_skipped "Configuração UFW não solicitada."; fi
 
 # ==============================================================================
@@ -965,18 +1009,33 @@ update-locale --locale-file "$LOG_DIR/locale" LANG=en_US.UTF-8 LC_ALL=en_US.UTF-
 install_config "$LOG_DIR/locale" "$LOCALE_FILE"
 log_success "Locales configurados em $LOCALE_FILE (en_US.UTF-8 / pt_BR.UTF-8)."
 
-timedatectl set-timezone America/Sao_Paulo
+if ! timedatectl set-timezone America/Sao_Paulo 2>/dev/null; then
+    if is_wsl || systemd-detect-virt --container --quiet; then
+        ln -snf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime
+        printf 'America/Sao_Paulo\n' > "$LOG_DIR/timezone"
+        install_config "$LOG_DIR/timezone" /etc/timezone 644
+        log_warning "timedatectl indisponível em contêiner/WSL; fuso America/Sao_Paulo aplicado via /etc/localtime e /etc/timezone."
+    else
+        fatal "Não foi possível configurar o fuso horário America/Sao_Paulo via timedatectl."
+    fi
+fi
 NTP_STATUS="Não sincronizado"
 if systemctl is-active --quiet chrony || systemctl is-active --quiet systemd-timesyncd; then
     log_info "Serviço de sincronização existente preservado."
+elif is_wsl || systemd-detect-virt --container --quiet; then
+    log_info "Ambiente contêiner/WSL detectado; relógio gerenciado pelo host."
 elif systemctl cat systemd-timesyncd.service >/dev/null 2>&1; then
     systemctl enable --now systemd-timesyncd || pendencia "Não foi possível iniciar timesyncd."
 else
     pendencia "Nenhum serviço NTP ativo detectado; configure o cliente de horário da sua preferência."
 fi
-if [[ $(timedatectl show -p NTPSynchronized --value 2>/dev/null) == yes ]]; then
+if [[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)" == yes ]]; then
     NTP_STATUS="Sincronizado"
-else pendencia "NTP ainda não confirmou sincronização; conferir após acesso à rede."; fi
+elif is_wsl || systemd-detect-virt --container --quiet; then
+    NTP_STATUS="Gerenciado pelo host (contêiner/WSL)"
+else
+    pendencia "NTP ainda não confirmou sincronização; conferir após acesso à rede."
+fi
 
 cat > "$LOG_DIR/keyboard" <<'EOF'
 XKBMODEL="pc105"
@@ -1589,7 +1648,12 @@ if ! grep -q 'motd_banner.sh' /etc/bash.bashrc; then
     { cat /etc/bash.bashrc; printf '\n'; cat "$LOG_DIR/motd-profile"; } > "$LOG_DIR/bash.bashrc"
     install_config "$LOG_DIR/bash.bashrc" /etc/bash.bashrc
 fi
-log_success "Banner instalado; .hushlogin e demais personalizações de login preservados."
+cat > "$LOG_DIR/motd-cmd" <<'EOF'
+#!/bin/sh
+exec /usr/local/bin/motd_banner.sh "$@"
+EOF
+install_config "$LOG_DIR/motd-cmd" /usr/local/bin/motd 755
+log_success "Banner instalado (/usr/local/bin/motd_banner.sh e comando 'motd'); .hushlogin e demais personalizações de login preservados."
 
 # ==============================================================================
 # 13. RESUMO DA INSTALAÇÃO E RESULTADOS VERIFICADOS
@@ -1605,9 +1669,13 @@ print_summary "Versão:" "$VERSION"
 print_summary_section "SISTEMA E VIRTUALIZAÇÃO"
 print_summary "Locales:" "en_US.UTF-8 / pt_BR.UTF-8" "$FG_GREEN"
 print_summary "Teclado:" "$KEYBOARD_STATUS"
-print_summary "Fuso horário:" "$(timedatectl show -p Timezone --value)" "$FG_GREEN"
+TZ_SUMMARY=$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || printf 'America/Sao_Paulo')
+print_summary "Fuso horário:" "$TZ_SUMMARY" "$FG_GREEN"
 RESULT_COLOR=$FG_YELLOW
-if [[ "$NTP_STATUS" == Sincronizado ]]; then RESULT_COLOR=$FG_GREEN; fi
+case "$NTP_STATUS" in
+    Sincronizado) RESULT_COLOR=$FG_GREEN ;;
+    "Gerenciado pelo host (contêiner/WSL)") RESULT_COLOR=$FG_CYAN ;;
+esac
 print_summary "NTP:" "$NTP_STATUS" "$RESULT_COLOR"
 case "$VIRT_TYPE" in
     kvm|qemu|bochs|vmware)

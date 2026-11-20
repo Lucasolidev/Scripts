@@ -6,7 +6,7 @@
 ![Vim](https://img.shields.io/badge/Vim-019733?style=flat&logo=vim&logoColor=white)
 ![Versão](https://img.shields.io/badge/Script-2.5-0078D4?style=flat)
 
-Guia operacional rápido, referência de configurações e *cheat sheet* completo para servidores configurados com o script [`pos_install_server_debian.sh`](../pos_install_server_debian.sh). **Versão 2.5, destinada ao Debian Server 12 (Bookworm) e 13 (Trixie) com systemd.** Aborda particularidades do Debian como garantia do `sudo`, sincronização de horário via `systemd-timesyncd`, repositórios `main` oficiais, hardening do SSH, firewall UFW e os comandos práticos dos utilitários de **diagnóstico**, **rede**, **segurança (Lynis/Fail2Ban/UFW/Auditd)**, **desempenho** e **produtividade**.
+Guia operacional rápido, referência de configurações e *cheat sheet* completo para servidores configurados com o script [`pos_install_server_debian.sh`](../pos_install_server_debian.sh). **Versão 2.5, destinada ao Debian Server 12 (Bookworm) e 13 (Trixie) com systemd.** Aborda particularidades do Debian como garantia do `sudo`, sincronização de horário via `systemd-timesyncd`, repositórios `main` oficiais, hardening do SSH, firewall UFW e os comandos práticos dos utilitários de **diagnóstico**, **rede**, **segurança (Fail2Ban/UFW/Auditd)**, **desempenho** e **produtividade**.
 
 ---
 
@@ -24,12 +24,11 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 | `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, OS, Data de instalação, RAM, Discos, IPs, Firewall). |
 | `/etc/profile.d/motd_banner.sh` | Disparador automático do banner no login interativo via SSH ou console local. |
 | `/etc/fail2ban/jail.d/99-pos-install-server.local` | Jaula SSH gerenciada com backend `systemd` e proteção contra ataques de força bruta. |
-| `/etc/default/ufw` | Configurações do firewall UFW (incluindo suporte a IPv6 ativo `IPV6=yes`). |
+| `/etc/default/ufw` | Configurações do firewall UFW (`IPV6=yes` quando IPv6 está disponível no kernel; `IPV6=no` caso contrário). |
 | `/etc/default/keyboard` | Mapeamento dual de layout de teclado (`ABNT2` + `US-International`). |
 | `/etc/default/locale` | Arquivo oficial de configuração dos locales padrão no Debian (`en_US.UTF-8` e `pt_BR.UTF-8`). |
-| `/etc/sudoers.d/grupo_*` | Administração ampla com barreiras de operações diretas para grupos operacionais. |
+| `/etc/sudoers.d/grupo_*` | Administração ampla com barreiras de operações diretas para grupos operacionais (protege automaticamente todos os membros do grupo `sudo`). |
 | `/var/log/sysstat/` | Diretório onde o `sysstat` armazena o histórico diário de métricas de CPU, RAM e I/O. |
-| `/var/log/lynis.log` | Relatório detalhado das varreduras de auditoria de segurança geradas pelo Lynis. |
 
 ---
 
@@ -253,24 +252,7 @@ nmap -sT -p 1-1024 localhost
 
 ---
 
-### 6.3 Auditoria de Segurança com Lynis
-
-O **Lynis** é um scanner de auditoria de conformidade e hardening para sistemas Linux.
-
-```bash
-# Executar auditoria de segurança completa do sistema
-sudo lynis audit system
-
-# Consultar o relatório e o índice de hardening
-grep "Hardening index" /var/log/lynis.log
-
-# Listar apenas os avisos e sugestões encontrados
-grep -E '(WARNING|SUGGESTION)' /var/log/lynis.log
-```
-
----
-
-### 6.4 Produtividade: Aliases e Banner Dinâmico
+### 6.3 Produtividade: Aliases e Banner Dinâmico
 
 #### Aliases Pré-Configurados (em `/etc/pos-install-server/bash_aliases`)
 Disponíveis para todos os usuários com login interativo no Bash:

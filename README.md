@@ -17,7 +17,7 @@ Repositório centralizado de scripts de automação, ferramentas de pós-instala
 Acesse os manuais e guias rápidos de consulta para servidores, ferramentas e utilitários:
 
 * 🐧 **[Guia de Ajuda Linux](Ajuda/ajuda_linux.md)** — Atalhos, manipulação de arquivos, permissões, POSIX ACLs, rsync/scp, usuários e comandos essenciais do Ubuntu Server.
-* ⚙️ **[Guia de Pós-Instalação & Utilitários Ubuntu](Ajuda/ajuda_pos_install_server_ubuntu.md)** — Manual de uso de todos os utilitários instalados (`btop`, `iotop`, `sysstat`, `lynis`, `mtr`, `iperf3`, `nmap`, `jq`, `ufw`, `fail2ban`, `tmux`, etc.) e configurações do servidor Ubuntu 24.04/26.04.
+* ⚙️ **[Guia de Pós-Instalação & Utilitários Ubuntu](Ajuda/ajuda_pos_install_server_ubuntu.md)** — Manual de uso de todos os utilitários instalados (`btop`, `iotop`, `sysstat`, `mtr`, `iperf3`, `nmap`, `jq`, `ufw`, `fail2ban`, `tmux`, etc.) e configurações do servidor Ubuntu 24.04/26.04.
 * ⚙️ **[Guia de Pós-Instalação & Utilitários Debian](Ajuda/ajuda_pos_install_server_debian.md)** — Manual de pós-instalação, hardening, particularidades do Debian (`sudo`, `systemd-timesyncd`, repositórios `main`), firewall e utilitários para Debian Server 12 (Bookworm) e 13 (Trixie).
 * 🐳 **[Guia de Ajuda Docker & Compose](Ajuda/ajuda_docker.md)** — Comandos de contêineres, imagens, volumes, redes e orquestração com Docker Compose.
 * 📊 **[Guia de Ajuda Zabbix](Ajuda/ajuda_zabbix.md)** — Monitoramento, `zabbix_get`, `zabbix_sender`, `zabbix_proxy`, agente 2 e `UserParameter`.
