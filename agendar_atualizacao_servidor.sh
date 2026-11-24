@@ -3,6 +3,7 @@
 # Version: 1.0
 # ------------------------------------------------
 VERSION="1.0"
+readonly SCRIPT_VERSION="$VERSION"
 # ==============================================================================
 # SCRIPT DE AGENDAMENTO DE ATUALIZAÇÃO DO SERVIDOR (DEBIAN / UBUNTU)
 # ==============================================================================
@@ -270,8 +271,12 @@ echo "   AGENDADOR DE ATUALIZAÇÃO CONTROLADA (DISPARO ÚNICO)"
 echo "   DEBIAN / UBUNTU — SYSTEMD TIMER + AUDITORIA PRÉ/PÓS-BOOT"
 echo "================================================================"
 echo -e "${NC}"
-log_info "Versão do Script: v${VERSION} | Host: $(hostname) | SO: ${OS_PRETTY}"
-log_info "Data/Hora Atual: $(date '+%d/%m/%Y %H:%M:%S') (Fuso: $(timedatectl show -p Timezone --value 2>/dev/null || echo 'N/A'))"
+log_info "Versão do Script: v${SCRIPT_VERSION} | Host: $(hostname) | SO: ${OS_PRETTY}"
+FUSO_ATUAL="$(timedatectl show -p Timezone --value 2>/dev/null || echo 'N/A')"
+log_info "Data/Hora Atual: $(date '+%d/%m/%Y %H:%M:%S') (Fuso: ${FUSO_ATUAL})"
+if [[ "$FUSO_ATUAL" == "UTC" || "$FUSO_ATUAL" == "Etc/UTC" ]]; then
+    log_warning "Fuso horário do servidor está em ${FUSO_ATUAL}. O horário informado no agendamento seguirá o relógio local do servidor (não o horário de Brasília)."
+fi
 
 print_header "1. PRÉ-CHECAGEM DO SERVIDOR E PRONTIDÃO PARA ATUALIZAÇÃO"
 
@@ -631,7 +636,7 @@ install -d -m 0700 -o root -g root "$BASE_DIR" "$STATE_DIR"
 
 # 4.1 - Arquivo de configuração da janela agendada
 cat > "${RUNTIME_DIR}/config.env" <<EOF
-# Configuração gerada por agendar_atualizacao_servidor.sh v${VERSION}
+# Configuração gerada por agendar_atualizacao_servidor.sh v${SCRIPT_VERSION}
 CALENDAR_SPEC="${CALENDAR_SPEC}"
 MODO_UPGRADE="${MODO_UPGRADE}"
 HOLD_DOCKER="${HOLD_DOCKER}"
@@ -1067,7 +1072,7 @@ print_header "RESUMO DA INSTALAÇÃO"
 LISTA_PACOTES="$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")"
 
 print_summary "Ação Executada:" "$ACAO_REALIZADA" "$FG_GREEN"
-print_summary "Versão do Script:" "v${VERSION}" "$FG_WHITE"
+print_summary "Versão do Script:" "v${SCRIPT_VERSION}" "$FG_WHITE"
 print_summary "Sistema Operacional:" "$OS_PRETTY" "$FG_CYAN"
 print_summary "Pacotes Instalados:" "${LISTA_PACOTES:-Nenhum}" "$FG_CYAN"
 print_summary "Timer Systemd:" "${UNIT_NAME}.timer ($(if systemctl is-active --quiet "${UNIT_NAME}.timer"; then echo 'Ativo'; else echo 'Inativo'; fi))" "$FG_GREEN"
