@@ -1,21 +1,21 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 3.1
+# Version: 3.2
 # ------------------------------------------------
-VERSION="3.1"
+VERSION="3.2"
 # ==============================================================================
 # AUDITORIA, VARREDURA E INVENTÁRIO 360° DO SERVIDOR LINUX (MULTI-DISTRO)
 # ==============================================================================
 # Script: auditoria_servidor_inventario.sh
 # Descrição: Raio-X completo e 100% passivo (somente leitura) organizado por:
-#            1. Sistema Operacional (EOL), Guest Agent (ESXi/Proxmox), Kernel/OOM e Reboot;
+#            1. Sistema Operacional (EOL, Data Instalação), Guest Agent (ESXi/Proxmox), Kernel/OOM e Reboot;
 #            2. Usuários (Ativos, Bloqueados, Expirados, Shell Desativado), Sudos e LDAP/AD;
 #            3. Armazenamento, Inodes, Partições RO, RAID/ZFS, SMART (bare-metal), FSTAB, NFS e SAMBA;
-#            4. Aplicações, Web (Apache/Nginx), Certbot + SSL Externos, PHP, Runtimes, Apps e Containers;
+#            4. Aplicações, Web, SSL, PHP, Runtimes, CMSs/Wikis (MediaWiki, DokuWiki, Nextcloud, Joomla, WP, GLPI, Roundcube, Redmine) e Containers (com versões internas);
 #            5. Bancos de Dados (MySQL/MariaDB, PostgreSQL, Redis, Mongo, SQLite);
 #            6. Firewall (Ativo/Inativo, Docker Bypass), Regras, SSH, Fail2Ban e Segurança;
 #            7. Portas Abertas (LISTEN), Rede, DNS, /etc/hosts e Conexões Ativas;
-#            8. Crontabs, Systemd Timers, Scripts, Backups Locais e Exportação JSON opcional.
+#            8. Crontabs, Systemd Timers, Scripts, Backups Locais (com data/idade) e Exportação JSON opcional.
 #            Grava o relatório exclusivamente na Home do usuário executor.
 # Autor: Lucas Oliveira
 # Repositório: https://github.com/Lucasolidev/Scripts
@@ -2185,7 +2185,7 @@ if (( ${#DISCOVERED_WEB_ROOTS[@]} > 0 )); then
         [[ -d "$d_root" ]] && add_unique_item SCAN_DIRS "$d_root"
     done
 fi
-for std_dir in "/var/www" "/srv" "/home" "/opt" "/usr/share/nextcloud" "/usr/share/zabbix" "/usr/share/glpi" "/usr/share/roundcube"; do
+for std_dir in "/var/www" "/srv" "/home" "/opt" "/var/lib/mediawiki" "/usr/share/mediawiki" "/usr/share/dokuwiki" "/usr/share/nextcloud" "/usr/share/zabbix" "/usr/share/glpi" "/usr/share/roundcube" "/usr/share/redmine" "/usr/share/phpmyadmin"; do
     [[ -d "$std_dir" ]] && add_unique_item SCAN_DIRS "$std_dir"
 done
 # Inclui diretórios customizados na raiz / (ex: /arquivos, /sistemas, /dados, /www, /app)
@@ -2333,6 +2333,62 @@ audit_nextcloud_dir() {
     FOUND_APPS=$((FOUND_APPS + 1))
 }
 
+audit_mediawiki_dir() {
+    local app_dir="$1"
+    if [[ "$app_dir" == "/usr/share/mediawiki" && -L /var/lib/mediawiki/includes ]]; then
+        return 0
+    fi
+    mark_app_audited "$app_dir" || return 0
+
+    local mw_ver="" mw_cfg="" mw_site="" mw_url="" mw_dbtype="" mw_dbname="" mw_sqdir="" mw_minor=""
+    if [[ -r "${app_dir}/includes/Defines.php" ]]; then
+        mw_ver=$(grep -E "define\([[:space:]]*['\"]MW_VERSION['\"]" "${app_dir}/includes/Defines.php" 2>/dev/null | sed -E "s/.*['\"]MW_VERSION['\"][[:space:]]*,[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | head -n 1 || true)
+    fi
+    if [[ -z "$mw_ver" && -r "${app_dir}/includes/DefaultSettings.php" ]]; then
+        mw_ver=$(grep -E "^[[:space:]]*\\\$wgVersion[[:space:]]*=" "${app_dir}/includes/DefaultSettings.php" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | head -n 1 || true)
+    fi
+    if [[ -z "$mw_ver" && -r "${app_dir}/composer.json" ]]; then
+        mw_ver=$(grep -m 1 -E '"version"[[:space:]]*:' "${app_dir}/composer.json" 2>/dev/null | cut -d'"' -f4 || true)
+    fi
+    if [[ -z "$mw_ver" && "$app_dir" == *mediawiki* ]]; then
+        mw_ver=$(_get_pkg_ver "mediawiki")
+    fi
+
+    if [[ -r "${app_dir}/LocalSettings.php" ]]; then
+        mw_cfg="${app_dir}/LocalSettings.php"
+    elif [[ -r /etc/mediawiki/LocalSettings.php && "$app_dir" == *mediawiki* ]]; then
+        mw_cfg="/etc/mediawiki/LocalSettings.php"
+    fi
+
+    if [[ -n "$mw_cfg" ]]; then
+        mw_site=$(grep -E "^[[:space:]]*\\\$wgSitename[[:space:]]*=" "$mw_cfg" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | tail -n 1 || true)
+        mw_url=$(grep -E "^[[:space:]]*\\\$wgServer[[:space:]]*=" "$mw_cfg" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | tail -n 1 || true)
+        mw_dbtype=$(grep -E "^[[:space:]]*\\\$wgDBtype[[:space:]]*=" "$mw_cfg" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | tail -n 1 || true)
+        mw_dbname=$(grep -E "^[[:space:]]*\\\$wgDBname[[:space:]]*=" "$mw_cfg" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | tail -n 1 || true)
+        mw_sqdir=$(grep -E "^[[:space:]]*\\\$wgSQLiteDataDir[[:space:]]*=" "$mw_cfg" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | tail -n 1 || true)
+        if [[ "$mw_dbtype" == *"sqlite"* && -n "$mw_sqdir" && -d "$mw_sqdir" ]]; then
+            local mw_sqfile=""
+            mw_sqfile=$(find "$mw_sqdir" -maxdepth 2 -type f \( -name "*.sqlite" -o -name "*.db" \) 2>/dev/null | head -n 1 || true)
+            [[ -n "$mw_sqfile" ]] && add_unique_item SQLITE_DBS_FOUND "${mw_sqfile} (MediaWiki)"
+        fi
+    fi
+
+    echo -e "    • ${FG_GREEN}${BOLD}MediaWiki v${mw_ver:-Detectado}${NC}${mw_site:+ (${mw_site})} -> Caminho: ${FG_CYAN}${app_dir}${NC}${mw_dbname:+ (Banco${mw_dbtype:+/$mw_dbtype}: ${FG_YELLOW}${mw_dbname}${NC})}${mw_url:+ [URL: ${mw_url}]}"
+    if [[ "$mw_ver" =~ ^1\.([0-9]+)(\.|$) ]]; then
+        mw_minor="${BASH_REMATCH[1]}"
+        if (( mw_minor < 39 || mw_minor == 40 || mw_minor == 41 )); then
+            add_alert "MediaWiki v${mw_ver} em ${app_dir} está em versão End-of-Life / sem suporte de segurança (LTS recomendadas: 1.39 / 1.43+)."
+        fi
+    elif [[ "$mw_ver" =~ ^0\. ]]; then
+        add_alert "MediaWiki v${mw_ver} em ${app_dir} está em versão obsoleta/End-of-Life."
+    fi
+
+    add_role "Wiki / Conhecimento (MediaWiki ${mw_ver:-Wiki})"
+    add_unique_item RESUMO_APPS_VERSOES "MediaWiki:${mw_ver:-Wiki}"
+    add_unique_item RESUMO_SITES_DETECTADOS "MediaWiki v${mw_ver:-Detectado}: ${app_dir}${mw_site:+ (${mw_site})}${mw_url:+ [${mw_url}]}"
+    FOUND_APPS=$((FOUND_APPS + 1))
+}
+
 # Verifica instalação do Nextcloud via Pacote SNAP (/var/snap/nextcloud)
 if [[ -d /var/snap/nextcloud/current ]] || [[ -f /snap/nextcloud/current/htdocs/version.php ]]; then
     SNAP_NC_VER_FILE="/snap/nextcloud/current/htdocs/version.php"
@@ -2368,6 +2424,9 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
         J_DB=""
         [[ -f "${APP_DIR}/configuration.php" ]] && J_DB=$(grep -E "public\s+\\\$db\s*=" "${APP_DIR}/configuration.php" 2>/dev/null | cut -d"'" -f2 || true)
         echo -e "    • ${FG_GREEN}${BOLD}Joomla v${J_VER_EXACT:-Detectado}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${J_DB:+ (Banco: ${FG_YELLOW}${J_DB}${NC})}"
+        if [[ "$J_VER_EXACT" =~ ^([1-4])\. ]]; then
+            add_alert "Joomla v${J_VER_EXACT} em ${APP_DIR} está em ramo legado/End-of-Life (Recomendado: Joomla 5.x+)."
+        fi
         add_role "Hospedagem Joomla (${J_VER_EXACT:-CMS})"
         add_unique_item RESUMO_APPS_VERSOES "Joomla:${J_VER_EXACT:-CMS}"
         add_unique_item RESUMO_SITES_DETECTADOS "Joomla ${J_VER_EXACT:-CMS}: ${APP_DIR}"
@@ -2383,6 +2442,9 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
         WP_DB=""
         [[ -f "${APP_DIR}/wp-config.php" ]] && WP_DB=$(grep -E "define\(\s*'DB_NAME'" "${APP_DIR}/wp-config.php" 2>/dev/null | cut -d"'" -f4 || true)
         echo -e "    • ${FG_GREEN}${BOLD}WordPress v${WP_VER:-Detectado}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${WP_DB:+ (Banco: ${FG_YELLOW}${WP_DB}${NC})}"
+        if [[ "$WP_VER" =~ ^([1-5])\. ]]; then
+            add_alert "WordPress v${WP_VER} em ${APP_DIR} está em ramo legado (< 6.x) — verificar atualizações de segurança."
+        fi
         add_role "Hospedagem WordPress (${WP_VER:-CMS})"
         add_unique_item RESUMO_APPS_VERSOES "WordPress:${WP_VER:-CMS}"
         add_unique_item RESUMO_SITES_DETECTADOS "WordPress ${WP_VER:-CMS}: ${APP_DIR}"
@@ -2412,16 +2474,72 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
         FOUND_APPS=$((FOUND_APPS + 1))
     done < <(find "$base_dir" -maxdepth 5 -type f -name "artisan" 2>/dev/null)
 
-    # GLPI, Zabbix, Drupal, Nextcloud, Moodle, Vtiger CRM, osTicket, Ampache, phpMyAdmin/Adminer
+    # GLPI, Zabbix, Drupal, MediaWiki, DokuWiki, Roundcube, Redmine, Nextcloud, Moodle, Vtiger CRM, osTicket, Ampache, phpMyAdmin/Adminer
     while IFS= read -r special_marker; do
         [[ -f "$special_marker" ]] || continue
         case "$special_marker" in
+            */LocalSettings.php)
+                if grep -qE "\\\$wg(Sitename|DBname|Server|ScriptPath)" "$special_marker" 2>/dev/null || [[ -f "$(dirname "$special_marker")/includes/Defines.php" || -f "$(dirname "$special_marker")/includes/DefaultSettings.php" ]]; then
+                    APP_DIR=$(dirname "$special_marker")
+                    audit_mediawiki_dir "$APP_DIR"
+                fi
+                ;;
+            */includes/Defines.php)
+                if grep -qE "define\([[:space:]]*['\"]MW_VERSION['\"]" "$special_marker" 2>/dev/null; then
+                    APP_DIR=$(dirname "$(dirname "$special_marker")")
+                    audit_mediawiki_dir "$APP_DIR"
+                fi
+                ;;
+            */doku.php)
+                APP_DIR=$(dirname "$special_marker")
+                if [[ -f "${APP_DIR}/VERSION" || -d "${APP_DIR}/conf" ]]; then
+                    mark_app_audited "$APP_DIR" || continue
+                    DOKU_VER=""
+                    [[ -r "${APP_DIR}/VERSION" ]] && DOKU_VER=$(head -n 1 "${APP_DIR}/VERSION" 2>/dev/null | trim_ws || true)
+                    DOKU_TITLE=""
+                    [[ -r "${APP_DIR}/conf/local.php" ]] && DOKU_TITLE=$(grep -E "^[[:space:]]*\\\$conf\['title'\]" "${APP_DIR}/conf/local.php" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | tail -n 1 || true)
+                    echo -e "    • ${FG_GREEN}${BOLD}DokuWiki ${DOKU_VER:-Detectado}${NC}${DOKU_TITLE:+ (${DOKU_TITLE})} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                    add_role "Wiki / Conhecimento (DokuWiki${DOKU_VER:+ ${DOKU_VER%% *}})"
+                    add_unique_item RESUMO_APPS_VERSOES "DokuWiki:${DOKU_VER:-Wiki}"
+                    add_unique_item RESUMO_SITES_DETECTADOS "DokuWiki (${DOKU_VER:-Wiki}): ${APP_DIR}"
+                    FOUND_APPS=$((FOUND_APPS + 1))
+                fi
+                ;;
+            */program/include/iniset.php)
+                if grep -q "RCUBE_VERSION" "$special_marker" 2>/dev/null; then
+                    APP_DIR=$(dirname "$(dirname "$(dirname "$special_marker")")")
+                    mark_app_audited "$APP_DIR" || continue
+                    RC_VER=$(grep -E "define\([[:space:]]*['\"]RCUBE_VERSION['\"]" "$special_marker" 2>/dev/null | sed -E "s/.*['\"]RCUBE_VERSION['\"][[:space:]]*,[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | head -n 1 || true)
+                    echo -e "    • ${FG_GREEN}${BOLD}Roundcube Webmail v${RC_VER:-Detectado}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                    add_role "Webmail (Roundcube${RC_VER:+ ${RC_VER}})"
+                    add_unique_item RESUMO_APPS_VERSOES "Roundcube:${RC_VER:-Webmail}"
+                    add_unique_item RESUMO_SITES_DETECTADOS "Roundcube v${RC_VER:-Webmail}: ${APP_DIR}"
+                    FOUND_APPS=$((FOUND_APPS + 1))
+                fi
+                ;;
+            */lib/redmine/version.rb)
+                APP_DIR=$(dirname "$(dirname "$(dirname "$special_marker")")")
+                mark_app_audited "$APP_DIR" || continue
+                RM_MAJ=$(awk -F'=' '/^[ \t]*MAJOR[ \t]*=/ {gsub(/[^0-9]/,"",$2); print $2; exit}' "$special_marker" 2>/dev/null || true)
+                RM_MIN=$(awk -F'=' '/^[ \t]*MINOR[ \t]*=/ {gsub(/[^0-9]/,"",$2); print $2; exit}' "$special_marker" 2>/dev/null || true)
+                RM_TIN=$(awk -F'=' '/^[ \t]*TINY[ \t]*=/ {gsub(/[^0-9]/,"",$2); print $2; exit}' "$special_marker" 2>/dev/null || true)
+                RM_VER=""
+                [[ -n "$RM_MAJ" ]] && RM_VER="${RM_MAJ}.${RM_MIN:-0}.${RM_TIN:-0}"
+                echo -e "    • ${FG_GREEN}${BOLD}Redmine${RM_VER:+ v${RM_VER}}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                add_role "Gestão de Projetos (Redmine${RM_VER:+ ${RM_VER}})"
+                add_unique_item RESUMO_APPS_VERSOES "Redmine:${RM_VER:-Ativo}"
+                add_unique_item RESUMO_SITES_DETECTADOS "Redmine${RM_VER:+ v${RM_VER}}: ${APP_DIR}"
+                FOUND_APPS=$((FOUND_APPS + 1))
+                ;;
             */inc/define.php)
                 if grep -q "GLPI_VERSION" "$special_marker" 2>/dev/null; then
                     APP_DIR=$(dirname "$(dirname "$special_marker")")
                     mark_app_audited "$APP_DIR" || continue
                     GLPI_V=$(grep -E "define\('GLPI_VERSION'" "$special_marker" 2>/dev/null | cut -d"'" -f4 || echo "Detectado")
                     echo -e "    • ${FG_GREEN}${BOLD}GLPI v${GLPI_V}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                    if [[ "$GLPI_V" =~ ^([0-9])\. ]]; then
+                        add_alert "GLPI v${GLPI_V} em ${APP_DIR} está em versão End-of-Life (Recomendado: GLPI 10.x+)."
+                    fi
                     add_role "Sistema GLPI (${GLPI_V})"
                     add_unique_item RESUMO_APPS_VERSOES "GLPI:${GLPI_V}"
                     add_unique_item RESUMO_SITES_DETECTADOS "GLPI ${GLPI_V}: ${APP_DIR}"
@@ -2446,6 +2564,9 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
                 mark_app_audited "$APP_DIR" || continue
                 DRUPAL_VER=$(grep -E "const[[:space:]]+VERSION[[:space:]]*=" "$special_marker" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | head -n 1 || true)
                 echo -e "    • ${FG_GREEN}${BOLD}CMS Drupal${DRUPAL_VER:+ v${DRUPAL_VER}}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
+                if [[ "$DRUPAL_VER" =~ ^([6-9])\. ]]; then
+                    add_alert "Drupal v${DRUPAL_VER} em ${APP_DIR} está em versão End-of-Life (Recomendado: Drupal 10.x/11.x)."
+                fi
                 add_role "Hospedagem Drupal${DRUPAL_VER:+ (${DRUPAL_VER})}"
                 add_unique_item RESUMO_APPS_VERSOES "Drupal:${DRUPAL_VER:-CMS}"
                 add_unique_item RESUMO_SITES_DETECTADOS "Drupal${DRUPAL_VER:+ v${DRUPAL_VER}}: ${APP_DIR}"
@@ -2471,10 +2592,18 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
                 APP_DIR=$(dirname "$(dirname "$special_marker")")
                 mark_app_audited "$APP_DIR" || continue
                 OST_DB=$(grep -E "define\('DBNAME'" "$special_marker" 2>/dev/null | cut -d"'" -f4 || true)
-                echo -e "    • ${FG_GREEN}${BOLD}osTicket Helpdesk${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${OST_DB:+ (Banco: ${FG_YELLOW}${OST_DB}${NC})}"
-                add_role "Helpdesk (osTicket)"
-                add_unique_item RESUMO_APPS_VERSOES "osTicket:Ativo"
-                add_unique_item RESUMO_SITES_DETECTADOS "osTicket Helpdesk: ${APP_DIR}"
+                OST_VER=""
+                for ost_vf in "${APP_DIR}/bootstrap.php" "${APP_DIR}/main.inc.php"; do
+                    if [[ -r "$ost_vf" ]]; then
+                        OST_VER=$(grep -E "define\([[:space:]]*['\"]THIS_VERSION['\"]" "$ost_vf" 2>/dev/null | sed -E "s/.*['\"]THIS_VERSION['\"][[:space:]]*,[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | head -n 1 || true)
+                        [[ -n "$OST_VER" ]] && break
+                    fi
+                done
+                OST_VER="${OST_VER#[vV]}"
+                echo -e "    • ${FG_GREEN}${BOLD}osTicket Helpdesk${OST_VER:+ v${OST_VER}}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${OST_DB:+ (Banco: ${FG_YELLOW}${OST_DB}${NC})}"
+                add_role "Helpdesk (osTicket${OST_VER:+ ${OST_VER}})"
+                add_unique_item RESUMO_APPS_VERSOES "osTicket:${OST_VER:-Ativo}"
+                add_unique_item RESUMO_SITES_DETECTADOS "osTicket Helpdesk${OST_VER:+ v${OST_VER}}: ${APP_DIR}"
                 FOUND_APPS=$((FOUND_APPS + 1))
                 ;;
             */version.php)
@@ -2488,9 +2617,24 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
                     MDL_DB=""
                     [[ -r "${APP_DIR}/config.php" ]] && MDL_DB=$(grep -E "^\s*\\\$CFG->dbname\s*=" "${APP_DIR}/config.php" 2>/dev/null | cut -d"'" -f2 || true)
                     echo -e "    • ${FG_GREEN}${BOLD}Moodle v${MDL_V}${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}${MDL_DB:+ (Banco: ${FG_YELLOW}${MDL_DB}${NC})}"
+                    if [[ "$MDL_V" =~ ^([1-3]\.|4\.0) ]]; then
+                        add_alert "Moodle (${MDL_V}) em ${APP_DIR} está em versão End-of-Life (Recomendado: >= 4.1 LTS / 4.4+)."
+                    fi
                     add_role "Plataforma EAD (Moodle)"
                     add_unique_item RESUMO_APPS_VERSOES "Moodle:${MDL_V}"
                     add_unique_item RESUMO_SITES_DETECTADOS "Moodle (${MDL_V}): ${APP_DIR}"
+                    FOUND_APPS=$((FOUND_APPS + 1))
+                fi
+                ;;
+            */libraries/classes/Version.php)
+                if grep -q "PhpMyAdmin" "$special_marker" 2>/dev/null; then
+                    APP_DIR=$(dirname "$(dirname "$(dirname "$special_marker")")")
+                    mark_app_audited "$APP_DIR" || continue
+                    PMA_VER=$(grep -E "const[[:space:]]+VERSION[[:space:]]*=" "$special_marker" 2>/dev/null | sed -E "s/.*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/" | head -n 1 || true)
+                    [[ -z "$PMA_VER" ]] && PMA_VER=$(_get_pkg_ver "phpmyadmin")
+                    log_warning "phpMyAdmin${PMA_VER:+ v${PMA_VER}} Exposto no Disco: ${FG_YELLOW}${APP_DIR}${NC}"
+                    add_unique_item RESUMO_APPS_VERSOES "phpMyAdmin:${PMA_VER:-Instalado}"
+                    add_alert "Ferramenta de banco web (phpMyAdmin${PMA_VER:+ v${PMA_VER}}) encontrada em ${APP_DIR} — verificar restrição de acesso."
                     FOUND_APPS=$((FOUND_APPS + 1))
                 fi
                 ;;
@@ -2518,13 +2662,13 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
                 FOUND_APPS=$((FOUND_APPS + 1))
                 ;;
         esac
-    done < <(find "$base_dir" -maxdepth 5 -type f \( -path "*/inc/define.php" -o -name "zabbix.php" -o -path "*/core/lib/Drupal.php" -o -name "vtigerversion.php" -o -path "*/include/ost-config.php" -o -name "version.php" -o -iname "adminer*.php" -o -path "*/config/ampache.cfg.php*" \) 2>/dev/null | sort -u)
+    done < <(find "$base_dir" -maxdepth 5 -type f \( -name "LocalSettings.php" -o -path "*/includes/Defines.php" -o -name "doku.php" -o -path "*/program/include/iniset.php" -o -path "*/lib/redmine/version.rb" -o -path "*/inc/define.php" -o -name "zabbix.php" -o -path "*/core/lib/Drupal.php" -o -name "vtigerversion.php" -o -path "*/include/ost-config.php" -o -name "version.php" -o -path "*/libraries/classes/Version.php" -o -iname "adminer*.php" -o -path "*/config/ampache.cfg.php*" \) 2>/dev/null | sort -u)
 
     # Descoberta universal de projetos PHP (composer.json) em diretórios web
     while IFS= read -r comp_file; do
         [[ -f "$comp_file" ]] || continue
         APP_DIR=$(dirname "$comp_file")
-        [[ -f "${APP_DIR}/artisan" || -f "${APP_DIR}/wp-config.php" || -f "${APP_DIR}/configuration.php" || -f "${APP_DIR}/vtigerversion.php" || -f "${APP_DIR}/version.php" || -f "${APP_DIR}/config/ampache.cfg.php" || -f "${APP_DIR}/config/ampache.cfg.php.dist" ]] && continue
+        [[ -f "${APP_DIR}/artisan" || -f "${APP_DIR}/wp-config.php" || -f "${APP_DIR}/configuration.php" || -f "${APP_DIR}/LocalSettings.php" || -f "${APP_DIR}/includes/Defines.php" || -f "${APP_DIR}/doku.php" || -f "${APP_DIR}/vtigerversion.php" || -f "${APP_DIR}/version.php" || -f "${APP_DIR}/config/ampache.cfg.php" || -f "${APP_DIR}/config/ampache.cfg.php.dist" ]] && continue
         mark_app_audited "$APP_DIR" || continue
         PKG_NAME=$(grep -m 1 -E '"name"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
         PKG_VER=$(grep -m 1 -E '"version"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
@@ -2692,16 +2836,57 @@ if [[ -n "$CONTAINER_ENGINE" ]]; then
                     fi
                 done
 
-                for wdir in /var/www/html /var/www /app /usr/share/nginx/html /srv; do
+                for wdir in /var/www/html /var/www /app /usr/share/nginx/html /srv /bitnami/mediawiki /opt/bitnami/mediawiki; do
                     [ -d "$wdir" ] || continue
                     for jv in "$wdir"/libraries/src/Version.php "$wdir"/*/libraries/src/Version.php; do
-                        [ -f "$jv" ] && echo "APP|Joomla|$(dirname "$(dirname "$(dirname "$jv")")")"
+                        if [ -f "$jv" ]; then
+                            j_d=$(dirname "$(dirname "$(dirname "$jv")")")
+                            j_maj=$(grep -E "const[[:space:]]+MAJOR_VERSION|public[[:space:]]+\\\$RELEASE" "$jv" 2>/dev/null | head -n 1 | awk "{print \$NF}" | tr -d ";\"\047")
+                            j_min=$(grep -E "const[[:space:]]+MINOR_VERSION|public[[:space:]]+\\\$DEV_LEVEL" "$jv" 2>/dev/null | head -n 1 | awk "{print \$NF}" | tr -d ";\"\047")
+                            j_pat=$(grep -E "const[[:space:]]+PATCH_VERSION|public[[:space:]]+\\\$BUILD" "$jv" 2>/dev/null | head -n 1 | awk "{print \$NF}" | tr -d ";\"\047")
+                            j_vs=""
+                            [ -n "$j_maj" ] && j_vs="${j_maj}.${j_min:-0}${j_pat:+.${j_pat}}"
+                            echo "APP|Joomla${j_vs:+ v$j_vs}|${j_d}"
+                        fi
                     done
                     for wpv in "$wdir"/wp-includes/version.php "$wdir"/*/wp-includes/version.php; do
-                        [ -f "$wpv" ] && echo "APP|WordPress|$(dirname "$(dirname "$wpv")")"
+                        if [ -f "$wpv" ]; then
+                            wp_d=$(dirname "$(dirname "$wpv")")
+                            wp_vs=$(grep "^\$wp_version[[:space:]]*=" "$wpv" 2>/dev/null | awk -F"=" "{print \$2}" | tr -d " ;\"\047")
+                            echo "APP|WordPress${wp_vs:+ v$wp_vs}|${wp_d}"
+                        fi
                     done
                     for art in "$wdir"/artisan "$wdir"/*/artisan; do
-                        [ -f "$art" ] && echo "APP|Laravel|$(dirname "$art")"
+                        if [ -f "$art" ]; then
+                            lv_d=$(dirname "$art")
+                            lv_vs=""
+                            if [ -r "${lv_d}/composer.lock" ]; then
+                                lv_vs=$(awk "/\"name\"[ \t]*:[ \t]*\"laravel\/framework\"/ {f=1} f && /\"version\"[ \t]*:/ {gsub(/.*\"version\"[ \t]*:[ \t]*\"|\".*/, \"\"); sub(/^[vV]/, \"\"); print; exit}" "${lv_d}/composer.lock" 2>/dev/null)
+                            fi
+                            echo "APP|Laravel${lv_vs:+ v$lv_vs}|${lv_d}"
+                        fi
+                    done
+                    for mwd in "$wdir"/includes/Defines.php "$wdir"/*/includes/Defines.php; do
+                        if [ -f "$mwd" ] && grep -q "MW_VERSION" "$mwd" 2>/dev/null; then
+                            mw_d=$(dirname "$(dirname "$mwd")")
+                            mw_vs=$(grep "MW_VERSION" "$mwd" 2>/dev/null | head -n 1 | sed -E "s/.*MW_VERSION[^,]*,[[:space:]]*[\"\047]([^\"\047]+)[\"\047].*/\1/")
+                            echo "APP|MediaWiki${mw_vs:+ v$mw_vs}|${mw_d}"
+                        fi
+                    done
+                    for glp in "$wdir"/inc/define.php "$wdir"/*/inc/define.php; do
+                        if [ -f "$glp" ] && grep -q "GLPI_VERSION" "$glp" 2>/dev/null; then
+                            gl_d=$(dirname "$(dirname "$glp")")
+                            gl_vs=$(grep "GLPI_VERSION" "$glp" 2>/dev/null | head -n 1 | awk -F"," "{print \$2}" | tr -d " );\"\047")
+                            echo "APP|GLPI${gl_vs:+ v$gl_vs}|${gl_d}"
+                        fi
+                    done
+                    for dkw in "$wdir"/doku.php "$wdir"/*/doku.php; do
+                        if [ -f "$dkw" ]; then
+                            dk_d=$(dirname "$dkw")
+                            dk_vs=""
+                            [ -r "${dk_d}/VERSION" ] && dk_vs=$(head -n 1 "${dk_d}/VERSION" 2>/dev/null)
+                            echo "APP|DokuWiki${dk_vs:+ $dk_vs}|${dk_d}"
+                        fi
                     done
                     for ncv in "$wdir"/version.php "$wdir"/*/version.php; do
                         if [ -f "$ncv" ] && grep -q "\$OC_VersionString" "$ncv" 2>/dev/null; then
@@ -2712,6 +2897,10 @@ if [[ -n "$CONTAINER_ENGINE" ]]; then
                                 nc_dd=$(grep "datadirectory" "${nc_d}/config/config.php" 2>/dev/null | awk -F"=>" "{print \$2}" | tr -d " ,;\"\047")
                             fi
                             echo "APP|Nextcloud v${nc_ver_s:-Detectado}|${nc_d}${nc_dd:+ (Dados: $nc_dd)}"
+                        elif [ -f "$ncv" ] && grep -q "MOODLE_INTERNAL" "$ncv" 2>/dev/null; then
+                            md_d=$(dirname "$ncv")
+                            md_vs=$(grep "^\$release[[:space:]]*=" "$ncv" 2>/dev/null | awk -F"=" "{print \$2}" | tr -d " ;\"\047")
+                            echo "APP|Moodle${md_vs:+ v$md_vs}|${md_d}"
                         fi
                     done
                 done
@@ -2741,7 +2930,18 @@ if [[ -n "$CONTAINER_ENGINE" ]]; then
                         APP)
                             echo -e "        ├─ Aplicação/CMS:   ${FG_GREEN}${BOLD}${p_k}${NC} em ${p_v}"
                             add_unique_item RESUMO_SITES_DETECTADOS "Container ${CT_NAME}: ${p_k} (${p_v})"
+                            add_unique_item RESUMO_APPS_VERSOES "Container(${CT_NAME}):${p_k}"
                             CT_ROLES_SUMMARY="${CT_ROLES_SUMMARY:+${CT_ROLES_SUMMARY}, }${p_k}"
+                            if [[ "$p_k" =~ ^MediaWiki[[:space:]]+v1\.([0-9]+) ]]; then
+                                ct_mw_min="${BASH_REMATCH[1]}"
+                                (( ct_mw_min < 39 || ct_mw_min == 40 || ct_mw_min == 41 )) && add_alert "Container '${CT_NAME}' executa ${p_k} em versão End-of-Life."
+                            elif [[ "$p_k" =~ ^Joomla[[:space:]]+v[1-4]\. ]]; then
+                                add_alert "Container '${CT_NAME}' executa ${p_k} em ramo legado/End-of-Life."
+                            elif [[ "$p_k" =~ ^WordPress[[:space:]]+v[1-5]\. ]]; then
+                                add_alert "Container '${CT_NAME}' executa ${p_k} em ramo legado (< 6.x)."
+                            elif [[ "$p_k" =~ ^GLPI[[:space:]]+v[0-9]\. ]]; then
+                                add_alert "Container '${CT_NAME}' executa ${p_k} em versão End-of-Life (< 10.x)."
+                            fi
                             ;;
                     esac
                 done <<< "$CT_PROBE"
@@ -3714,14 +3914,49 @@ if [[ -n "$CUSTOM_SCRIPTS" ]]; then
     done <<< "$CUSTOM_SCRIPTS"
 fi
 
-BACKUP_ARCHIVES=$(find /var/backups /backup /backups /root /home -maxdepth 3 -type f \( -name "*.sql" -o -name "*.sql.gz" -o -name "*.dump" -o -name "*backup*.tar.gz" -o -name "*bkp*.tar.gz" \) 2>/dev/null | head -n 15 || true)
+BACKUP_ARCHIVES=$(find /var/backups /backup /backups /root /home -maxdepth 3 -type f \( -name "*.sql" -o -name "*.sql.gz" -o -name "*.dump" -o -name "*backup*.tar.gz" -o -name "*bkp*.tar.gz" \) -printf '%T@|%p\n' 2>/dev/null | sort -t'|' -k1,1rn | head -n 15 || true)
+if [[ -z "$BACKUP_ARCHIVES" ]]; then
+    while IFS= read -r fb_path; do
+        [[ -f "$fb_path" ]] || continue
+        fb_ts=$(stat -c '%Y' "$fb_path" 2>/dev/null || echo 0)
+        BACKUP_ARCHIVES+="${fb_ts}|${fb_path}"$'\n'
+    done < <(find /var/backups /backup /backups /root /home -maxdepth 3 -type f \( -name "*.sql" -o -name "*.sql.gz" -o -name "*.dump" -o -name "*backup*.tar.gz" -o -name "*bkp*.tar.gz" \) 2>/dev/null | head -n 15 || true)
+    BACKUP_ARCHIVES=$(printf '%s' "$BACKUP_ARCHIVES" | sort -t'|' -k1,1rn || true)
+fi
 if [[ -n "$BACKUP_ARCHIVES" ]]; then
-    echo -e "\n  ${BOLD}Arquivos de Dump / Backup Localizados no Disco:${NC}"
-    while IFS= read -r ba; do
+    echo -e "\n  ${BOLD}Arquivos de Dump / Backup Localizados no Disco (Mais Recentes Primeiro):${NC}"
+    NOW_BKP_EPOCH=$(date +%s)
+    NEWEST_BKP_DAYS=""
+    NEWEST_BKP_FILE=""
+    while IFS='|' read -r ba_ts_raw ba; do
+        [[ -z "$ba" ]] && continue
         BA_SIZE=$(safe_du "$ba")
         [[ -z "$BA_SIZE" ]] && BA_SIZE="N/A"
-        echo -e "    • ${FG_CYAN}${ba}${NC} (${BA_SIZE})"
+        ba_epoch="${ba_ts_raw%%.*}"
+        BA_DATE_STR="Data N/A"
+        if [[ "$ba_epoch" =~ ^[0-9]+$ ]] && (( ba_epoch > 0 )); then
+            ba_dt=$(date -d "@$ba_epoch" '+%d/%m/%Y %H:%M' 2>/dev/null || echo "N/A")
+            ba_days=$(( (NOW_BKP_EPOCH - ba_epoch) / 86400 ))
+            (( ba_days < 0 )) && ba_days=0
+            if [[ -z "$NEWEST_BKP_DAYS" ]]; then
+                NEWEST_BKP_DAYS="$ba_days"
+                NEWEST_BKP_FILE="$ba"
+            fi
+            if (( ba_days == 0 )); then
+                BA_DATE_STR="${FG_GREEN}${ba_dt} (hoje)${NC}"
+            elif (( ba_days <= 7 )); then
+                BA_DATE_STR="${FG_GREEN}${ba_dt} (há ${ba_days} dia(s))${NC}"
+            elif (( ba_days <= 30 )); then
+                BA_DATE_STR="${FG_YELLOW}${ba_dt} (há ${ba_days} dias)${NC}"
+            else
+                BA_DATE_STR="${FG_RED}${ba_dt} (há ${ba_days} dias)${NC}"
+            fi
+        fi
+        echo -e "    • ${FG_CYAN}${ba}${NC} — Tamanho: ${FG_YELLOW}${BA_SIZE}${NC} | Modificado: ${BA_DATE_STR}"
     done <<< "$BACKUP_ARCHIVES"
+    if [[ "$NEWEST_BKP_DAYS" =~ ^[0-9]+$ ]] && (( NEWEST_BKP_DAYS > 14 )); then
+        add_alert "O arquivo de backup/dump mais recente encontrado no disco tem ${NEWEST_BKP_DAYS} dias (${NEWEST_BKP_FILE}) — verificar rotina de backup."
+    fi
 fi
 return 0
 }
