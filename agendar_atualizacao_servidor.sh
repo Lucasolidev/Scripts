@@ -88,6 +88,15 @@ print_summary() {
     printf '  %b%s%*s%b%b%s%b\n' "$BOLD" "$label" "$padding" '' "$NC" "$color" "$value" "$NC"
 }
 
+format_systemd_br() {
+    local raw="${1:-}"
+    if [[ -z "$raw" || "$raw" == "n/a" || "$raw" == "Desconhecido" ]]; then
+        printf '%s' "${raw:-Desconhecido}"
+        return 0
+    fi
+    date -d "$raw" '+%d-%m-%Y %H:%M:%S (%Z)' 2>/dev/null || printf '%s' "$raw"
+}
+
 # 1.2 - CONSTANTES DE UNIDADES E ARTEFATOS ADMINISTRATIVOS
 readonly BASE_DIR="/usr/local/lib/agendar-atualizacao-servidor"
 readonly STATE_DIR="${BASE_DIR}/estado"
@@ -225,7 +234,7 @@ finalizar() {
 
     printf '\n'
     draw_separator
-    printf '  %bFinalizado em: %s (Código de saída: %s)%b\n\n' "$DIM" "$(date '+%d/%m/%Y %H:%M:%S')" "$rc" "$NC"
+    printf '  %bFinalizado em: %s (Código de saída: %s)%b\n\n' "$DIM" "$(date '+%d-%m-%Y %H:%M:%S')" "$rc" "$NC"
 
     exec 1>&3 2>&4
     wait "$TEE_PID" 2>/dev/null || true
@@ -275,7 +284,7 @@ echo "================================================================"
 echo -e "${NC}"
 log_info "Versão do Script: v${SCRIPT_VERSION} | Host: $(hostname) | SO: ${OS_PRETTY}"
 FUSO_ATUAL="$(timedatectl show -p Timezone --value 2>/dev/null || echo 'N/A')"
-log_info "Data/Hora Atual: $(date '+%d/%m/%Y %H:%M:%S') (Fuso: ${FUSO_ATUAL})"
+log_info "Data/Hora Atual: $(date '+%d-%m-%Y %H:%M:%S') (Fuso: ${FUSO_ATUAL})"
 if [[ "$FUSO_ATUAL" == "UTC" || "$FUSO_ATUAL" == "Etc/UTC" ]]; then
     log_warning "Fuso horário do servidor está em ${FUSO_ATUAL}. O horário informado no agendamento seguirá o relógio local do servidor (não o horário de Brasília)."
 fi
@@ -450,7 +459,8 @@ fi
 AGENDAMENTO_EXISTE="N"
 if systemctl is-active --quiet "${UNIT_NAME}.timer" 2>/dev/null || [[ -f "$TIMER_FILE" ]]; then
     AGENDAMENTO_EXISTE="S"
-    PROX_EXISTENTE="$(systemctl show -p NextElapseUSecRealtime --value "${UNIT_NAME}.timer" 2>/dev/null || echo 'Desconhecido')"
+    RAW_PROX_EXISTENTE="$(systemctl show -p NextElapseUSecRealtime --value "${UNIT_NAME}.timer" 2>/dev/null || echo 'Desconhecido')"
+    PROX_EXISTENTE="$(format_systemd_br "$RAW_PROX_EXISTENTE")"
     log_warning "Já existe um agendamento de atualização configurado. Próximo disparo: ${PROX_EXISTENTE}"
 else
     log_info "Nenhum agendamento de atualização pendente no momento."
@@ -573,10 +583,10 @@ if [[ "$AGENDAMENTO_EXISTE" == "S" ]]; then
     fi
 fi
 
-# 3.3.1 - Data e hora do disparo único
+# 3.3.1 - Data e hora do disparo único (formato BR DD-MM-YYYY)
 CALENDAR_SPEC=""
 while [[ -z "$CALENDAR_SPEC" ]]; do
-    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Informe o horário (HH:MM) ou data+hora (YYYY-MM-DD HH:MM) [01:00]: ${NC}")" ENTRADA_DATA
+    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Informe o horário (HH:MM) ou data+hora (DD-MM-YYYY HH:MM) [01:00]: ${NC}")" ENTRADA_DATA
     ENTRADA_DATA="$(printf '%s' "${ENTRADA_DATA:-01:00}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     EPOCH_AGORA="$(date +%s)"
@@ -591,29 +601,41 @@ while [[ -z "$CALENDAR_SPEC" ]]; do
             CANDIDATO="${AMANHA} ${ENTRADA_DATA}:00"
             EPOCH_CAND="$(date -d "$CANDIDATO" +%s 2>/dev/null || echo 0)"
         fi
-    elif [[ "$ENTRADA_DATA" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]+([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; then
-        CANDIDATO="${ENTRADA_DATA}:00"
+    elif [[ "$ENTRADA_DATA" =~ ^([0-9]{2})[-/]([0-9]{2})[-/]([0-9]{4})[[:space:]]+([01][0-9]|2[0-3]):([0-5][0-9])$ ]]; then
+        DIA_IN="${BASH_REMATCH[1]}"
+        MES_IN="${BASH_REMATCH[2]}"
+        ANO_IN="${BASH_REMATCH[3]}"
+        HORA_IN="${BASH_REMATCH[4]}"
+        MIN_IN="${BASH_REMATCH[5]}"
+        CANDIDATO="${ANO_IN}-${MES_IN}-${DIA_IN} ${HORA_IN}:${MIN_IN}:00"
+        VALIDA_ISO="$(date -d "$CANDIDATO" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)"
+        if [[ "$VALIDA_ISO" != "$CANDIDATO" ]]; then
+            log_warning "Data inexistente no calendário (${DIA_IN}-${MES_IN}-${ANO_IN}). Verifique o dia e o mês informados."
+            continue
+        fi
         EPOCH_CAND="$(date -d "$CANDIDATO" +%s 2>/dev/null || echo 0)"
     else
-        log_warning "Formato inválido. Use HH:MM (ex: 01:00) ou YYYY-MM-DD HH:MM (ex: 2026-11-25 01:00)."
+        log_warning "Formato inválido. Use HH:MM (ex: 01:00) ou DD-MM-YYYY HH:MM (ex: $(date -d 'tomorrow' '+%d-%m-%Y') 01:00)."
         continue
     fi
 
+    CANDIDATO_BR="$(date -d "$CANDIDATO" '+%d-%m-%Y %H:%M:%S' 2>/dev/null || echo "$CANDIDATO")"
+
     if (( EPOCH_CAND <= EPOCH_AGORA + 60 )); then
-        log_warning "A data/hora informada (${CANDIDATO}) deve ser pelo menos 1 minuto no futuro."
+        log_warning "A data/hora informada (${CANDIDATO_BR}) deve ser pelo menos 1 minuto no futuro."
         continue
     fi
 
     if command -v systemd-analyze >/dev/null 2>&1; then
         if ! systemd-analyze calendar "$CANDIDATO" >/dev/null 2>&1; then
-            log_warning "Expressão de calendário rejeitada pelo systemd: ${CANDIDATO}"
+            log_warning "Expressão de calendário rejeitada pelo systemd: ${CANDIDATO_BR}"
             continue
         fi
     fi
 
     CALENDAR_SPEC="$CANDIDATO"
-    DATA_HORA_AGENDADA="$CALENDAR_SPEC"
-    log_info "Disparo único agendado para: ${CALENDAR_SPEC}"
+    DATA_HORA_AGENDADA="$CANDIDATO_BR"
+    log_info "Disparo único agendado para: ${DATA_HORA_AGENDADA}"
 done
 
 # 3.3.2 - Modo de atualização APT
@@ -703,7 +725,7 @@ log_info "Política de reinicialização definida: ${POLITICA_REBOOT_DESC}"
 
 # 3.3.5 - Confirmação final antes de gravar o agendamento
 print_alert_box "Confirme os dados antes de ativar o disparo único:
-    • Horário:       ${CALENDAR_SPEC}
+    • Horário:       ${DATA_HORA_AGENDADA}
     • Atualização:   ${MODO_UPGRADE_DESC}
     • Docker Hold:   ${HOLD_DOCKER_DESC}
     • Banco Hold:    ${HOLD_DB_DESC}
@@ -730,6 +752,7 @@ install -d -m 0700 -o root -g root "$BASE_DIR" "$STATE_DIR"
 # 4.1 - Arquivo de configuração da janela agendada
 cat > "${RUNTIME_DIR}/config.env" <<EOF
 # Configuração gerada por agendar_atualizacao_servidor.sh v${SCRIPT_VERSION}
+DATA_HORA_BR="${DATA_HORA_AGENDADA}"
 CALENDAR_SPEC="${CALENDAR_SPEC}"
 MODO_UPGRADE="${MODO_UPGRADE}"
 HOLD_DOCKER="${HOLD_DOCKER}"
@@ -831,7 +854,7 @@ trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
     echo "   RELATÓRIO DE EXECUÇÃO — ATUALIZAÇÃO AGENDADA (DISPARO ÚNICO)"
     echo "================================================================"
     echo "  Host:              $(hostname)"
-    echo "  Início:            $(date '+%d/%m/%Y %H:%M:%S')"
+    echo "  Início:            $(date '+%d-%m-%Y %H:%M:%S')"
     echo "  Kernel Pré-Update: $(uname -r)"
     echo "  Modo APT:          ${MODO_UPGRADE}"
     echo "  Hold Docker:       ${HOLD_DOCKER:-N}"
@@ -965,13 +988,13 @@ trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
         if [[ -f "$POSTBOOT_SERVICE_FILE" ]]; then
             systemctl enable "${POSTBOOT_UNIT}.service" >/dev/null 2>&1 || true
         fi
-        echo "  - Encerramento gracioso e reinicialização em 5 segundos ($(date '+%d/%m/%Y %H:%M:%S'))..."
+        echo "  - Encerramento gracioso e reinicialização em 5 segundos ($(date '+%d-%m-%Y %H:%M:%S'))..."
         publicar_relatorio
         sync
         sleep 5
         systemctl reboot
     else
-        echo "  - Execução concluída sem reboot em: $(date '+%d/%m/%Y %H:%M:%S')"
+        echo "  - Execução concluída sem reboot em: $(date '+%d-%m-%Y %H:%M:%S')"
     fi
 } >> "$REPORT_PATH" 2>&1
 EOF
@@ -1026,7 +1049,7 @@ copy_to_home() {
     echo "================================================================"
     echo "   VERIFICAÇÃO AUTOMÁTICA PÓS-BOOT (ANTES x DEPOIS)"
     echo "================================================================"
-    echo "  Verificado em:     $(date '+%d/%m/%Y %H:%M:%S')"
+    echo "  Verificado em:     $(date '+%d-%m-%Y %H:%M:%S')"
     echo "  Kernel Pré-Update: $(cat "${STATE_DIR}/pre_kernel.txt" 2>/dev/null || echo 'N/A')"
     echo "  Kernel Pós-Boot:   $(uname -r)"
     echo "  Uptime Atual:      $(uptime -p 2>/dev/null || uptime)"
@@ -1187,7 +1210,8 @@ systemctl daemon-reload
 systemctl enable --now "${UNIT_NAME}.timer" >/dev/null
 
 if systemctl is-active --quiet "${UNIT_NAME}.timer"; then
-    PROXIMA_EXECUCAO="$(systemctl show -p NextElapseUSecRealtime --value "${UNIT_NAME}.timer" 2>/dev/null || echo "$CALENDAR_SPEC")"
+    RAW_PROXIMA="$(systemctl show -p NextElapseUSecRealtime --value "${UNIT_NAME}.timer" 2>/dev/null || echo "$DATA_HORA_AGENDADA")"
+    PROXIMA_EXECUCAO="$(format_systemd_br "$RAW_PROXIMA")"
     ACAO_REALIZADA="Agendamento criado e ativado"
     log_success "Timer ${UNIT_NAME}.timer ativado com sucesso!"
     log_info "Próximo disparo confirmado pelo systemd: ${PROXIMA_EXECUCAO}"
