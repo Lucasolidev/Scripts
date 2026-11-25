@@ -1,17 +1,17 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.0
+# Version: 1.1
 # ------------------------------------------------
-VERSION="1.0"
+VERSION="1.1"
 readonly SCRIPT_VERSION="$VERSION"
 # ==============================================================================
 # SCRIPT DE AGENDAMENTO DE ATUALIZAÇÃO DO SERVIDOR (DEBIAN / UBUNTU)
 # ==============================================================================
 # Descrição: Agenda uma janela única (one-shot) via systemd timer para atualizar
 #            pacotes via apt-get de forma não-interativa, com pré-checagem de
-#            riscos (Docker, PM2, portas soltas, crons da madrugada), opção de
-#            hold temporário de pacotes críticos, reboot condicional e auditoria
-#            automática pré-update x pós-boot.
+#            riscos (sintaxe de daemons, serviços disabled no boot, dpkg, Docker,
+#            PM2, crons da madrugada), opção de hold temporário de containers e
+#            bancos de dados, reboot condicional e auditoria pré-update x pós-boot.
 # Autor: Lucas Oliveira
 # Repositório: https://github.com/Lucasolidev/Scripts
 # Execução recomendada (copiar e colar comando único):
@@ -29,6 +29,7 @@ umask 077
 
 export VERSION
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 export LC_ALL=C.UTF-8
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -108,6 +109,7 @@ DATA_HORA_AGENDADA="Não agendado"
 PROXIMA_EXECUCAO="Não agendado"
 MODO_UPGRADE_DESC="N/A"
 HOLD_DOCKER_DESC="N/A"
+HOLD_DB_DESC="N/A"
 POLITICA_REBOOT_DESC="N/A"
 POSBOOT_DESC="N/A"
 
@@ -312,7 +314,14 @@ if mountpoint -q /boot 2>/dev/null; then
     fi
 fi
 
-# 2.2 - Pacotes pendentes (usando cache local ou atualização rápida de índice)
+# 2.2 - Integridade do dpkg e pacotes pendentes no APT
+DPKG_AUDIT="$(dpkg --audit 2>&1 || true)"
+if [[ -n "$DPKG_AUDIT" ]]; then
+    pendencia "Banco de pacotes dpkg possui inconsistências ('dpkg --audit'). Execute 'sudo dpkg --configure -a' antes da janela."
+else
+    log_success "Integridade do banco dpkg ('dpkg --audit'): OK."
+fi
+
 log_info "Verificando pacotes pendentes no APT (simulação somente leitura)..."
 PACOTES_PENDENTES_LISTA="$(apt-get -s upgrade 2>/dev/null | awk '/^Inst / {print $2}' || true)"
 TOTAL_PENDENTES=0
@@ -322,7 +331,7 @@ fi
 
 if (( TOTAL_PENDENTES > 0 )); then
     log_warning "Existem ${TOTAL_PENDENTES} pacote(s) pendente(s) no cache local do APT."
-    CRITICOS_DETECTADOS="$(printf '%s\n' "$PACOTES_PENDENTES_LISTA" | grep -E '^(docker-ce|containerd|linux-image|systemd|libc6|openssh|postgresql|mysql|mariadb|redis|nginx|apache2)' | tr '\n' ' ' | sed 's/ $//' || true)"
+    CRITICOS_DETECTADOS="$(printf '%s\n' "$PACOTES_PENDENTES_LISTA" | grep -E '^(docker-ce|containerd|linux-image|systemd|libc6|openssh|postgresql|mysql|mariadb|percona|mongodb|redis|valkey|nginx|apache2|haproxy)' | tr '\n' ' ' | sed 's/ $//' || true)"
     if [[ -n "$CRITICOS_DETECTADOS" ]]; then
         log_warning "Pacotes críticos/sensíveis pendentes: ${CRITICOS_DETECTADOS}"
     fi
@@ -330,7 +339,76 @@ else
     log_info "Nenhum pacote pendente no cache local atual (o runner executará 'apt-get update' na hora agendada)."
 fi
 
-# 2.3 - Prontidão Docker (RestartPolicy)
+# 2.3 - Validação passiva de sintaxe de daemons ativos e persistência no boot
+if (systemctl is-active --quiet ssh 2>/dev/null || systemctl is-active --quiet sshd 2>/dev/null) && command -v sshd >/dev/null 2>&1; then
+    install -d -m 0755 -o root -g root /run/sshd 2>/dev/null || true
+    if sshd -t >/dev/null 2>&1; then
+        log_success "Sintaxe de configuração do OpenSSH ('sshd -t'): OK."
+    else
+        pendencia "Configuração atual do OpenSSH ('sshd -t') contém erro de sintaxe! Corrija antes de atualizar/reiniciar."
+    fi
+fi
+
+if systemctl is-active --quiet apache2 2>/dev/null && command -v apache2ctl >/dev/null 2>&1; then
+    if apache2ctl -t >/dev/null 2>&1; then
+        log_success "Sintaxe de configuração do Apache ('apache2ctl -t'): OK."
+    else
+        pendencia "Configuração atual do Apache ('apache2ctl -t') contém erro de sintaxe! O serviço pode falhar ao reiniciar."
+    fi
+fi
+
+if systemctl is-active --quiet nginx 2>/dev/null && command -v nginx >/dev/null 2>&1; then
+    if nginx -t >/dev/null 2>&1; then
+        log_success "Sintaxe de configuração do Nginx ('nginx -t'): OK."
+    else
+        pendencia "Configuração atual do Nginx ('nginx -t') contém erro de sintaxe! O serviço pode falhar ao reiniciar."
+    fi
+fi
+
+if systemctl is-active --quiet haproxy 2>/dev/null && command -v haproxy >/dev/null 2>&1 && [[ -f /etc/haproxy/haproxy.cfg ]]; then
+    if haproxy -c -f /etc/haproxy/haproxy.cfg >/dev/null 2>&1; then
+        log_success "Sintaxe de configuração do HAProxy ('haproxy -c'): OK."
+    else
+        pendencia "Configuração atual do HAProxy ('haproxy -c') contém erro de sintaxe! O serviço pode falhar ao reiniciar."
+    fi
+fi
+
+SERVICOS_DISABLED_BOOT=()
+while IFS= read -r svc; do
+    [[ -z "$svc" ]] && continue
+    case "$svc" in
+        user@*|session-*|getty@*|serial-getty@*|agendar-atualizacao-*|wpa_supplicant.service|ModemManager.service|bluetooth.service|cups-browsed.service)
+            continue
+            ;;
+    esac
+    SVC_ENABLED_STATE="$(systemctl is-enabled "$svc" 2>/dev/null || true)"
+    if [[ "$SVC_ENABLED_STATE" == "disabled" ]]; then
+        SVC_SOCKET="${svc%.service}.socket"
+        if ! systemctl is-enabled --quiet "$SVC_SOCKET" 2>/dev/null && ! systemctl is-active --quiet "$SVC_SOCKET" 2>/dev/null; then
+            SERVICOS_DISABLED_BOOT+=("$svc")
+        fi
+    fi
+done < <(systemctl list-units --type=service --state=running --plain --no-legend --no-pager 2>/dev/null | awk '{print $1}')
+
+if (( ${#SERVICOS_DISABLED_BOOT[@]} > 0 )); then
+    pendencia "Serviço(s) em execução agora, mas DESABILITADO(S) no boot ('disabled' — não subirão após reboot): ${SERVICOS_DISABLED_BOOT[*]}"
+else
+    log_success "Persistência de boot dos serviços em execução: OK (nenhum daemon ativo marcado como 'disabled')."
+fi
+
+FAILED_PRE_EXISTENTES="$(systemctl list-units --state=failed --plain --no-legend --no-pager 2>/dev/null | awk '{print $1}' | tr '\n' ' ' | sed 's/ $//' || true)"
+if [[ -n "$FAILED_PRE_EXISTENTES" ]]; then
+    log_warning "Unidade(s) systemd JÁ em estado FAILED antes da janela (serão tratadas como pré-existentes no pós-boot): ${FAILED_PRE_EXISTENTES}"
+fi
+
+# 2.4 - Detecção de Bancos de Dados no Host e Prontidão Docker (RestartPolicy)
+BANCO_ATIVO="N"
+BANCOS_HOST_DETECTADOS="$(dpkg-query -W -f='${Package}|${Status}\n' 'mariadb-server*' 'mysql-server*' 'percona-server*' 'postgresql*' 'mongodb-org-server*' 'redis-server*' 'valkey-server*' 2>/dev/null | awk -F'|' '$2 == "install ok installed" {print $1}' | tr '\n' ' ' | sed 's/ $//' || true)"
+if [[ -n "$BANCOS_HOST_DETECTADOS" ]]; then
+    BANCO_ATIVO="S"
+    log_info "Servidor(es) de Banco de Dados instalado(s) no host: ${BANCOS_HOST_DETECTADOS}"
+fi
+
 DOCKER_ATIVO="N"
 if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/dev/null; then
     DOCKER_ATIVO="S"
@@ -352,12 +430,11 @@ if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker 2>/de
     fi
 fi
 
-# 2.4 - Prontidão PM2 e processos Node/Python soltos
+# 2.5 - Prontidão PM2 e agendamentos da madrugada
 if pgrep -f "PM2 v" >/dev/null 2>&1; then
     log_warning "PM2 detectado em execução. Antes de reiniciar, confirme se o desenvolvedor executou 'pm2 save' para atualizar o dump.pm2."
 fi
 
-# 2.5 - Verificar crons da madrugada (00h às 06h) para ajudar na escolha da janela
 CRONS_MADRUGADA=0
 for u_cron in /var/spool/cron/crontabs/*; do
     [[ -f "$u_cron" ]] || continue
@@ -562,10 +639,10 @@ while [[ -z "$MODO_UPGRADE" ]]; do
 done
 log_info "Modo de atualização definido: ${MODO_UPGRADE_DESC}"
 
-# 3.3.3 - Hold temporário de pacotes Docker/containerd
+# 3.3.3 - Hold temporário opcional de Docker/containerd e Bancos de Dados
 HOLD_DOCKER="N"
 if [[ "$DOCKER_ATIVO" == "S" ]]; then
-    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Segurar (hold temporário) pacotes do Docker/containerd para atualizar apenas o SO? (s/N): ${NC}")" ENTRADA_HOLD
+    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Segurar (hold temporário) pacotes do Docker/containerd nesta janela? (s/N): ${NC}")" ENTRADA_HOLD
     if [[ "${ENTRADA_HOLD,,}" == "s" ]]; then
         HOLD_DOCKER="S"
         HOLD_DOCKER_DESC="Sim (hold temporário em docker-ce/containerd)"
@@ -577,6 +654,21 @@ else
     HOLD_DOCKER_DESC="Não aplicável (Docker inativo)"
 fi
 log_info "Hold temporário Docker/containerd: ${HOLD_DOCKER_DESC}"
+
+HOLD_DB="N"
+if [[ "$BANCO_ATIVO" == "S" ]]; then
+    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Segurar (hold temporário) pacotes de Banco de Dados (${BANCOS_HOST_DETECTADOS}) nesta janela? (s/N): ${NC}")" ENTRADA_HOLD_DB
+    if [[ "${ENTRADA_HOLD_DB,,}" == "s" ]]; then
+        HOLD_DB="S"
+        HOLD_DB_DESC="Sim (hold temporário nos pacotes SGBD instalados)"
+    else
+        HOLD_DB="N"
+        HOLD_DB_DESC="Não (atualizar SGBD junto com o SO)"
+    fi
+else
+    HOLD_DB_DESC="Não aplicável (nenhum SGBD detectado no host)"
+fi
+log_info "Hold temporário Banco de Dados: ${HOLD_DB_DESC}"
 
 # 3.3.4 - Política de reinicialização
 printf '\n  %bPolítica de reinicialização após a atualização:%b\n' "$BOLD" "$NC"
@@ -614,6 +706,7 @@ print_alert_box "Confirme os dados antes de ativar o disparo único:
     • Horário:       ${CALENDAR_SPEC}
     • Atualização:   ${MODO_UPGRADE_DESC}
     • Docker Hold:   ${HOLD_DOCKER_DESC}
+    • Banco Hold:    ${HOLD_DB_DESC}
     • Reboot:        ${POLITICA_REBOOT_DESC}
     • Pós-Boot:      ${POSBOOT_DESC}
     • Garantia:      Disparo único (o timer se auto-remove após executar)"
@@ -640,6 +733,7 @@ cat > "${RUNTIME_DIR}/config.env" <<EOF
 CALENDAR_SPEC="${CALENDAR_SPEC}"
 MODO_UPGRADE="${MODO_UPGRADE}"
 HOLD_DOCKER="${HOLD_DOCKER}"
+HOLD_DB="${HOLD_DB}"
 POLITICA_REBOOT="${POLITICA_REBOOT}"
 REAL_USER="${REAL_USER}"
 REAL_USER_HOME="${REAL_USER_HOME}"
@@ -654,6 +748,7 @@ set -Eeuo pipefail
 umask 077
 
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 export LC_ALL=C.UTF-8
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -739,7 +834,8 @@ trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
     echo "  Início:            $(date '+%d/%m/%Y %H:%M:%S')"
     echo "  Kernel Pré-Update: $(uname -r)"
     echo "  Modo APT:          ${MODO_UPGRADE}"
-    echo "  Hold Docker:       ${HOLD_DOCKER}"
+    echo "  Hold Docker:       ${HOLD_DOCKER:-N}"
+    echo "  Hold Banco Dados:  ${HOLD_DB:-N}"
     echo "  Política Reboot:   ${POLITICA_REBOOT}"
     echo "================================================================"
     echo ""
@@ -750,8 +846,11 @@ trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
     echo "$REPORT_PATH" > "${STATE_DIR}/last_report_path.txt"
     echo "$REPORT_NAME" > "${STATE_DIR}/last_report_name.txt"
 
-    systemctl list-units --type=service --state=running --no-legend --no-pager \
+    systemctl list-units --type=service --state=running --plain --no-legend --no-pager \
         | awk '{print $1}' | sort -u > "${STATE_DIR}/pre_services.txt"
+
+    systemctl list-units --state=failed --plain --no-legend --no-pager \
+        | awk '{print $1}' | sort -u > "${STATE_DIR}/pre_failed.txt" || true
 
     ss -tlnH 2>/dev/null | awk '{print $4}' | sed -E 's/.*:([0-9]+)$/\1/' | sort -nu > "${STATE_DIR}/pre_ports.txt" || true
 
@@ -762,21 +861,42 @@ trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
     fi
 
     echo "  - Serviços systemd ativos: $(wc -l < "${STATE_DIR}/pre_services.txt")"
+    echo "  - Unidades systemd em falha prévia: $(wc -l < "${STATE_DIR}/pre_failed.txt")"
     echo "  - Containers Docker ativos: $(wc -l < "${STATE_DIR}/pre_containers.txt")"
     echo "  - Portas TCP em LISTEN: $(wc -l < "${STATE_DIR}/pre_ports.txt")"
     echo ""
 
-    # 2. Hold temporário opcional de Docker/containerd
-    if [[ "${HOLD_DOCKER:-N}" == "S" ]]; then
-        echo ">>> [2/5] Aplicando hold temporário em pacotes Docker/containerd..."
-        JA_EM_HOLD="$(apt-mark showhold 2>/dev/null || true)"
-        for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras; do
-            if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
-                if ! printf '%s\n' "$JA_EM_HOLD" | grep -qx "$pkg"; then
-                    apt-mark hold "$pkg" >/dev/null 2>&1 && HELD_BY_US+=("$pkg")
+    # 2. Hold temporário opcional de Docker/containerd e Bancos de Dados
+    JA_EM_HOLD="$(apt-mark showhold 2>/dev/null || true)"
+    if [[ "${HOLD_DOCKER:-N}" == "S" || "${HOLD_DB:-N}" == "S" ]]; then
+        echo ">>> [2/5] Aplicando hold temporário configurado para esta janela..."
+        CANDIDATOS_HOLD=()
+
+        if [[ "${HOLD_DOCKER:-N}" == "S" ]]; then
+            for pkg in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras; do
+                if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
+                    CANDIDATOS_HOLD+=("$pkg")
                 fi
-            fi
-        done
+            done
+        fi
+
+        if [[ "${HOLD_DB:-N}" == "S" ]]; then
+            while IFS= read -r db_pkg; do
+                [[ -n "$db_pkg" ]] && CANDIDATOS_HOLD+=("$db_pkg")
+            done < <(dpkg-query -W -f='${Package}|${Status}\n' 2>/dev/null \
+                | awk -F'|' '$2 == "install ok installed" && $1 ~ /^(mariadb-|mysql-|libmysqlclient|libmariadb|percona-server|postgresql|mongodb-org|redis-|valkey-)/ {print $1}')
+        fi
+
+        if (( ${#CANDIDATOS_HOLD[@]} > 0 )); then
+            for pkg in "${CANDIDATOS_HOLD[@]}"; do
+                if ! printf '%s\n' "$JA_EM_HOLD" | grep -qx "$pkg"; then
+                    if apt-mark hold "$pkg" >/dev/null 2>&1; then
+                        HELD_BY_US+=("$pkg")
+                    fi
+                fi
+            done
+        fi
+
         if (( ${#HELD_BY_US[@]} > 0 )); then
             echo "  - Pacotes mantidos em hold temporário: ${HELD_BY_US[*]}"
         else
@@ -934,7 +1054,7 @@ copy_to_home() {
 
     # Comparar Serviços Systemd
     if [[ -f "${STATE_DIR}/pre_services.txt" ]]; then
-        systemctl list-units --type=service --state=running --no-legend --no-pager \
+        systemctl list-units --type=service --state=running --plain --no-legend --no-pager \
             | awk '{print $1}' | sort -u > "${STATE_DIR}/post_services.txt"
 
         FALTANDO_SERVICES="$(comm -23 "${STATE_DIR}/pre_services.txt" "${STATE_DIR}/post_services.txt" \
@@ -961,14 +1081,27 @@ copy_to_home() {
         fi
     fi
 
-    # Unidades com falha
-    FAILED_UNITS="$(systemctl --failed --no-legend --no-pager 2>/dev/null || true)"
-    if [[ -n "$FAILED_UNITS" ]]; then
+    # Unidades com falha (diferenciando falhas novas x pré-existentes)
+    systemctl list-units --state=failed --plain --no-legend --no-pager 2>/dev/null \
+        | awk '{print $1}' | sort -u > "${STATE_DIR}/post_failed.txt" || true
+    if [[ ! -f "${STATE_DIR}/pre_failed.txt" ]]; then
+        : > "${STATE_DIR}/pre_failed.txt"
+    fi
+
+    NOVAS_FALHAS="$(comm -13 "${STATE_DIR}/pre_failed.txt" "${STATE_DIR}/post_failed.txt" || true)"
+    FALHAS_PREVIAS="$(comm -12 "${STATE_DIR}/pre_failed.txt" "${STATE_DIR}/post_failed.txt" || true)"
+
+    if [[ -n "$NOVAS_FALHAS" ]]; then
         ALERTAS=$((ALERTAS + 1))
-        echo "  [ATENÇÃO] Unidades systemd em estado FAILED após boot:"
-        printf '%s\n' "$FAILED_UNITS" | sed 's/^/      - /'
+        echo "  [ATENÇÃO] NOVAS unidades systemd em estado FAILED após a atualização/boot:"
+        printf '%s\n' "$NOVAS_FALHAS" | sed 's/^/      - /'
     else
-        echo "  [OK] Nenhuma unidade systemd em estado FAILED."
+        echo "  [OK] Nenhuma nova unidade systemd entrou em estado FAILED após o boot."
+    fi
+
+    if [[ -n "$FALHAS_PREVIAS" ]]; then
+        echo "  [INFO] Unidades que JÁ estavam em estado FAILED antes da janela (pré-existentes):"
+        printf '%s\n' "$FALHAS_PREVIAS" | sed 's/^/      - /'
     fi
 
     echo ""
@@ -1080,6 +1213,7 @@ print_summary "Horário Programado:" "$DATA_HORA_AGENDADA" "$FG_CYAN"
 print_summary "Próximo Disparo:" "$PROXIMA_EXECUCAO" "$FG_GREEN"
 print_summary "Modo APT:" "$MODO_UPGRADE_DESC" "$FG_CYAN"
 print_summary "Hold Docker/containerd:" "$HOLD_DOCKER_DESC" "$FG_CYAN"
+print_summary "Hold Banco de Dados:" "$HOLD_DB_DESC" "$FG_CYAN"
 print_summary "Política de Reboot:" "$POLITICA_REBOOT_DESC" "$FG_CYAN"
 print_summary "Verificação Pós-Boot:" "$POSBOOT_DESC" "$FG_CYAN"
 print_summary "Relatório Agendamento:" "/root/${LOG_FILENAME}" "$FG_CYAN"
