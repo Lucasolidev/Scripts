@@ -37,6 +37,16 @@
 >        local msg="$1"
 >        echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
 >    }
+>    print_tree_row() {
+>        local branch="$1" label="$2" val="$3" color="${4:-$FG_CYAN}" badge="${5:-}"
+>        local pad=$((22 - ${#label}))
+>        if (( pad < 1 )); then pad=1; fi
+>        if [[ -n "$badge" ]]; then
+>            printf '     %b%s%b %b%s%*s%b%b %b%s%b\n' "${DIM}${FG_CYAN}" "$branch" "$NC" "$BOLD" "$label" "$pad" '' "$NC" "$badge" "$color" "$val" "$NC"
+>        else
+>            printf '     %b%s%b %b%s%*s%b%b%s%b\n' "${DIM}${FG_CYAN}" "$branch" "$NC" "$BOLD" "$label" "$pad" '' "$NC" "$color" "$val" "$NC"
+>        fi
+>    }
 >    ```
 > 
 > 3. **Interatividade e Coleta de Parâmetros com Feedback Visual Imediato**:
@@ -157,10 +167,12 @@
 >    - Falhas ao salvar o relatório devem ser informadas, preservando a origem e o código de falha. Funções chamadas por `if`, `!` ou `||` precisam propagar erros explicitamente: `set -e` pode estar desabilitado nesses contextos.
 >    - A última etapa numerada deve anunciar o salvamento pelo finalizador. Referência de implementação: funções `install_config`, `copy_to_home` e `finalizar` do `pos_install_server_ubuntu.sh`.
 >
-> 12. **Resultado Final Estruturado (Resumo da Instalação)**:
->    No final de todo script, exiba obrigatoriamente um painel de encerramento utilizando a função `print_header "RESUMO DA INSTALAÇÃO"`.
->    - Preservar o resumo colorido nas refatorações: rótulos em negrito, informações em ciano, estados confirmados em verde e pendências/estados não verificados em amarelo. Não usar verde para auditoria apenas gravada ou sincronização não confirmada. Ao usar `printf`, reservar `%b` aos estilos ANSI controlados e `%s` aos valores para não interpretar escapes nos dados. Referência: `print_summary` do `pos_install_server_ubuntu.sh`.
->    - Agrupar o painel por assunto e manter cada serviço importante em um bloco identificado, com espaço e separador: estado, configuração, regras ou agendamento e histórico quando aplicável. Saídas nativas, como `ufw status`, pertencem ao bloco do próprio serviço, com indentação; nunca anexá-las sem título ao serviço anterior. Distinguir ferramentas manuais (como ACL) de serviços ativos e controles efetivamente aplicados. Quebrar listas extensas de pacotes em linhas e alinhar rótulos considerando caracteres acentuados, não apenas bytes.
+> 12. **Resultado Final Estruturado (Resumo da Instalação — Painel Híbrido Dashboard + Árvore)**:
+>    No final de todo script, exiba obrigatoriamente um painel de encerramento no padrão **Painel Híbrido (Dashboard + Árvore)**:
+>    - **Cabeçalho em moldura (`┌── ... ──┐`)**: destaque o título do resumo com `${FG_BLUE}${BOLD}${ARROW} RESUMO ...${NC}` dentro de uma caixa ciano (`┌`, `│`, `└`) de 78 colunas internas. No corpo abaixo da moldura, **não use borda direita fixa**, permitindo que caminhos longos de log, URLs e strings extensas possam ser copiados inteiros no terminal sem truncamento.
+>    - **Estrutura em árvore por blocos numerados**: agrupe o painel por assunto (ex.: `1. Sistema e Estado`, `2. Acessos e Segurança`, `3. Serviços e Aplicações`, `4. Rede e Relatório`), com título do bloco em `${FG_BLUE}${BOLD}`, subitens indentados usando conectores `├─` e `└─` via `print_tree_row()`, separadores horizontais (`──`) entre blocos e linha dupla (`══`) ao final do painel.
+>    - **Badges e cores semânticas**: utilize badges rápidos `[OK]` (`FG_GREEN`), `[ATENÇÃO]` (`FG_YELLOW`) e `[CRÍTICO]` (`FG_RED`), mantendo rótulos em negrito, informações gerais em ciano, estados confirmados em verde e pendências/estados não verificados em amarelo. Não usar verde para auditoria apenas gravada ou sincronização não confirmada. Ao usar `printf`, reservar `%b` aos estilos ANSI controlados e `%s` aos valores para não interpretar escapes nos dados.
+>    - **Listas e saídas extensas**: agrupar cada serviço importante em seu bloco; saídas nativas (como `ufw status`) pertencem ao bloco do próprio serviço com indentação, sem anexá-las sem título ao serviço anterior. Listas extensas (como pacotes ou aplicações) devem quebrar em múltiplas linhas mantendo o recuo alinhado da coluna da direita (`│` + espaços), sem invadir a coluna dos rótulos. Distinguir ferramentas manuais (como ACL) de serviços ativos e controles efetivamente aplicados, e alinhar rótulos considerando caracteres acentuados, não apenas bytes.
 >    **Obrigatório**: É fundamental incluir a linha de **Pacotes/Programas Instalados** detalhando os softwares adicionados ao sistema durante a execução (armazenando na array `PACOTES_INSTALADOS` e formatando com `LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")`).
 >    
 >    Exemplo de bloco de resumo:
@@ -176,18 +188,29 @@
 >    fi
 >    LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
 >
->    # Anunciar sucesso somente quando as verificações obrigatórias passarem.
->    # Caso contrário, listar pendências ou falha e retornar o código correspondente.
->    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}"
->    echo -e "  ${BOLD}Status do Sistema:${NC}     ${STATUS_VERIFICADO}"
->    echo -e "  ${BOLD}Pacotes Instalados:${NC}    ${FG_CYAN}${LISTA_PACOTES:-Nenhum}${NC}"
->    echo -e "  ${BOLD}Locales UTF-8:${NC}         ${FG_GREEN}pt_BR.UTF-8 / en_US.UTF-8 (Gerados)${NC}"
->    echo -e "  ${BOLD}Mapa de Teclado:${NC}       ${FG_CYAN}${KEYBOARD_STATUS}${NC}"
->    echo -e "  ${BOLD}Layout Ativo:${NC}          ${FG_GREEN}US-International (us:intl)${NC}"
->    echo -e "  ${BOLD}Fuso Horário:${NC}          $(timedatectl show -p Timezone --value) / NTP: ${NTP_STATUS}"
->    echo -e "  ${BOLD}Serviço Principal:${NC}     $(get_service_status nome_do_servico)"
->    echo -e "  ${BOLD}Log de Instalação:${NC}     ${FG_CYAN}/root/${LOG_FILENAME}${NC}"
->    echo -e "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
+>    BOX_BORDER="──────────────────────────────────────────────────────────────────────────────"
+>    BOX_DOUBLE="══════════════════════════════════════════════════════════════════════════════"
+>    HDR_TEXT="  ${ARROW} RESUMO DA INSTALAÇÃO — $(hostname -s 2>/dev/null || uname -n)"
+>    HDR_PAD=$((78 - ${#HDR_TEXT}))
+>    (( HDR_PAD < 0 )) && HDR_PAD=0
+>
+>    echo -e ""
+>    printf '%b┌%s┐%b\n' "${FG_CYAN}${BOLD}" "$BOX_BORDER" "$NC"
+>    printf '%b│%b%b%s%*s%b%b│%b\n' "${FG_CYAN}${BOLD}" "$NC" "${FG_BLUE}${BOLD}" "$HDR_TEXT" "$HDR_PAD" '' "$NC" "${FG_CYAN}${BOLD}" "$NC"
+>    printf '%b└%s┘%b\n' "${FG_CYAN}${BOLD}" "$BOX_BORDER" "$NC"
+>
+>    echo -e "  ${FG_BLUE}${BOLD}1. Sistema e Ambiente${NC}"
+>    print_tree_row "├─" "Status do Sistema:" "${STATUS_VERIFICADO}" "$FG_GREEN" "${FG_GREEN}${BOLD}[OK]${NC}"
+>    print_tree_row "├─" "Locales UTF-8:"     "pt_BR.UTF-8 / en_US.UTF-8 (Gerados)" "$FG_GREEN"
+>    print_tree_row "├─" "Mapa de Teclado:"   "${KEYBOARD_STATUS}" "$FG_CYAN"
+>    print_tree_row "└─" "Fuso Horário:"      "$(timedatectl show -p Timezone --value) / NTP: ${NTP_STATUS}" "$FG_CYAN"
+>    echo -e "  ${DIM}${FG_CYAN}${BOX_BORDER}${NC}"
+>
+>    echo -e "  ${FG_BLUE}${BOLD}2. Serviços, Pacotes e Log${NC}"
+>    print_tree_row "├─" "Serviço Principal:" "$(get_service_status nome_do_servico)" "$FG_CYAN"
+>    print_tree_row "├─" "Pacotes Instalados:" "${LISTA_PACOTES:-Nenhum}" "$FG_CYAN"
+>    print_tree_row "└─" "Log de Instalação:" "/root/${LOG_FILENAME}" "$FG_GREEN"
+>    echo -e "  ${FG_CYAN}${BOLD}${BOX_DOUBLE}${NC}\n"
 >    ```
 > 
 > 13. **Cabeçalho de Metadados, Comentários e Versionamento**:
