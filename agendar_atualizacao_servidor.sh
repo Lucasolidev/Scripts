@@ -661,36 +661,42 @@ while [[ -z "$MODO_UPGRADE" ]]; do
 done
 log_info "Modo de atualização definido: ${MODO_UPGRADE_DESC}"
 
-# 3.3.3 - Hold temporário opcional de Docker/containerd e Bancos de Dados
+# 3.3.3 - Opção de pular atualização de Containers (Docker) ou Bancos de Dados nesta janela
 HOLD_DOCKER="N"
 if [[ "$DOCKER_ATIVO" == "S" ]]; then
-    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Segurar (hold temporário) pacotes do Docker/containerd nesta janela? (s/N): ${NC}")" ENTRADA_HOLD
+    printf '\n  %bPacotes de Containers (Docker / containerd):%b\n' "$BOLD" "$NC"
+    printf '    %b• ENTER / N = Atualiza o Docker junto com o Linux (padrão)%b\n' "$DIM" "$NC"
+    printf '    %b• s         = Pula o Docker nesta janela (atualiza apenas o Linux)%b\n\n' "$DIM" "$NC"
+    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Pular a atualização do Docker/containerd nesta janela? (s/N): ${NC}")" ENTRADA_HOLD
     if [[ "${ENTRADA_HOLD,,}" == "s" ]]; then
         HOLD_DOCKER="S"
-        HOLD_DOCKER_DESC="Sim (hold temporário em docker-ce/containerd)"
+        HOLD_DOCKER_DESC="Pular Docker (atualizar apenas o SO)"
     else
         HOLD_DOCKER="N"
-        HOLD_DOCKER_DESC="Não (atualizar Docker junto com o SO)"
+        HOLD_DOCKER_DESC="Atualizar Docker junto com o SO"
     fi
 else
     HOLD_DOCKER_DESC="Não aplicável (Docker inativo)"
 fi
-log_info "Hold temporário Docker/containerd: ${HOLD_DOCKER_DESC}"
+log_info "Containers (Docker) nesta janela: ${HOLD_DOCKER_DESC}"
 
 HOLD_DB="N"
 if [[ "$BANCO_ATIVO" == "S" ]]; then
-    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Segurar (hold temporário) pacotes de Banco de Dados (${BANCOS_HOST_DETECTADOS}) nesta janela? (s/N): ${NC}")" ENTRADA_HOLD_DB
+    printf '\n  %bPacotes de Banco de Dados (%s):%b\n' "$BOLD" "$BANCOS_HOST_DETECTADOS" "$NC"
+    printf '    %b• ENTER / N = Atualiza o Banco junto com o Linux (padrão)%b\n' "$DIM" "$NC"
+    printf '    %b• s         = Pula o Banco nesta janela (atualiza apenas o Linux)%b\n\n' "$DIM" "$NC"
+    read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Pular a atualização do Banco de Dados nesta janela? (s/N): ${NC}")" ENTRADA_HOLD_DB
     if [[ "${ENTRADA_HOLD_DB,,}" == "s" ]]; then
         HOLD_DB="S"
-        HOLD_DB_DESC="Sim (hold temporário nos pacotes SGBD instalados)"
+        HOLD_DB_DESC="Pular Banco de Dados (atualizar apenas o SO)"
     else
         HOLD_DB="N"
-        HOLD_DB_DESC="Não (atualizar SGBD junto com o SO)"
+        HOLD_DB_DESC="Atualizar Banco de Dados junto com o SO"
     fi
 else
     HOLD_DB_DESC="Não aplicável (nenhum SGBD detectado no host)"
 fi
-log_info "Hold temporário Banco de Dados: ${HOLD_DB_DESC}"
+log_info "Banco de Dados nesta janela: ${HOLD_DB_DESC}"
 
 # 3.3.4 - Política de reinicialização
 printf '\n  %bPolítica de reinicialização após a atualização:%b\n' "$BOLD" "$NC"
@@ -727,8 +733,8 @@ log_info "Política de reinicialização definida: ${POLITICA_REBOOT_DESC}"
 print_alert_box "Confirme os dados antes de ativar o disparo único:
     • Horário:       ${DATA_HORA_AGENDADA}
     • Atualização:   ${MODO_UPGRADE_DESC}
-    • Docker Hold:   ${HOLD_DOCKER_DESC}
-    • Banco Hold:    ${HOLD_DB_DESC}
+    • Containers:    ${HOLD_DOCKER_DESC}
+    • Banco Dados:   ${HOLD_DB_DESC}
     • Reboot:        ${POLITICA_REBOOT_DESC}
     • Pós-Boot:      ${POSBOOT_DESC}
     • Garantia:      Disparo único (o timer se auto-remove após executar)"
@@ -1236,8 +1242,8 @@ print_summary "Timer Systemd:" "${UNIT_NAME}.timer ($(if systemctl is-active --q
 print_summary "Horário Programado:" "$DATA_HORA_AGENDADA" "$FG_CYAN"
 print_summary "Próximo Disparo:" "$PROXIMA_EXECUCAO" "$FG_GREEN"
 print_summary "Modo APT:" "$MODO_UPGRADE_DESC" "$FG_CYAN"
-print_summary "Hold Docker/containerd:" "$HOLD_DOCKER_DESC" "$FG_CYAN"
-print_summary "Hold Banco de Dados:" "$HOLD_DB_DESC" "$FG_CYAN"
+print_summary "Containers (Docker):" "$HOLD_DOCKER_DESC" "$FG_CYAN"
+print_summary "Banco de Dados:" "$HOLD_DB_DESC" "$FG_CYAN"
 print_summary "Política de Reboot:" "$POLITICA_REBOOT_DESC" "$FG_CYAN"
 print_summary "Verificação Pós-Boot:" "$POSBOOT_DESC" "$FG_CYAN"
 print_summary "Relatório Agendamento:" "/root/${LOG_FILENAME}" "$FG_CYAN"
