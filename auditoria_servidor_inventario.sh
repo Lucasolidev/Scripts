@@ -359,6 +359,7 @@ print_alert_box() {
     echo -e "\n  ${FG_YELLOW}${BOLD}⚠ ATENÇÃO REQUERIDA:${NC} ${FG_YELLOW}${msg}${NC}\n"
 }
 
+# shellcheck disable=SC2317,SC2329
 print_summary() {
     local label="$1"
     local val="$2"
@@ -366,6 +367,17 @@ print_summary() {
     local padding=$((28 - ${#label}))
     if (( padding < 1 )); then padding=1; fi
     printf '  %b%s%*s%b%b%s%b\n' "$BOLD" "$label" "$padding" '' "$NC" "$color" "$val" "$NC"
+}
+
+print_tree_row() {
+    local branch="$1" label="$2" val="$3" color="${4:-$FG_CYAN}" badge="${5:-}"
+    local pad=$((22 - ${#label}))
+    if (( pad < 1 )); then pad=1; fi
+    if [[ -n "$badge" ]]; then
+        printf '     %b%s%b %b%s%*s%b%b %b%s%b\n' "${DIM}${FG_CYAN}" "$branch" "$NC" "$BOLD" "$label" "$pad" '' "$NC" "$badge" "$color" "$val" "$NC"
+    else
+        printf '     %b%s%b %b%s%*s%b%b%s%b\n' "${DIM}${FG_CYAN}" "$branch" "$NC" "$BOLD" "$label" "$pad" '' "$NC" "$color" "$val" "$NC"
+    fi
 }
 
 # Arrays acumuladoras e valores padrão para o Resumo Executivo, JSON e Descoberta
@@ -1121,16 +1133,16 @@ for priv_grp in sudo wheel admin adm docker lxd; do
     GRP_GID=$(echo "$GRP_ENTRY" | cut -d: -f3)
     GRP_USERS=$(echo "$GRP_ENTRY" | cut -d: -f4 | tr ',' ' ' | trim_ws || true)
     PRI_USERS=$(awk -F: -v gid="$GRP_GID" '$4 == gid {print $1}' /etc/passwd 2>/dev/null | trim_ws || true)
-    ALL_GRP_MEMBERS=$(printf '%s\n' "${GRP_USERS}" "${PRI_USERS}" | tr ' ' '\n' | grep -v '^$' | sort -u | trim_ws || true)
+    ALL_GRP_MEMBERS=$(printf '%s\n' "${GRP_USERS}" "${PRI_USERS}" | tr ' ' '\n' | grep -v '^$' | sort -u | paste -sd ', ' - || true)
 
     echo -e "    • Grupo ${FG_YELLOW}${BOLD}${priv_grp}${NC} (GID ${GRP_GID}): Membros -> ${FG_GREEN}${BOLD}${ALL_GRP_MEMBERS:-Nenhum membro cadastrado}${NC}"
     if [[ "$priv_grp" =~ ^(sudo|wheel|admin)$ ]]; then
         add_unique_item RESUMO_GRUPOS_SUDO "%${priv_grp} (${ALL_GRP_MEMBERS:-vazio})"
-        for m_usr in $ALL_GRP_MEMBERS; do
+        for m_usr in ${ALL_GRP_MEMBERS//,/ }; do
             add_unique_item RESUMO_USUARIOS_SUDO "${m_usr} (grupo ${priv_grp})"
         done
     elif [[ "$priv_grp" == "docker" && -n "$ALL_GRP_MEMBERS" ]]; then
-        for m_usr in $ALL_GRP_MEMBERS; do
+        for m_usr in ${ALL_GRP_MEMBERS//,/ }; do
             add_unique_item RESUMO_USUARIOS_SUDO "${m_usr} (grupo docker/root-equiv)"
         done
     fi
@@ -1160,9 +1172,14 @@ if [[ -r /etc/sudoers ]]; then
             fi
             if [[ "$ENTITY" == %* ]]; then
                 GRP_CLEAN="${ENTITY#%}"
-                GRP_MEM=$(getent group "$GRP_CLEAN" 2>/dev/null | cut -d: -f4 | tr ',' ' ' | trim_ws || true)
+                S_GRP_ENTRY=$(getent group "$GRP_CLEAN" 2>/dev/null || true)
+                S_GRP_GID=$(echo "$S_GRP_ENTRY" | cut -d: -f3)
+                S_GRP_U=$(echo "$S_GRP_ENTRY" | cut -d: -f4 | tr ',' ' ' | trim_ws || true)
+                S_PRI_U=""
+                [[ -n "$S_GRP_GID" ]] && S_PRI_U=$(awk -F: -v gid="$S_GRP_GID" '$4 == gid {print $1}' /etc/passwd 2>/dev/null | trim_ws || true)
+                GRP_MEM=$(printf '%s\n' "${S_GRP_U}" "${S_PRI_U}" | tr ' ' '\n' | grep -v '^$' | sort -u | paste -sd ', ' - || true)
                 add_unique_item RESUMO_GRUPOS_SUDO "${ENTITY} (${GRP_MEM:-vazio})"
-                for gm in $GRP_MEM; do
+                for gm in ${GRP_MEM//,/ }; do
                     add_unique_item RESUMO_USUARIOS_SUDO "${gm} (grupo ${GRP_CLEAN})"
                 done
             elif [[ "$ENTITY" != "Defaults"* && "$ENTITY" != "@include"* && "$ENTITY" != "User_Alias" && "$ENTITY" != "Cmnd_Alias" && "$ENTITY" != "Host_Alias" && "$ENTITY" != "Runas_Alias" ]]; then
@@ -1546,10 +1563,11 @@ if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
         APACHE_SVC="httpd"
     fi
     APACHE_VER=$($APACHE_BIN -v 2>/dev/null | head -n 1 | cut -d':' -f2 | trim_ws || echo "Instalado")
+    APACHE_CLEAN_VER=$(echo "$APACHE_VER" | sed -E 's|^Apache/||; s|[[:space:]]*\(.*\)||' | trim_ws)
     log_success "Apache (${APACHE_SVC}): ${BOLD}${APACHE_VER}${NC} [$(get_service_status "$APACHE_SVC")]"
-    add_unique_item RESUMO_APPS_VERSOES "Apache:${APACHE_VER}"
+    add_unique_item RESUMO_APPS_VERSOES "Apache:${APACHE_CLEAN_VER:-$APACHE_VER}"
     if [[ "$(get_service_status_plain "$APACHE_SVC")" == "Ativo" ]]; then
-        add_role "Web Server Apache (${APACHE_VER})"
+        add_role "Web Server Apache (${APACHE_CLEAN_VER:-$APACHE_VER})"
     fi
 
     APACHE_CTL=$(command -v apache2ctl || command -v apachectl || echo "$APACHE_BIN")
@@ -1660,10 +1678,11 @@ fi
 if command -v nginx >/dev/null 2>&1; then
     WEB_FOUND=1
     NGINX_VER=$(nginx -v 2>&1 | cut -d':' -f2 | trim_ws || echo "Instalado")
+    NGINX_CLEAN_VER=$(echo "$NGINX_VER" | sed -E 's|^nginx/||; s|[[:space:]]*\(.*\)||' | trim_ws)
     log_success "Nginx: ${BOLD}${NGINX_VER}${NC} [$(get_service_status nginx)]"
-    add_unique_item RESUMO_APPS_VERSOES "Nginx:${NGINX_VER}"
+    add_unique_item RESUMO_APPS_VERSOES "Nginx:${NGINX_CLEAN_VER:-$NGINX_VER}"
     if [[ "$(get_service_status_plain nginx)" == "Ativo" ]]; then
-        add_role "Web Server / Proxy Nginx (${NGINX_VER})"
+        add_role "Web Server / Proxy Nginx (${NGINX_CLEAN_VER:-$NGINX_VER})"
     fi
 
     echo -e "\n    ${BOLD}Server Blocks / Domínios Configurados no Nginx:${NC}"
@@ -2217,6 +2236,17 @@ mark_app_audited() {
     return 0
 }
 
+is_inside_audited_app() {
+    local target_dir="$1" real_d item
+    real_d=$(readlink -f "$target_dir" 2>/dev/null || echo "${target_dir%/}")
+    if (( ${#AUDITED_APP_DIRS[@]} > 0 )); then
+        for item in "${AUDITED_APP_DIRS[@]}"; do
+            [[ "$real_d" == "$item" || "$real_d" == "${item}/"* ]] && return 0
+        done
+    fi
+    return 1
+}
+
 audit_nextcloud_dir() {
     local app_dir="$1" ver_file="$2" cfg_file="$3" install_type="${4:-Diretório Web Host}"
     mark_app_audited "$app_dir" || return 0
@@ -2669,8 +2699,12 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
         [[ -f "$comp_file" ]] || continue
         APP_DIR=$(dirname "$comp_file")
         [[ -f "${APP_DIR}/artisan" || -f "${APP_DIR}/wp-config.php" || -f "${APP_DIR}/configuration.php" || -f "${APP_DIR}/LocalSettings.php" || -f "${APP_DIR}/includes/Defines.php" || -f "${APP_DIR}/doku.php" || -f "${APP_DIR}/vtigerversion.php" || -f "${APP_DIR}/version.php" || -f "${APP_DIR}/config/ampache.cfg.php" || -f "${APP_DIR}/config/ampache.cfg.php.dist" ]] && continue
-        mark_app_audited "$APP_DIR" || continue
+        is_inside_audited_app "$APP_DIR" && continue
+        PKG_TYPE=$(grep -m 1 -E '"type"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
+        [[ "$PKG_TYPE" =~ ^(library|composer-plugin|mediawiki-extension|mediawiki-skin|wordpress-plugin|wordpress-theme|drupal-module|drupal-theme|joomla-plugin|symfony-bundle)$ ]] && continue
         PKG_NAME=$(grep -m 1 -E '"name"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
+        [[ "$PKG_NAME" == mediawiki/* && "$PKG_NAME" != "mediawiki/core" ]] && continue
+        mark_app_audited "$APP_DIR" || continue
         PKG_VER=$(grep -m 1 -E '"version"\s*:' "$comp_file" 2>/dev/null | cut -d'"' -f4 || true)
         if [[ -n "$PKG_NAME" ]]; then
             echo -e "    • ${FG_GREEN}${BOLD}Aplicação PHP/Composer (${PKG_NAME}${PKG_VER:+ v$PKG_VER})${NC} -> Caminho: ${FG_CYAN}${APP_DIR}${NC}"
@@ -2679,12 +2713,13 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
             add_unique_item RESUMO_SITES_DETECTADOS "${PKG_NAME}${PKG_VER:+ v$PKG_VER}: ${APP_DIR}"
             FOUND_APPS=$((FOUND_APPS + 1))
         fi
-    done < <(find "$base_dir" -maxdepth 3 -type f -name "composer.json" ! -path "*/vendor/*" ! -path "*/3rdparty/*" ! -path "*/apps/*" 2>/dev/null || true)
+    done < <(find "$base_dir" -maxdepth 3 -type f -name "composer.json" ! -path "*/vendor/*" ! -path "*/3rdparty/*" ! -path "*/apps/*" ! -path "*/extensions/*" ! -path "*/skins/*" ! -path "*/plugins/*" ! -path "*/modules/*" ! -path "*/themes/*" ! -path "*/wp-content/*" ! -path "*/libraries/*" 2>/dev/null || true)
 
     # Descoberta de projetos Node.js (package.json) em diretórios de aplicação
     while IFS= read -r pkg_json; do
         [[ -f "$pkg_json" ]] || continue
         APP_DIR=$(dirname "$pkg_json")
+        is_inside_audited_app "$APP_DIR" && continue
         mark_app_audited "$APP_DIR" || continue
         NODE_APP_NAME=$(grep -m 1 -E '"name"\s*:' "$pkg_json" 2>/dev/null | cut -d'"' -f4 || true)
         NODE_APP_VER=$(grep -m 1 -E '"version"\s*:' "$pkg_json" 2>/dev/null | cut -d'"' -f4 || true)
@@ -2695,12 +2730,13 @@ if (( ${#SCAN_DIRS[@]} > 0 )); then
             add_unique_item RESUMO_SITES_DETECTADOS "Node.js ${NODE_APP_NAME}${NODE_APP_VER:+ v$NODE_APP_VER}: ${APP_DIR}"
             FOUND_APPS=$((FOUND_APPS + 1))
         fi
-    done < <(find "$base_dir" -maxdepth 3 -type f -name "package.json" ! -path "*/node_modules/*" ! -path "*/vendor/*" ! -path "*/.git/*" 2>/dev/null || true)
+    done < <(find "$base_dir" -maxdepth 3 -type f -name "package.json" ! -path "*/node_modules/*" ! -path "*/vendor/*" ! -path "*/extensions/*" ! -path "*/skins/*" ! -path "*/plugins/*" ! -path "*/themes/*" ! -path "*/wp-content/*" ! -path "*/.git/*" 2>/dev/null || true)
 
     # Descoberta de projetos Python (pyproject.toml / requirements.txt / manage.py)
     while IFS= read -r py_marker; do
         [[ -f "$py_marker" ]] || continue
         APP_DIR=$(dirname "$py_marker")
+        is_inside_audited_app "$APP_DIR" && continue
         mark_app_audited "$APP_DIR" || continue
         PY_APP_NAME=$(basename "$APP_DIR")
         PY_APP_VER=""
@@ -3088,12 +3124,17 @@ check_infra_service() {
     local svc="$1" label="$2" role_tag="$3"
     if [[ "$(get_service_status_plain "$svc")" != "Não instalado" ]] || pgrep -x "$svc" >/dev/null 2>&1; then
         INFRA_FOUND=$((INFRA_FOUND + 1))
-        local st d_ver
+        local st d_ver role_fmt
         st=$(get_service_status "$svc")
         d_ver=$(get_daemon_version "$svc")
         echo -e "    • ${BOLD}${label}${NC} (${svc}${d_ver:+ v${d_ver}}): [${st}]"
         if [[ "$(get_service_status_plain "$svc")" == "Ativo" ]] || pgrep -x "$svc" >/dev/null 2>&1; then
-            add_role "${role_tag}${d_ver:+ (${d_ver})}"
+            if [[ -n "$d_ver" && "$role_tag" == *")" ]]; then
+                role_fmt="${role_tag%)} ${d_ver})"
+            else
+                role_fmt="${role_tag}${d_ver:+ (${d_ver})}"
+            fi
+            add_role "$role_fmt"
             add_unique_item RESUMO_APPS_VERSOES "${svc}:${d_ver:-Ativo}"
         fi
     fi
@@ -3303,7 +3344,7 @@ if command -v snap >/dev/null 2>&1; then
         while IFS='|' read -r sn_name sn_ver sn_track; do
             [[ -z "$sn_name" ]] && continue
             echo -e "      ├─ ${FG_CYAN}${sn_name}${NC} (${FG_YELLOW}v${sn_ver}${NC} | Canal: ${DIM}${sn_track}${NC})"
-            if [[ ! "$sn_name" =~ ^(bare|core|core[0-9]+|snapd|lxd)$ ]]; then
+            if [[ ! "$sn_name" =~ ^(bare|core|core[0-9]+|snapd|lxd|certbot|nextcloud)$ ]]; then
                 add_unique_item RESUMO_APPS_VERSOES "Snap-${sn_name}:${sn_ver}"
             fi
         done <<< "$SNAP_LIST"
@@ -3962,121 +4003,208 @@ return 0
 }
 
 # ==============================================================================
-# RESUMO EXECUTIVO DO INVENTÁRIO (PAINEL CONSOLIDADO NA ORDEM SOLICITADA)
+# RESUMO EXECUTIVO DO INVENTÁRIO (PAINEL HÍBRIDO DASHBOARD + ÁRVORE)
 # ==============================================================================
 resumo_executivo() {
-print_header "RESUMO DA INSTALAÇÃO E DIAGNÓSTICO DO SERVIDOR"
+    local box_border="──────────────────────────────────────────────────────────────────────────────"
+    local box_double="══════════════════════════════════════════════════════════════════════════════"
+    local hdr_text="  ${ARROW} RESUMO EXECUTIVO E DIAGNÓSTICO — ${HOSTNAME_SHORT} (${PRIMARY_IP:-N/A})"
+    if (( ${#hdr_text} > 76 )); then
+        hdr_text="${hdr_text:0:73}..."
+    fi
+    local hdr_pad=$((78 - ${#hdr_text}))
+    (( hdr_pad < 0 )) && hdr_pad=0
 
-ROLES_STR="Servidor Linux Genérico / Sem Serviços de Rede Ativos"
-if (( ${#PAPEIS_DETECTADOS[@]} > 0 )); then
-    ROLES_STR=$(printf '%s + ' "${PAPEIS_DETECTADOS[@]}" | sed 's/ + $//')
-fi
+    echo -e ""
+    printf '%b┌%s┐%b\n' "${FG_CYAN}${BOLD}" "$box_border" "$NC"
+    printf '%b│%b%b%s%*s%b%b│%b\n' "${FG_CYAN}${BOLD}" "$NC" "${FG_BLUE}${BOLD}" "$hdr_text" "$hdr_pad" '' "$NC" "${FG_CYAN}${BOLD}" "$NC"
+    printf '%b└%s┘%b\n' "${FG_CYAN}${BOLD}" "$box_border" "$NC"
 
-APPS_SUMMARY_STR="Nenhuma aplicação principal detectada"
-if (( ${#RESUMO_APPS_VERSOES[@]} > 0 )); then
-    APPS_SUMMARY_STR=$(printf '%s, ' "${RESUMO_APPS_VERSOES[@]}" | sed 's/, $//')
-fi
+    # --- 1. Sistema Operacional e Saúde Base ---
+    echo -e "  ${FG_BLUE}${BOLD}1. Sistema Operacional e Saúde Base${NC}"
+    print_tree_row "├─" "Sistema / Kernel:" "${OS_NAME} (Kernel ${KERNEL_VER})" "$FG_CYAN"
+    print_tree_row "├─" "Instalado em (SO):" "${OS_INSTALLED_AT}" "$FG_CYAN"
 
-PHP_SUMMARY_STR="Não instalado (Host e Containers)"
-PHP_SUMMARY_COLOR="$DIM"
-if (( ${#RESUMO_PHP_VERSOES[@]} > 0 )); then
-    PHP_SUMMARY_STR=$(printf '%s, ' "${RESUMO_PHP_VERSOES[@]}" | sed 's/, $//')
-    PHP_SUMMARY_COLOR="$FG_GREEN"
-fi
+    local upd_color="$FG_GREEN" upd_badge="${FG_GREEN}${BOLD}[OK]${NC}"
+    if [[ "$OS_UPDATE_STATUS_STR" == "Não verificado"* ]]; then
+        upd_color="$DIM"
+        upd_badge=""
+    elif (( PENDING_UPDATES_COUNT > 0 )); then
+        upd_color="$FG_YELLOW"
+        upd_badge="${FG_YELLOW}${BOLD}[ATENÇÃO]${NC}"
+    fi
+    print_tree_row "├─" "Atualizações:" "${OS_UPDATE_STATUS_STR}" "$upd_color" "$upd_badge"
 
-DB_SUMMARY_STR="Nenhum ativo"
-if (( ${#RESUMO_BANCOS_ATIVOS[@]} > 0 )); then
-    DB_SUMMARY_STR=$(printf '%s, ' "${RESUMO_BANCOS_ATIVOS[@]}" | sed 's/, $//')
-fi
+    local reb_color="$FG_GREEN" reb_badge="${FG_GREEN}${BOLD}[OK]${NC}" reb_txt="${REBOOT_NEEDED}${REBOOT_REASON:+ ($REBOOT_REASON)}"
+    if [[ "$REBOOT_NEEDED" == "Sim" ]]; then
+        reb_color="$FG_RED"
+        reb_badge="${FG_RED}${BOLD}[CRÍTICO]${NC}"
+        reb_txt="SIM${REBOOT_REASON:+ ($REBOOT_REASON)}"
+    fi
+    print_tree_row "└─" "Aguardando Reboot?" "$reb_txt" "$reb_color" "$reb_badge"
+    echo -e "  ${DIM}${FG_CYAN}${box_border}${NC}"
 
-SUDO_USERS_STR="Nenhum identificado"
-if (( ${#RESUMO_USUARIOS_SUDO[@]} > 0 )); then
-    SUDO_USERS_STR=$(printf '%s, ' "${RESUMO_USUARIOS_SUDO[@]}" | sed 's/, $//')
-fi
+    # --- 2. Acessos, Privilégios e Storage de Rede ---
+    echo -e "  ${FG_BLUE}${BOLD}2. Acessos, Privilégios e Storage de Rede${NC}"
+    local sudo_users_str="Nenhum identificado"
+    if (( ${#RESUMO_USUARIOS_SUDO[@]} > 0 )); then
+        sudo_users_str=$(printf '%s, ' "${RESUMO_USUARIOS_SUDO[@]}" | sed 's/, $//')
+    fi
+    local sudo_groups_str="Nenhum identificado"
+    if (( ${#RESUMO_GRUPOS_SUDO[@]} > 0 )); then
+        sudo_groups_str=$(printf '%s  |  ' "${RESUMO_GRUPOS_SUDO[@]}" | sed 's/  |  $//')
+    fi
+    local storage_rede_str="Apenas discos locais (Sem NFS/Samba/LDAP ativo)"
+    if (( ${#RESUMO_STORAGE_REDE[@]} > 0 )); then
+        storage_rede_str=$(printf '%s  |  ' "${RESUMO_STORAGE_REDE[@]}" | sed 's/  |  $//')
+    fi
 
-SUDO_GROUPS_STR="Nenhum identificado"
-if (( ${#RESUMO_GRUPOS_SUDO[@]} > 0 )); then
-    SUDO_GROUPS_STR=$(printf '%s, ' "${RESUMO_GRUPOS_SUDO[@]}" | sed 's/, $//')
-fi
+    print_tree_row "├─" "Usuários com Sudo:" "$sudo_users_str" "$FG_YELLOW"
+    print_tree_row "├─" "Grupos com Sudo:" "$sudo_groups_str" "$FG_CYAN"
+    if (( ${#DISABLED_USERS_SUMMARY[@]} > 0 )); then
+        local dis_str
+        dis_str=$(printf '%s, ' "${DISABLED_USERS_SUMMARY[@]}" | sed 's/, $//')
+        print_tree_row "├─" "Contas Desativadas:" "$dis_str" "$FG_YELLOW" "${FG_YELLOW}${BOLD}[ATENÇÃO]${NC}"
+    fi
+    print_tree_row "└─" "NFS / Samba / LDAP:" "$storage_rede_str" "$FG_CYAN"
+    echo -e "  ${DIM}${FG_CYAN}${box_border}${NC}"
 
-STORAGE_REDE_STR="Apenas discos locais (Sem NFS/Samba/LDAP ativo)"
-if (( ${#RESUMO_STORAGE_REDE[@]} > 0 )); then
-    STORAGE_REDE_STR=$(printf '%s, ' "${RESUMO_STORAGE_REDE[@]}" | sed 's/, $//')
-fi
+    # --- 3. Papel do Servidor, Aplicações e Versões (Host + Containers) ---
+    echo -e "  ${FG_BLUE}${BOLD}3. Papel do Servidor, Aplicações e Versões (Host + Containers)${NC}"
+    if (( ${#PAPEIS_DETECTADOS[@]} > 0 )); then
+        local r_idx=0 r_item
+        for r_item in "${PAPEIS_DETECTADOS[@]}"; do
+            if (( r_idx == 0 )); then
+                print_tree_row "├─" "Funções Ativas:" "• ${r_item}" "$FG_YELLOW"
+            else
+                printf '     %b│%b                        %b• %s%b\n' "${DIM}${FG_CYAN}" "$NC" "$FG_YELLOW" "$r_item" "$NC"
+            fi
+            r_idx=$((r_idx + 1))
+        done
+    else
+        print_tree_row "├─" "Funções Ativas:" "Servidor Linux Genérico / Sem Serviços de Rede Ativos" "$DIM"
+    fi
 
-UPDATES_SUMMARY_COLOR="$FG_GREEN"
-if (( PENDING_UPDATES_COUNT > 0 )); then
-    UPDATES_SUMMARY_COLOR="$FG_YELLOW"
-fi
+    if (( ${#RESUMO_APPS_VERSOES[@]} > 0 )); then
+        local a_idx=0 a_line="" a_line_num=0 a_raw a_fmt
+        for a_raw in "${RESUMO_APPS_VERSOES[@]}"; do
+            a_fmt="${a_raw/:/ }"
+            if [[ -z "$a_line" ]]; then
+                a_line="$a_fmt"
+            else
+                a_line="${a_line}  |  ${a_fmt}"
+            fi
+            a_idx=$((a_idx + 1))
+            if (( a_idx % 3 == 0 )); then
+                if (( a_line_num == 0 )); then
+                    print_tree_row "├─" "Aplicações / Versões:" "$a_line" "$FG_GREEN"
+                else
+                    printf '     %b│%b                        %b%s%b\n' "${DIM}${FG_CYAN}" "$NC" "$FG_GREEN" "$a_line" "$NC"
+                fi
+                a_line=""
+                a_line_num=$((a_line_num + 1))
+            fi
+        done
+        if [[ -n "$a_line" ]]; then
+            if (( a_line_num == 0 )); then
+                print_tree_row "├─" "Aplicações / Versões:" "$a_line" "$FG_GREEN"
+            else
+                printf '     %b│%b                        %b%s%b\n' "${DIM}${FG_CYAN}" "$NC" "$FG_GREEN" "$a_line" "$NC"
+            fi
+        fi
+    else
+        print_tree_row "├─" "Aplicações / Versões:" "Nenhuma aplicação principal detectada" "$DIM"
+    fi
 
-REBOOT_SUMMARY_COLOR="$FG_GREEN"
-if [[ "$REBOOT_NEEDED" == "Sim" ]]; then
-    REBOOT_SUMMARY_COLOR="$FG_RED"
-fi
+    local php_summary_str="Não instalado (Host e Containers)" php_summary_color="$DIM"
+    if (( ${#RESUMO_PHP_VERSOES[@]} > 0 )); then
+        php_summary_str=$(printf '%s  |  ' "${RESUMO_PHP_VERSOES[@]}" | sed 's/  |  $//')
+        php_summary_str="${php_summary_str//:/: }"
+        php_summary_color="$FG_GREEN"
+    fi
+    print_tree_row "├─" "PHP (Host/Container):" "$php_summary_str" "$php_summary_color"
 
-FW_SUMMARY_COLOR="$FG_GREEN"
-if [[ "$FIREWALL_SUMMARY_STATE" == "INATIVO"* ]]; then
-    FW_SUMMARY_COLOR="$FG_RED"
-fi
+    local cb_badge="" cb_color="$FG_CYAN"
+    if [[ "$RESUMO_CERTBOT_STATUS" == *"Auto-Renew: ATIVA"* ]]; then
+        cb_badge="${FG_GREEN}${BOLD}[OK]${NC}"
+    elif [[ "$RESUMO_CERTBOT_STATUS" == *"Auto-Renew: INATIVA"* ]]; then
+        cb_badge="${FG_YELLOW}${BOLD}[ATENÇÃO]${NC}"
+        cb_color="$FG_YELLOW"
+    else
+        cb_color="$DIM"
+    fi
+    print_tree_row "├─" "Certbot / SSL:" "$RESUMO_CERTBOT_STATUS" "$cb_color" "$cb_badge"
 
-LISTA_PACOTES="Nenhum (Modo 100% Passivo / Somente Leitura)"
-if (( ${#PACOTES_INSTALADOS[@]} > 0 )); then
-    LISTA_PACOTES=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
-fi
+    local db_summary_str="Nenhum ativo" db_color="$DIM"
+    if (( ${#RESUMO_BANCOS_ATIVOS[@]} > 0 )); then
+        db_summary_str=$(printf '%s  |  ' "${RESUMO_BANCOS_ATIVOS[@]}" | sed 's/  |  $//')
+        db_color="$FG_CYAN"
+    fi
+    print_tree_row "├─" "Bancos de Dados:" "$db_summary_str" "$db_color"
+    print_tree_row "└─" "Containers Ativos:" "${#RESUMO_CONTAINERS_ATIVOS[@]} ativo(s)" "$FG_CYAN"
+    echo -e "  ${DIM}${FG_CYAN}${box_border}${NC}"
 
-print_summary "1. Sistema Operacional:"     "${OS_NAME} (Kernel ${KERNEL_VER})" "$FG_CYAN"
-print_summary "   Instalado em (SO):"       "${OS_INSTALLED_AT}" "$FG_CYAN"
-print_summary "   Status de Atualização:"   "${OS_UPDATE_STATUS_STR}" "$UPDATES_SUMMARY_COLOR"
-print_summary "   Aguardando Reboot?"       "${REBOOT_NEEDED}${REBOOT_REASON:+ ($REBOOT_REASON)}" "$REBOOT_SUMMARY_COLOR"
-print_summary "2. Usuários com Sudo:"       "${SUDO_USERS_STR}" "$FG_YELLOW"
-print_summary "   Grupos com Sudo:"         "${SUDO_GROUPS_STR}" "$FG_CYAN"
-if (( ${#DISABLED_USERS_SUMMARY[@]} > 0 )); then
-    DISABLED_USERS_STR=$(printf '%s, ' "${DISABLED_USERS_SUMMARY[@]}" | sed 's/, $//')
-    print_summary "   Contas Desativadas:"      "${DISABLED_USERS_STR}" "$FG_YELLOW"
-fi
-print_summary "3. NFS / Samba / LDAP:"      "${STORAGE_REDE_STR}" "$FG_CYAN"
-print_summary "4. Papel do Servidor:"       "${ROLES_STR}" "$FG_YELLOW"
-print_summary "   Aplicações e Versões:"    "${APPS_SUMMARY_STR}" "$FG_GREEN"
-print_summary "   Certbot / SSL:"           "${RESUMO_CERTBOT_STATUS}" "$FG_CYAN"
-print_summary "   PHP (Host + Containers):" "${PHP_SUMMARY_STR}" "$PHP_SUMMARY_COLOR"
-print_summary "   Containers em Execução:"  "${#RESUMO_CONTAINERS_ATIVOS[@]} ativo(s)" "$FG_CYAN"
-print_summary "5. Bancos de Dados:"         "${DB_SUMMARY_STR}" "$FG_CYAN"
-print_summary "6. Firewall de Host:"        "${FIREWALL_SUMMARY_STATE}" "$FW_SUMMARY_COLOR"
-print_summary "7. Hostname / IP Principal:" "${HOSTNAME_SHORT} (${PRIMARY_IP:-N/A})" "$FG_GREEN"
-print_summary "8. Pacotes Instalados:"      "${LISTA_PACOTES}" "$DIM"
-print_summary "9. Relatório na Home:"       "${EXECUTOR_HOME}/${LOG_FILENAME}" "$FG_GREEN"
-draw_separator
+    # --- 4. Segurança, Rede e Relatório Gerado ---
+    echo -e "  ${FG_BLUE}${BOLD}4. Segurança, Rede e Relatório Gerado${NC}"
+    print_tree_row "├─" "Hostname / IP:" "${HOSTNAME_SHORT} (${PRIMARY_IP:-N/A})" "$FG_GREEN"
 
-if (( ${#RESUMO_CONTAINERS_ATIVOS[@]} > 0 )); then
-    echo -e "\n  ${BOLD}${FG_CYAN}Contêineres Ativos e Stack Interna Identificada:${NC}"
-    for c_item in "${RESUMO_CONTAINERS_ATIVOS[@]}"; do
-        echo -e "    • ${c_item}"
-    done
-fi
+    local fw_color="$FG_GREEN" fw_badge="${FG_GREEN}${BOLD}[OK]${NC}"
+    if [[ "$FIREWALL_SUMMARY_STATE" == "INATIVO"* ]]; then
+        fw_color="$FG_RED"
+        fw_badge="${FG_RED}${BOLD}[CRÍTICO]${NC}"
+    elif [[ "$FIREWALL_SUMMARY_STATE" == "Não verificado"* ]]; then
+        fw_color="$DIM"
+        fw_badge=""
+    fi
+    print_tree_row "├─" "Firewall de Host:" "$FIREWALL_SUMMARY_STATE" "$fw_color" "$fw_badge"
 
-if (( ${#RESUMO_SITES_DETECTADOS[@]} > 0 )); then
-    echo -e "\n  ${BOLD}${FG_CYAN}Sites, VirtualHosts e Aplicações Identificadas (Host + Containers):${NC}"
-    for s_item in "${RESUMO_SITES_DETECTADOS[@]}"; do
-        echo -e "    • ${s_item}"
-    done
-fi
+    local lista_pacotes="Nenhum (Modo 100% Passivo / Somente Leitura)"
+    if (( ${#PACOTES_INSTALADOS[@]} > 0 )); then
+        lista_pacotes=$(IFS=', '; echo "${PACOTES_INSTALADOS[*]}")
+    fi
+    print_tree_row "├─" "Pacotes Instalados:" "$lista_pacotes" "$DIM"
+    print_tree_row "└─" "Relatório na Home:" "${EXECUTOR_HOME}/${LOG_FILENAME}" "$FG_GREEN"
+    echo -e "  ${FG_CYAN}${BOLD}${box_double}${NC}"
 
-TOTAL_ALERTS=$(( ${#ALERTAS_CRITICOS[@]} + ${#ALERTAS_AUDITORIA[@]} ))
-if (( TOTAL_ALERTS > 0 )); then
-    echo -e "\n  ${BOLD}${FG_YELLOW}⚠ PONTOS DE ATENÇÃO E RECOMENDAÇÕES (${TOTAL_ALERTS} — Críticos: ${#ALERTAS_CRITICOS[@]} | Atenção: ${#ALERTAS_AUDITORIA[@]}):${NC}"
-    if (( ${#ALERTAS_CRITICOS[@]} > 0 )); then
-        for crit_a in "${ALERTAS_CRITICOS[@]}"; do
-            echo -e "    ${FG_RED}${BOLD}[CRÍTICO]${NC} ${FG_RED}${crit_a}${NC}"
+    if (( ${#RESUMO_CONTAINERS_ATIVOS[@]} > 0 )); then
+        echo -e "\n  ${BOLD}${FG_CYAN}Contêineres Ativos e Stack Interna Identificada:${NC}"
+        local c_i=0 c_total=${#RESUMO_CONTAINERS_ATIVOS[@]} c_br="├─" c_item
+        for c_item in "${RESUMO_CONTAINERS_ATIVOS[@]}"; do
+            c_i=$((c_i + 1))
+            (( c_i == c_total )) && c_br="└─"
+            echo -e "     ${DIM}${FG_CYAN}${c_br}${NC} ${c_item}"
         done
     fi
-    if (( ${#ALERTAS_AUDITORIA[@]} > 0 )); then
-        for alerta in "${ALERTAS_AUDITORIA[@]}"; do
-            echo -e "    ${FG_YELLOW}[ATENÇÃO]${NC} ${alerta}"
+
+    if (( ${#RESUMO_SITES_DETECTADOS[@]} > 0 )); then
+        echo -e "\n  ${BOLD}${FG_CYAN}Sites, VirtualHosts e Aplicações Identificadas (Host + Containers):${NC}"
+        local s_i=0 s_total=${#RESUMO_SITES_DETECTADOS[@]} s_br="├─" s_item
+        for s_item in "${RESUMO_SITES_DETECTADOS[@]}"; do
+            s_i=$((s_i + 1))
+            (( s_i == s_total )) && s_br="└─"
+            echo -e "     ${DIM}${FG_CYAN}${s_br}${NC} ${s_item}"
         done
     fi
-else
-    echo -e "\n  ${FG_GREEN}[+] Nenhum alerta crítico ou ponto de atenção imediato detectado durante a varredura.${NC}"
-fi
+
+    local total_alerts=$(( ${#ALERTAS_CRITICOS[@]} + ${#ALERTAS_AUDITORIA[@]} ))
+    if (( total_alerts > 0 )); then
+        echo -e "\n  ${BOLD}${FG_YELLOW}⚠ PONTOS DE ATENÇÃO E RECOMENDAÇÕES (${total_alerts} — Críticos: ${#ALERTAS_CRITICOS[@]} | Atenção: ${#ALERTAS_AUDITORIA[@]}):${NC}"
+        if (( ${#ALERTAS_CRITICOS[@]} > 0 )); then
+            local crit_a
+            for crit_a in "${ALERTAS_CRITICOS[@]}"; do
+                echo -e "     ${FG_RED}${BOLD}[CRÍTICO]${NC} ${FG_RED}${crit_a}${NC}"
+            done
+        fi
+        if (( ${#ALERTAS_AUDITORIA[@]} > 0 )); then
+            local alerta
+            for alerta in "${ALERTAS_AUDITORIA[@]}"; do
+                echo -e "     ${FG_YELLOW}[ATENÇÃO]${NC} ${alerta}"
+            done
+        fi
+    else
+        echo -e "\n  ${FG_GREEN}[+] Nenhum alerta crítico ou ponto de atenção imediato detectado durante a varredura.${NC}"
+    fi
+    return 0
 }
 
 # ==============================================================================
