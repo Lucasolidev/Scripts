@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.1
+# Version: 1.2
 # ------------------------------------------------
-VERSION="1.1"
+VERSION="1.2"
 readonly SCRIPT_VERSION="$VERSION"
 # ==============================================================================
 # SCRIPT DE AGENDAMENTO DE ATUALIZAÇÃO DO SERVIDOR (DEBIAN / UBUNTU)
