@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.1
+# Version: 1.2
 # ------------------------------------------------
-VERSION="1.1"
+VERSION="1.2"
 # ==============================================================================
 # INSTALADOR E ATUALIZADOR DO BANNER DINÂMICO DE BOAS-VINDAS (MOTD)
 # ==============================================================================
@@ -14,7 +14,7 @@ VERSION="1.1"
 # 2. Verifica as ferramentas nativas necessárias sem alterar pacotes via APT.
 # 3. Instala ou atualiza atomicamente /usr/local/bin/motd_banner.sh com detecção
 #    automática de Hostname, Sistema, Kernel, Data de instalação/primeiro boot,
-#    Uptime, barras de RAM/SWAP/Discos, IPs, UFW e status de Reboot Pendente.
+#    Uptime, CPU/Load, barras de RAM/SWAP/Discos, IPs, UFW e Reboot Pendente.
 # 4. Integra o disparo único em terminais interativos (/etc/profile.d/motd_banner.sh
 #    e /etc/bash.bashrc), preservando scp/sftp/rsync e .hushlogin.
 # 5. Disponibiliza o comando rápido 'motd' em /usr/local/bin/motd para qualquer shell.
@@ -111,19 +111,32 @@ copy_to_home() {
 # Invocada indiretamente pelo trap EXIT.
 # shellcheck disable=SC2317,SC2329
 finalizar() {
-    local rc="$1" home_dir root_saved=0
+    local rc="$1" home_dir root_saved=0 backup_msg tmp_log old_f
+    local -a old_logs=()
     trap - EXIT ERR INT TERM HUP
     set +e
     if (( rc == 0 && ${#PENDENCIAS[@]} > 0 )); then rc=3; fi
+    backup_msg="$BACKUP_DIR"
+    if [[ -d "${BACKUP_DIR:-}" ]] && rmdir -- "$BACKUP_DIR" 2>/dev/null; then
+        backup_msg="Nenhum arquivo alterado exigiu backup (diretório vazio removido)"
+    fi
     printf '\nResultado: código %s. Finalizado em: %s\n' "$rc" "$(date '+%d/%m/%Y %H:%M:%S')"
-    printf 'Relatório previsto: /root/%s\nBackups: %s\n' "$LOG_FILENAME" "$BACKUP_DIR"
+    printf 'Relatório previsto: /root/%s\nBackups: %s\n' "$LOG_FILENAME" "$backup_msg"
     exec 1>&3 2>&4
     wait "$TEE_PID" || { log_error "Falha na captura do relatório."; rc=1; }
-    if install_config "$LOG_FILE" "/root/$LOG_FILENAME" 600; then
+    tmp_log=$(mktemp /root/.install-motd-log.XXXXXXXX 2>/dev/null) || tmp_log=""
+    if [[ -n "$tmp_log" ]] && install -o root -g root -m 600 -- "$LOG_FILE" "$tmp_log" && mv -fT -- "$tmp_log" "/root/$LOG_FILENAME"; then
         root_saved=1
         log_success "Relatório salvo: /root/$LOG_FILENAME"
-        install_config "$LOG_FILE" "/root/$LOG_LATEST" 600 || rc=1
+        tmp_log=$(mktemp /root/.install-motd-log.XXXXXXXX 2>/dev/null) || tmp_log=""
+        if [[ -z "$tmp_log" ]] || ! install -o root -g root -m 600 -- "$LOG_FILE" "$tmp_log" || ! mv -fT -- "$tmp_log" "/root/$LOG_LATEST"; then
+            rm -f -- "$tmp_log"
+            rc=1
+        fi
+        mapfile -t old_logs < <(find /root -maxdepth 1 -type f -name 'relatorio_install_motd_banner_[0-9]*.log' -printf '%T@ %p\n' 2>/dev/null | sort -rn | awk 'NR>10 {sub(/^[^ ]+ /,""); print}')
+        for old_f in "${old_logs[@]}"; do rm -f -- "$old_f"; done
     else
+        rm -f -- "$tmp_log"
         log_error "Não foi possível salvar em /root; relatório preservado em $LOG_FILE"
         rc=1
     fi
@@ -364,6 +377,20 @@ get_install_info() {
 INSTALADO_EM=$(get_install_info)
 UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
 
+CPU_CORES=$(nproc 2>/dev/null || grep -c '^processor' /proc/cpuinfo 2>/dev/null || printf '1')
+[[ "$CPU_CORES" =~ ^[0-9]+$ ]] && [ "$CPU_CORES" -gt 0 ] || CPU_CORES=1
+read -r LOAD1 LOAD5 LOAD15 _ < /proc/loadavg
+LOAD_COLOR="\033[32m"
+LOAD1_INT="${LOAD1%%.*}"
+if [[ "${LOAD1_INT:-}" =~ ^[0-9]+$ ]]; then
+  if [ "$LOAD1_INT" -ge $((CPU_CORES * 2)) ]; then
+    LOAD_COLOR="\033[1;31m"
+  elif [ "$LOAD1_INT" -ge "$CPU_CORES" ]; then
+    LOAD_COLOR="\033[1;33m"
+  fi
+fi
+if [ "$CPU_CORES" -eq 1 ]; then CPU_LBL="1 vCPU"; else CPU_LBL="${CPU_CORES} vCPUs"; fi
+
 read -r MEM_USED MEM_TOTAL MEM_AVAIL <<< "$(free -h 2>/dev/null | awk '/^Mem:/ {print $3, $2, $7}')"
 read -r MEM_B_TOTAL MEM_B_USED <<< "$(free -b 2>/dev/null | awk '/^Mem:/ {print $2, $3}')"
 MEM_PCT=0
@@ -380,6 +407,7 @@ print_row_color "Hostname:" "\033[36m" "${HOSTNAME}"
 print_row_color "Sistema:" "\033[36m" "${SISTEMA}" "(Kernel ${KERNEL})"
 print_row_color "Instalado em:" "\033[36m" "${INSTALADO_EM}"
 print_row_color "Uptime:" "\033[36m" "${UPTIME}"
+printf "     \033[1m%-19s\033[0m \033[36m%s |\033[0m %bLoad: %s, %s, %s\033[0m\n" "CPU / Load:" "$CPU_LBL" "$LOAD_COLOR" "${LOAD1:-N/A}" "${LOAD5:-N/A}" "${LOAD15:-N/A}"
 if [ -n "${MEM_TOTAL:-}" ]; then
   print_row_bar "Memória RAM:" "$MEM_PCT" "${MEM_USED} / ${MEM_TOTAL} | Livre: ${MEM_AVAIL:-N/A}"
 else

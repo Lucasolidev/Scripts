@@ -21,9 +21,10 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 | `/etc/audit/rules.d/server_security.rules` | Regras de auditoria de contas, sudoers, SSH, rede e persistência. |
 | `/etc/pos-install-server/` | Aliases compartilhados e configuração opcional do Vim. |
 | `/usr/local/share/pos-install-server/vim/2.5` | Plugins opcionais fixados por commit, compartilhados e pertencentes a root. |
-| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, Sistema, Data de instalação, Uptime, barras de RAM/SWAP/Disco, IP, UFW e Reboot Pendente). |
+| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, Sistema, Data de instalação, Uptime, CPU/Load, barras de RAM/SWAP/Disco, IP, UFW e Reboot Pendente). |
 | `/etc/profile.d/motd_banner.sh` | Disparador automático do banner no login interativo via SSH ou console local. |
 | `/etc/fail2ban/jail.d/99-pos-install-server.local` | Jaula SSH do script. `jail.local` e outras jaulas são preservadas. |
+| `/etc/systemd/journald.conf.d/99-pos-install.conf` | Limite de retenção do `systemd-journald` (`SystemMaxUse=500M` e `MaxRetentionSec=90day`). |
 | `/etc/default/ufw` | Configurações do firewall UFW (`IPV6=yes` quando IPv6 está disponível no kernel; `IPV6=no` caso contrário). |
 | `/etc/default/keyboard` | Mapeamento dual de layout de teclado (`ABNT2` + `US-International`). |
 | `/etc/sudoers.d/grupo_*` | Administração ampla com bloqueios de operações diretas para grupos operacionais (protege automaticamente todos os membros do grupo `sudo`). |
@@ -576,7 +577,7 @@ Em uma VM limpa, informar `dev` cria somente `/etc/sudoers.d/grupo_dev`, com reg
 | `sudo passwd` sem argumento | Negado, pois atuaria sobre root. |
 | Editar arquivos protegidos | Bloqueia editor + caminho absoluto exato em nano, vi, vim, vim.tiny e editor; sudoedit também é negado. |
 | Caminhos SSH protegidos pelas barreiras | `sshd_config` e arquivos `.conf` existentes em `sshd_config.d/` com nomes simples, sob `/etc/ssh/`. A negação para `pos-install-server.conf` permanece por compatibilidade com a política legada, mas esse arquivo não é criado nas novas execuções. |
-| Outros bloqueios preservados | visudo, usermod, gpasswd, su e leituras diretas específicas de shadow. Também é negado executar sudo dentro de outro sudo. |
+| Outros bloqueios preservados | `visudo`, `usermod`, `userdel`, `deluser`, `chpasswd`, `chgpasswd`, `chage` (nas contas protegidas), `gpasswd`, `su` e leituras diretas específicas de `shadow`. Também é negado executar `sudo` dentro de outro `sudo`. |
 
 > ⚠️ Shells, instaladores e outros programas privilegiados continuam capazes de modificar contas e SSH. As regras não impedem que outro administrador tome controle do servidor. Outras concessões sudoers ou associação ao grupo sudo também podem alterar o resultado efetivo; confira a política de cada conta.
 

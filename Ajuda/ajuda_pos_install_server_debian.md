@@ -21,9 +21,10 @@ Guia operacional rápido, referência de configurações e *cheat sheet* complet
 | `/etc/audit/rules.d/server_security.rules` | Regras ativas de auditoria do Auditd (contas, sudoers, SSH, rede `/etc/network` e persistência). |
 | `/etc/pos-install-server/` | Aliases compartilhados do Shell e configurações centralizadas do Vim. |
 | `/usr/local/share/pos-install-server/vim/2.5` | Plugins opcionais fixados por commit (Sonokai, Airline, Polyglot, Devicons). |
-| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, OS, Data de instalação, RAM, Discos, IPs, Firewall). |
+| `/usr/local/bin/motd_banner.sh` | Script autônomo do banner dinâmico com métricas em tempo real (Host, OS, Data de instalação, CPU/Load, RAM, Discos, IPs, Firewall e Reboot Pendente). |
 | `/etc/profile.d/motd_banner.sh` | Disparador automático do banner no login interativo via SSH ou console local. |
 | `/etc/fail2ban/jail.d/99-pos-install-server.local` | Jaula SSH gerenciada com backend `systemd` e proteção contra ataques de força bruta. |
+| `/etc/systemd/journald.conf.d/99-pos-install.conf` | Limite de retenção do `systemd-journald` (`SystemMaxUse=500M` e `MaxRetentionSec=90day`). |
 | `/etc/default/ufw` | Configurações do firewall UFW (`IPV6=yes` quando IPv6 está disponível no kernel; `IPV6=no` caso contrário). |
 | `/etc/default/keyboard` | Mapeamento dual de layout de teclado (`ABNT2` + `US-International`). |
 | `/etc/default/locale` | Arquivo oficial de configuração dos locales padrão no Debian (`en_US.UTF-8` e `pt_BR.UTF-8`). |
@@ -276,7 +277,7 @@ Disponíveis para todos os usuários com login interativo no Bash:
 Exibe no login de console e SSH:
 * Hostname, Sistema Operacional (`Debian GNU/Linux 12/13`) e Kernel
 * Data aproximada de instalação ou primeiro boot do SO (VM/Físico, Template, LXC ou WSL)
-* Uptime detalhado do servidor
+* Uptime detalhado do servidor e `CPU / Load` com alerta por cor conforme o número de vCPUs
 * Memória RAM e SWAP com barra de uso percentual e alerta por cor
 * Utilização de todas as partições montadas com barra percentual e alerta por cor
 * IPs locais de todas as interfaces físicas ativas

@@ -21,7 +21,7 @@
 # 11. Gerencia somente o grupo operacional informado, preservando maiúsculas/minúsculas, e usuários com barreiras operacionais no sudoers, sem isolamento contra administradores.
 # 12. Configura e ativa o Firewall UFW Dual-Stack (IPv4/IPv6) liberando portas SSH detectadas e Zabbix Agent (10050/tcp).
 # 13. Opcionalmente personaliza o editor Vim com tema Sonokai, Airline e plugins fixados por commit com suporte multi-usuário (/root, /etc/skel, /home).
-# 14. Instala o Banner dinâmico de Boas-Vindas no login (/usr/local/bin/motd_banner.sh integrado ao /etc/profile.d e /etc/bash.bashrc) com Hostname, Sistema, Kernel, Data de instalação, Uptime, barras de RAM/SWAP/Discos, IPs, UFW e Reboot Pendente.
+# 14. Instala o Banner dinâmico de Boas-Vindas no login (/usr/local/bin/motd_banner.sh integrado ao /etc/profile.d e /etc/bash.bashrc) com Hostname, Sistema, Kernel, Data de instalação, Uptime, CPU/Load, barras de RAM/SWAP/Discos, IPs, UFW e Reboot Pendente.
 # 15. Exibe o Resumo da Instalação com auditoria completa de status, pacotes, serviços e grava os logs em /root e na Home.
 # ==============================================================================
 
@@ -139,7 +139,8 @@ copy_to_home() {
 # Invocada indiretamente pelo trap EXIT.
 # shellcheck disable=SC2317,SC2329
 finalizar() {
-    local rc="$1" home_dir root_saved=0
+    local rc="$1" home_dir root_saved=0 backup_msg tmp_log old_f
+    local -a old_logs=()
     trap - EXIT ERR INT TERM HUP
     set +e
     if [[ "${SSH_TRANSACTION_ACTIVE:-N}" == S ]]; then
@@ -147,15 +148,27 @@ finalizar() {
         rollback_ssh || { log_error "Restauração SSH incompleta; use os backups pelo console."; rc=1; }
     fi
     if (( rc == 0 && ${#PENDENCIAS[@]} > 0 )); then rc=3; fi
+    backup_msg="$BACKUP_DIR"
+    if [[ -d "${BACKUP_DIR:-}" ]] && rmdir -- "$BACKUP_DIR" 2>/dev/null; then
+        backup_msg="Nenhum arquivo alterado exigiu backup (diretório vazio removido)"
+    fi
     printf '\nResultado: código %s. Finalizado em: %s\n' "$rc" "$(date '+%d/%m/%Y %H:%M:%S')"
-    printf 'Relatório previsto: /root/%s\nBackups: %s\n' "$LOG_FILENAME" "$BACKUP_DIR"
+    printf 'Relatório previsto: /root/%s\nBackups: %s\n' "$LOG_FILENAME" "$backup_msg"
     exec 1>&3 2>&4
     wait "$TEE_PID" || { log_error "Falha na captura do relatório."; rc=1; }
-    if install_config "$LOG_FILE" "/root/$LOG_FILENAME" 600; then
+    tmp_log=$(mktemp /root/.pos-install-log.XXXXXXXX 2>/dev/null) || tmp_log=""
+    if [[ -n "$tmp_log" ]] && install -o root -g root -m 600 -- "$LOG_FILE" "$tmp_log" && mv -fT -- "$tmp_log" "/root/$LOG_FILENAME"; then
         root_saved=1
         log_success "Relatório salvo: /root/$LOG_FILENAME"
-        install_config "$LOG_FILE" "/root/$LOG_LATEST" 600 || rc=1
+        tmp_log=$(mktemp /root/.pos-install-log.XXXXXXXX 2>/dev/null) || tmp_log=""
+        if [[ -z "$tmp_log" ]] || ! install -o root -g root -m 600 -- "$LOG_FILE" "$tmp_log" || ! mv -fT -- "$tmp_log" "/root/$LOG_LATEST"; then
+            rm -f -- "$tmp_log"
+            rc=1
+        fi
+        mapfile -t old_logs < <(find /root -maxdepth 1 -type f -name 'relatorio_pos_install_server_ubuntu_[0-9]*.log' -printf '%T@ %p\n' 2>/dev/null | sort -rn | awk 'NR>10 {sub(/^[^ ]+ /,""); print}')
+        for old_f in "${old_logs[@]}"; do rm -f -- "$old_f"; done
     else
+        rm -f -- "$tmp_log"
         log_error "Não foi possível salvar em /root; relatório preservado em $LOG_FILE"
         rc=1
     fi
@@ -585,9 +598,9 @@ if (( ${#GRUPOS_AUDITADOS[@]} )); then
             printf '%%%s ALL=(ALL:ALL) ALL' "$grp"
             printf ', !/usr/bin/passwd ""'
             for adm_prot in "${ADMINS_PROTEGIDOS[@]}"; do
-                printf ', !/usr/bin/passwd %s' "$adm_prot"
+                printf ', !/usr/bin/passwd %s, !/usr/bin/chage %s' "$adm_prot" "$adm_prot"
             done
-            printf ', !/usr/sbin/visudo, !/usr/sbin/usermod, !/usr/bin/gpasswd, !/usr/bin/su, !/usr/bin/sudo'
+            printf ', !/usr/sbin/visudo, !/usr/sbin/usermod, !/usr/sbin/userdel, !/usr/sbin/deluser, !/usr/sbin/chpasswd, !/usr/sbin/chgpasswd, !/usr/bin/gpasswd, !/usr/bin/su, !/usr/bin/sudo'
             # Somente editor + caminho absoluto exato. Opções, múltiplos arquivos,
             # caminhos relativos e outras ferramentas continuam contornando.
             for editor in /usr/bin/nano /usr/bin/vi /usr/bin/vim /usr/bin/vim.tiny /usr/bin/editor; do
@@ -638,13 +651,19 @@ if [[ "$PERMITIR_ROOT_SSH" == S ]]; then
 elif [[ "$ADMIN_SSH_PREEXISTENTE" == S ]] && id "$ADMIN_SSH_VALIDADO" >/dev/null 2>&1 &&
      id -nG "$ADMIN_SSH_VALIDADO" | tr ' ' '\n' | grep -qx sudo; then
     ADMIN_SHELL=$(getent passwd "$ADMIN_SSH_VALIDADO" | cut -d: -f7)
+    ADMIN_HOME=$(getent passwd "$ADMIN_SSH_VALIDADO" | cut -d: -f6)
     ADMIN_STATE=$(passwd -S "$ADMIN_SSH_VALIDADO" | awk '{print $2}')
     ADMIN_SHELL_OK=N
     case "$ADMIN_SHELL" in
         /bin/bash|/usr/bin/bash|/bin/zsh|/usr/bin/zsh|/bin/sh|/usr/bin/sh|/bin/dash|/usr/bin/dash|/usr/bin/fish)
             [[ -x "$ADMIN_SHELL" ]] && ADMIN_SHELL_OK=S ;;
     esac
-    if [[ "$ADMIN_SHELL_OK" == S && "$ADMIN_STATE" == P ]] &&
+    ADMIN_HAS_SSH_KEY=N
+    if [[ -d "$ADMIN_HOME/.ssh" && ! -L "$ADMIN_HOME/.ssh" && -f "$ADMIN_HOME/.ssh/authorized_keys" && ! -L "$ADMIN_HOME/.ssh/authorized_keys" ]] &&
+       grep -qE '^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)[[:space:]]+' "$ADMIN_HOME/.ssh/authorized_keys" 2>/dev/null; then
+        ADMIN_HAS_SSH_KEY=S
+    fi
+    if [[ "$ADMIN_SHELL_OK" == S ]] && [[ "$ADMIN_STATE" == P || "$ADMIN_HAS_SSH_KEY" == S ]] &&
        sudo -l -U "$ADMIN_SSH_VALIDADO" >/dev/null 2>&1; then
         ROOT_POLICY=no
         CHANGE_ROOT=S
@@ -775,11 +794,17 @@ if ! awk -v expected="$ROOT_EXPECTED" '
 fi
 if [[ "$CHANGE_ROOT" == S && "$ROOT_POLICY" == no ]]; then
     sshd -T "${SSH_CONTEXT_ARGS[@]}" -C "user=$ADMIN_SSH_VALIDADO" > "$LOG_DIR/ssh-admin"
+    ADMIN_AUTH_OK=N
+    if [[ "${ADMIN_STATE:-}" == P ]] && grep -qx 'passwordauthentication yes' "$LOG_DIR/ssh-admin"; then
+        ADMIN_AUTH_OK=S
+    elif [[ "${ADMIN_HAS_SSH_KEY:-N}" == S ]] && grep -qx 'pubkeyauthentication yes' "$LOG_DIR/ssh-admin"; then
+        ADMIN_AUTH_OK=S
+    fi
     # Não presumir acesso quando há restrições adicionais ou múltiplos fatores.
     if grep -qE '^(allowusers|denyusers|allowgroups|denygroups) ' "$LOG_DIR/ssh-admin" ||
        ! grep -qx 'authenticationmethods any' "$LOG_DIR/ssh-admin" ||
        ! grep -qx 'forcecommand none' "$LOG_DIR/ssh-admin" ||
-       ! grep -qx 'passwordauthentication yes' "$LOG_DIR/ssh-admin"; then
+       [[ "$ADMIN_AUTH_OK" != S ]]; then
         # Não altera autenticação por chave/AllowUsers/Match/MFA para tentar
         # satisfazer uma verificação simplificada. Preserva o SSH inteiro.
         rollback_ssh
@@ -866,6 +891,26 @@ if ! systemctl enable --now fail2ban || ! systemctl restart fail2ban || ! wait_f
     fatal "Jaula SSH indisponível; configuração anterior restaurada."
 fi
 log_success "Fail2Ban ativo; jaula SSH responde. Outras jaulas e jail.local preservados."
+
+# 6.1 - Limite de retenção do systemd-journald para evitar consumo excessivo de disco
+JOURNALD_DROPIN=/etc/systemd/journald.conf.d/99-pos-install.conf
+JOURNALD_STATUS="Configurado (SystemMaxUse=500M)"
+install -d -m 0755 -o root -g root /etc/systemd/journald.conf.d
+cat > "$LOG_DIR/journald-limit.conf" <<'EOF'
+# Gerenciado por pos_install_server; evita crescimento excessivo em /var/log/journal.
+[Journal]
+SystemMaxUse=500M
+RuntimeMaxUse=100M
+MaxRetentionSec=90day
+EOF
+install_config "$LOG_DIR/journald-limit.conf" "$JOURNALD_DROPIN" 644
+if systemctl is-active --quiet systemd-journald; then
+    if ! systemctl restart systemd-journald; then
+        JOURNALD_STATUS="Drop-in gravado; recarga pendente"
+        pendencia "Não foi possível reiniciar systemd-journald após gravar $JOURNALD_DROPIN."
+    fi
+fi
+log_success "Journald limitado em 500M ($JOURNALD_DROPIN)."
 cat > "$LOG_DIR/auto-upgrades" <<'EOF'
 // Gerenciado por pos_install_server. Origens permitidas permanecem na política da distribuição.
 APT::Periodic::Update-Package-Lists "1";
@@ -1562,6 +1607,20 @@ get_install_info() {
 INSTALADO_EM=$(get_install_info)
 UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || echo "N/A")
 
+CPU_CORES=$(nproc 2>/dev/null || grep -c '^processor' /proc/cpuinfo 2>/dev/null || printf '1')
+[[ "$CPU_CORES" =~ ^[0-9]+$ ]] && [ "$CPU_CORES" -gt 0 ] || CPU_CORES=1
+read -r LOAD1 LOAD5 LOAD15 _ < /proc/loadavg
+LOAD_COLOR="\033[32m"
+LOAD1_INT="${LOAD1%%.*}"
+if [[ "${LOAD1_INT:-}" =~ ^[0-9]+$ ]]; then
+  if [ "$LOAD1_INT" -ge $((CPU_CORES * 2)) ]; then
+    LOAD_COLOR="\033[1;31m"
+  elif [ "$LOAD1_INT" -ge "$CPU_CORES" ]; then
+    LOAD_COLOR="\033[1;33m"
+  fi
+fi
+if [ "$CPU_CORES" -eq 1 ]; then CPU_LBL="1 vCPU"; else CPU_LBL="${CPU_CORES} vCPUs"; fi
+
 read -r MEM_USED MEM_TOTAL MEM_AVAIL <<< "$(free -h 2>/dev/null | awk '/^Mem:/ {print $3, $2, $7}')"
 read -r MEM_B_TOTAL MEM_B_USED <<< "$(free -b 2>/dev/null | awk '/^Mem:/ {print $2, $3}')"
 MEM_PCT=0
@@ -1578,6 +1637,7 @@ print_row_color "Hostname:" "\033[36m" "${HOSTNAME}"
 print_row_color "Sistema:" "\033[36m" "${SISTEMA}" "(Kernel ${KERNEL})"
 print_row_color "Instalado em:" "\033[36m" "${INSTALADO_EM}"
 print_row_color "Uptime:" "\033[36m" "${UPTIME}"
+printf "     \033[1m%-19s\033[0m \033[36m%s |\033[0m %bLoad: %s, %s, %s\033[0m\n" "CPU / Load:" "$CPU_LBL" "$LOAD_COLOR" "${LOAD1:-N/A}" "${LOAD5:-N/A}" "${LOAD15:-N/A}"
 if [ -n "${MEM_TOTAL:-}" ]; then
   print_row_bar "Memória RAM:" "$MEM_PCT" "${MEM_USED} / ${MEM_TOTAL} | Livre: ${MEM_AVAIL:-N/A}"
 else
@@ -1735,7 +1795,7 @@ print_summary "Fail2Ban:" "$SERVICE_STATUS; jaula sshd verificada" "$RESULT_COLO
 print_summary "Configuração:" "$F2B_FILE"
 print_summary "IPs/redes ignorados:" "$F2B_IGNORE"
 print_summary_section "UFW — FIREWALL E REGRAS ATUAIS"
-if UFW_SUMMARY=$(ufw status); then
+if UFW_SUMMARY=$(ufw status 2>/dev/null); then
     RESULT_COLOR=$FG_YELLOW
     UFW_SUMMARY_STATUS="Inativo"
     if grep -q '^Status: active' <<< "$UFW_SUMMARY"; then
@@ -1745,6 +1805,10 @@ if UFW_SUMMARY=$(ufw status); then
     print_summary "Firewall UFW:" "$UFW_SUMMARY_STATUS" "$RESULT_COLOR"
     printf '\n'
     while IFS= read -r item; do printf '  %b%s%b\n' "$FG_CYAN" "$item" "$NC"; done <<< "$UFW_SUMMARY"
+elif [[ "$HABILITAR_UFW" != S ]]; then
+    print_summary "Firewall UFW:" "Não solicitado (consulta indisponível neste ambiente)" "$FG_CYAN"
+elif is_wsl || systemd-detect-virt --container --quiet; then
+    print_summary "Firewall UFW:" "Indisponível no contêiner/WSL (gerenciado pelo host)" "$FG_YELLOW"
 else
     pendencia "Não foi possível consultar as regras atuais do UFW no resumo."
 fi
@@ -1759,6 +1823,9 @@ if ! is_wsl && ! systemd-detect-virt --container --quiet; then
     print_summary "Regras gerenciadas:" "/etc/audit/rules.d/server_security.rules"
     print_summary "Logs de auditoria:" "/var/log/audit/"
 fi
+RESULT_COLOR=$FG_YELLOW
+if [[ "$JOURNALD_STATUS" == "Configurado (SystemMaxUse=500M)" ]]; then RESULT_COLOR=$FG_GREEN; fi
+print_summary "Journald:" "$JOURNALD_STATUS" "$RESULT_COLOR"
 RESULT_COLOR=$FG_YELLOW
 if [[ "$SHM_STATUS" == "noexec,nosuid,nodev verificados na montagem" ]]; then RESULT_COLOR=$FG_GREEN; fi
 print_summary "/dev/shm:" "$SHM_STATUS" "$RESULT_COLOR"
