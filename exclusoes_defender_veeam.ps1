@@ -1,3 +1,11 @@
+# ==============================================================================
+# Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/exclusoes_defender_veeam.ps1 | iex
+#
+# Execucao remota passando repositorios locais extras manualmente:
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/exclusoes_defender_veeam.ps1))) -RepositoryPaths 'E:\Backups','F:\Veeam'
+# ==============================================================================
+
 <#
 .SYNOPSIS
     Aplica exclusoes recomendadas (KB1999) no Microsoft Defender para Veeam Backup & Replication.
@@ -56,14 +64,6 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$IgnorarAutoDeteccaoRepositorios
 )
-
-# ==============================================================================
-# Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
-# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/exclusoes_defender_veeam.ps1 | iex
-#
-# Execucao remota passando repositorios locais extras manualmente:
-# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/exclusoes_defender_veeam.ps1))) -RepositoryPaths 'E:\Backups','F:\Veeam'
-# ==============================================================================
 
 $ErrorActionPreference = 'Stop'
 $codigoSaida = 1
