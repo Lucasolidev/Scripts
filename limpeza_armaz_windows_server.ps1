@@ -1,3 +1,11 @@
+# ==============================================================================
+# Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/limpeza_armaz_windows_server.ps1 | iex
+#
+# Execucao remota com /ResetBase (remove versoes antigas de componentes substituidos):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/limpeza_armaz_windows_server.ps1))) -ResetBase
+# ==============================================================================
+
 <#
 .SYNOPSIS
     Analisa e executa a limpeza do repositorio de componentes (WinSxS) no Windows Server e Windows 11.
@@ -29,11 +37,6 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$ResetBase
 )
-
-# ==============================================================================
-# Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
-# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/lucasolidev/scripts/main/limpeza_armaz_windows_server.ps1 | iex
-# ==============================================================================
 
 $ErrorActionPreference = 'Stop'
 $codigoSaida = 1

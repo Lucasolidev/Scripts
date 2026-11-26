@@ -1,3 +1,11 @@
+# ==============================================================================
+# Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/agendar_reinicio.ps1 | iex
+#
+# Execucao remota informando o horario diretamente:
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/agendar_reinicio.ps1))) -Horario '23:30'
+# ==============================================================================
+
 <#
 .SYNOPSIS
     Agenda o reinicio do Windows para um horario especifico (HH:MM).
@@ -80,7 +88,7 @@ try {
     $diferenca = ($dataAlvo - (Get-Date)).TotalSeconds
     $segundos = [math]::Round($diferenca)
 
-    if ($PSCmdlet.ShouldProcess("Computador Local", "Agendar reinicio para $dataAlvo ($segundos segundos)")) {
+    if (($null -eq $PSCmdlet) -or $PSCmdlet.ShouldProcess("Computador Local", "Agendar reinicio para $dataAlvo ($segundos segundos)")) {
         $etapa = 'Agendamento com shutdown.exe'
 
         Write-Host "==========================================================" -ForegroundColor Cyan
@@ -137,5 +145,10 @@ if ($null -ne $dataAlvo) {
 Write-Host "  - Comando de Cancelar:   shutdown /a" -ForegroundColor White
 Write-Host "  - Codigo de saida:       $codigoSaida" -ForegroundColor White
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+
+# Quando executado via Invoke-Expression (iex), usa return para nao fechar a janela do PowerShell do operador
+if ([string]::IsNullOrEmpty($PSCommandPath)) {
+    return
+}
 
 exit $codigoSaida

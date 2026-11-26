@@ -105,8 +105,24 @@
 >    - Para scripts `.ps1` que contenham caracteres nao ASCII e devam funcionar no Windows PowerShell 5.1, use UTF-8 com BOM. Texto ASCII e um subconjunto de UTF-8, mas mensagens de ferramentas externas ainda dependem da codificacao do terminal.
 >    - Para arquivos consumidos por ferramentas externas, siga a codificacao exigida pelo consumidor e declare-a no codigo. No Windows PowerShell 5.1, `-Encoding UTF8` grava BOM; no PowerShell 7, o padrao de saida textual e UTF-8 sem BOM. Quando necessario em ambos, use `System.Text.UTF8Encoding` com BOM desabilitado e uma API de escrita apropriada, respeitando as protecoes contra sobrescrita.
 >
-> 11. **Execucao Remota Segura**:
->    - Nao recomende `irm <URL> | iex` nos metadados ou exemplos. Oriente o operador a baixar o arquivo, revisar seu conteudo e executar a copia local validada.
+> 11. **Execucao Remota Padronizada (Bloco no Topo do Script)**:
+>    - Todo script PowerShell autonomo (`.ps1`) da raiz do repositorio deve conter **obrigatoriamente nas primeiras linhas do arquivo (acima do bloco `<# ... #>`)** o comentario de execucao recomendada em comando unico para facil copia e colagem no GitHub:
+>      ```powershell
+>      # ==============================================================================
+>      # Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
+>      # [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/<NOME_DO_SCRIPT>.ps1 | iex
+>      # ==============================================================================
+>      ```
+>    - Quando o script nao exigir elevacao (ex: escopo `HKCU` ou leitura local), ajuste a legenda removendo `como Administrador`.
+>    - Quando o script possuir parametros publicos uteis na execucao remota, inclua tambem uma variante usando `[scriptblock]::Create(...)`, pois `| iex` nao aceita parametros apos o pipe:
+>      ```powershell
+>      # Execucao remota passando parametros:
+>      # [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/<NOME_DO_SCRIPT>.ps1))) -Parametro "Valor"
+>      ```
+>    - **Compatibilidade obrigatoria com `irm ... | iex`**:
+>      * Proteja chamadas a `$PSCmdlet.ShouldProcess(...)` contra `$null -eq $PSCmdlet`: `(($null -eq $PSCmdlet) -or $PSCmdlet.ShouldProcess(...))`.
+>      * Ao encerrar o script, use `if ([string]::IsNullOrEmpty($PSCommandPath)) { return }` antes de `exit $codigoSaida`, evitando fechar a janela do PowerShell do operador quando executado em memoria via `iex`.
+>    - A URL deve apontar sempre diretamente para a raiz da branch `main` (`https://raw.githubusercontent.com/Lucasolidev/Scripts/main/<NOME_DO_SCRIPT>.ps1`). Recomende revisar o conteudo antes de executar em producao.
 > "
 >
 > ---
@@ -116,6 +132,14 @@
 > Este esqueleto destina-se a um script executavel de console, chamado com `-File` ou `&`, e nao a dot-sourcing ou importacao como modulo, pois utiliza `exit`. Substitua o `throw` de operacao pendente pela implementacao e pela verificacao de sua pos-condicao antes de usar em producao. Enquanto nao adaptado, o caminho normal falha explicitamente; `-WhatIf` apenas mostra o planejamento. Para etapas irreversiveis, acrescente a confirmacao textual e as validacoes de backup da secao 8 dentro do bloco autorizado.
 >
 > ```powershell
+> # ==============================================================================
+> # Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
+> # [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/TemplateScript.ps1 | iex
+> #
+> # Execucao remota passando parametros:
+> # [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/TemplateScript.ps1))) -ParametroExemplo "AlvoDeExemplo"
+> # ==============================================================================
+> 
 > <#
 > .SYNOPSIS
 >     Template estrutural de referencia para scripts PowerShell.
@@ -154,7 +178,7 @@
 >
 > try {
 >     # Validar aqui o alvo exato e as pre-condicoes, usando apenas leitura.
->     if ($PSCmdlet.ShouldProcess($ParametroExemplo, 'Executar operacao principal')) {
+>     if (($null -eq $PSCmdlet) -or $PSCmdlet.ShouldProcess($ParametroExemplo, 'Executar operacao principal')) {
 >         $etapa = 'Operacao principal'
 >         # Substituir o throw pela operacao e verificar o resultado antes do sucesso.
 >         throw 'Operacao principal ainda nao implementada.'
@@ -187,6 +211,12 @@
 > Write-Host "  - Status: $status" -ForegroundColor $corStatus
 > Write-Host "  - Codigo de saida: $codigoSaida" -ForegroundColor White
 > Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+> 
+> # Quando executado via Invoke-Expression (iex), usa return para nao fechar a janela do PowerShell do operador
+> if ([string]::IsNullOrEmpty($PSCommandPath)) {
+>     return
+> }
+> 
 > exit $codigoSaida
 > ```
 

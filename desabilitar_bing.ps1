@@ -1,3 +1,8 @@
+# ==============================================================================
+# Execucao recomendada (copiar e colar comando unico no PowerShell):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/desabilitar_bing.ps1 | iex
+# ==============================================================================
+
 <#
 .SYNOPSIS
     Desabilita o Bing na barra de pesquisa do Windows 10 e 11.
@@ -37,7 +42,7 @@ try {
     $name = 'BingSearchEnabled'
     $value = 0
 
-    if ($PSCmdlet.ShouldProcess($path, "Definir $name = $value e reiniciar o processo explorer")) {
+    if (($null -eq $PSCmdlet) -or $PSCmdlet.ShouldProcess($path, "Definir $name = $value e reiniciar o processo explorer")) {
         $etapa = 'Configuracao do Registro'
 
         Write-Host "`nConfigurando o Registro do Windows..." -ForegroundColor Yellow
@@ -84,5 +89,10 @@ Write-Host "  - Valor Definido:  BingSearchEnabled = 0" -ForegroundColor White
 Write-Host "  - Processo:        explorer.exe reiniciado" -ForegroundColor White
 Write-Host "  - Codigo de saida: $codigoSaida" -ForegroundColor White
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+
+# Quando executado via Invoke-Expression (iex), usa return para nao fechar a janela do PowerShell do operador
+if ([string]::IsNullOrEmpty($PSCommandPath)) {
+    return
+}
 
 exit $codigoSaida

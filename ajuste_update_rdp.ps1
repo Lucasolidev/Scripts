@@ -1,3 +1,8 @@
+# ==============================================================================
+# Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/ajuste_update_rdp.ps1 | iex
+# ==============================================================================
+
 <#
 .SYNOPSIS
     Ajusta configuracoes de registro para suprimir avisos de redirecionamento no RDP.
@@ -38,7 +43,7 @@ try {
     $name = 'RedirectionWarningDialogVersion'
     $value = 1
 
-    if ($PSCmdlet.ShouldProcess($registryPath, "Definir $name = $value")) {
+    if (($null -eq $PSCmdlet) -or $PSCmdlet.ShouldProcess($registryPath, "Definir $name = $value")) {
         $etapa = 'Configuracao do Registro'
 
         Write-Host "`nAplicando configuracao no Registro do Windows..." -ForegroundColor Cyan
@@ -85,5 +90,10 @@ Write-Host "  - Chave Alvo:      HKLM\...\Terminal Services\Client" -ForegroundC
 Write-Host "  - Valor Definido:  RedirectionWarningDialogVersion = 1" -ForegroundColor White
 Write-Host "  - Codigo de saida: $codigoSaida" -ForegroundColor White
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+
+# Quando executado via Invoke-Expression (iex), usa return para nao fechar a janela do PowerShell do operador
+if ([string]::IsNullOrEmpty($PSCommandPath)) {
+    return
+}
 
 exit $codigoSaida

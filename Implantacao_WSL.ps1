@@ -1,3 +1,11 @@
+# ==============================================================================
+# Execucao recomendada (copiar e colar comando unico no PowerShell como Administrador):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/Implantacao_WSL.ps1 | iex
+#
+# Execucao remota para criar apenas instancias descartaveis de teste (-Modo CriarTestes):
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/Lucasolidev/Scripts/main/Implantacao_WSL.ps1))) -Modo CriarTestes
+# ==============================================================================
+
 <#
 .SYNOPSIS
     Prepara imagens-base do Ubuntu no WSL ou cria instancias descartaveis de teste.
@@ -430,6 +438,9 @@ catch {
     Write-Host ' ERRO NA EXECUCAO' -ForegroundColor Red
     Write-Host '==========================================================' -ForegroundColor Red
     Write-Host " $($_.Exception.Message)" -ForegroundColor Red
+    if ([string]::IsNullOrEmpty($PSCommandPath)) {
+        return
+    }
     exit 1
 }
 finally {
