@@ -1,8 +1,8 @@
 #!/bin/bash
 # ------------------------------------------------
-# Version: 1.2
+# Version: 1.3
 # ------------------------------------------------
-VERSION="1.2"
+VERSION="1.3"
 readonly SCRIPT_VERSION="$VERSION"
 # ==============================================================================
 # SCRIPT DE AGENDAMENTO DE ATUALIZAÇÃO DO SERVIDOR (DEBIAN / UBUNTU)
@@ -386,7 +386,7 @@ SERVICOS_DISABLED_BOOT=()
 while IFS= read -r svc; do
     [[ -z "$svc" ]] && continue
     case "$svc" in
-        user@*|session-*|getty@*|serial-getty@*|agendar-atualizacao-*|wpa_supplicant.service|ModemManager.service|bluetooth.service|cups-browsed.service)
+        user@*|session-*|getty@*|serial-getty@*|agendar-atualizacao-*|wpa_supplicant.service|ModemManager.service|bluetooth.service|cups-browsed.service|upower.service|udisks2.service|packagekit.service|polkit.service|fwupd.service|accounts-daemon.service|colord.service|rtkit-daemon.service|power-profiles-daemon.service|switcheroo-control.service)
             continue
             ;;
     esac
@@ -405,7 +405,7 @@ else
     log_success "Persistência de boot dos serviços em execução: OK (nenhum daemon ativo marcado como 'disabled')."
 fi
 
-FAILED_PRE_EXISTENTES="$(systemctl list-units --state=failed --plain --no-legend --no-pager 2>/dev/null | awk '{print $1}' | tr '\n' ' ' | sed 's/ $//' || true)"
+FAILED_PRE_EXISTENTES="$(systemctl list-units --state=failed --plain --no-legend --no-pager 2>/dev/null | awk '{print $1}' | grep -Ev '^agendar-atualizacao-' | tr '\n' ' ' | sed 's/ $//' || true)"
 if [[ -n "$FAILED_PRE_EXISTENTES" ]]; then
     log_warning "Unidade(s) systemd JÁ em estado FAILED antes da janela (serão tratadas como pré-existentes no pós-boot): ${FAILED_PRE_EXISTENTES}"
 fi
@@ -522,8 +522,8 @@ if [[ "$OPCAO_MENU" == "2" ]]; then
     if [[ -f "/root/relatorio_execucao_atualizacao_latest.log" ]]; then
         printf '\n'
         log_success "Último relatório de execução encontrado: /root/relatorio_execucao_atualizacao_latest.log"
-        log_info "Últimas 20 linhas do relatório:"
-        tail -n 20 "/root/relatorio_execucao_atualizacao_latest.log" | sed 's/^/      /'
+        log_info "Últimas 35 linhas do relatório:"
+        tail -n 35 "/root/relatorio_execucao_atualizacao_latest.log" | sed 's/^/      /'
     else
         log_info "Nenhum relatório de execução anterior encontrado em /root/."
     fi
@@ -544,8 +544,9 @@ if [[ "$OPCAO_MENU" == "3" ]]; then
     ACAO_REALIZADA="Cancelamento de agendamento"
     print_header "3. CANCELAMENTO DE AGENDAMENTO"
 
-    if [[ "$AGENDAMENTO_EXISTE" == "N" && ! -f "$POSTBOOT_SERVICE_FILE" ]]; then
-        log_info "Não existe nenhum agendamento ativo para cancelar."
+    if [[ "$AGENDAMENTO_EXISTE" == "N" && ! -f "$POSTBOOT_SERVICE_FILE" && ! -f "$SERVICE_FILE" ]] && \
+       ! systemctl is-failed --quiet "${UNIT_NAME}.service" 2>/dev/null; then
+        log_info "Não existe nenhum agendamento ou artefato pendente para cancelar."
     else
         read -r -p "$(printf '%b' "  ${FG_YELLOW}${ARROW} Confirma o cancelamento do agendamento pendente? (s/N): ${NC}")" CONF_CANCEL
         log_info "Confirmação de cancelamento: ${CONF_CANCEL:-N}"
@@ -833,6 +834,8 @@ copy_to_home() {
 }
 
 HELD_BY_US=()
+RELATORIO_PUBLICADO=0
+
 restaurar_holds() {
     if (( ${#HELD_BY_US[@]} > 0 )); then
         echo "[INFO] Restaurando unhold temporário: ${HELD_BY_US[*]}"
@@ -840,10 +843,13 @@ restaurar_holds() {
     fi
 }
 
-remover_agendamento_unico() {
+desativar_timer_unico() {
+    # Nunca remover $SERVICE_FILE nem executar 'systemctl daemon-reload' enquanto
+    # esta própria unidade oneshot estiver rodando ('activating'), pois o systemd
+    # enviaria SIGTERM ao cgroup antes da etapa de reinicialização.
+    systemctl stop "${UNIT_NAME}.timer" >/dev/null 2>&1 || true
     systemctl disable "${UNIT_NAME}.timer" >/dev/null 2>&1 || true
-    rm -f -- "$TIMER_FILE" "$SERVICE_FILE"
-    systemctl daemon-reload >/dev/null 2>&1 || true
+    rm -f -- "$TIMER_FILE"
 }
 
 publicar_relatorio() {
@@ -851,9 +857,20 @@ publicar_relatorio() {
     chmod 600 "/root/${REPORT_LATEST}" 2>/dev/null || true
     copy_to_home "${REAL_USER:-}" "${REAL_USER_HOME:-}" "$REPORT_PATH" "$REPORT_NAME"
     copy_to_home "${REAL_USER:-}" "${REAL_USER_HOME:-}" "$REPORT_PATH" "$REPORT_LATEST"
+    RELATORIO_PUBLICADO=1
 }
 
-trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
+finalizar_runner() {
+    restaurar_holds
+    desativar_timer_unico
+    if [[ "$RELATORIO_PUBLICADO" -eq 0 ]]; then
+        publicar_relatorio
+    fi
+}
+
+trap 'finalizar_runner' EXIT
+
+DEVE_ACIONAR_REBOOT=0
 
 {
     echo "================================================================"
@@ -879,7 +896,7 @@ trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
         | awk '{print $1}' | sort -u > "${STATE_DIR}/pre_services.txt"
 
     systemctl list-units --state=failed --plain --no-legend --no-pager \
-        | awk '{print $1}' | sort -u > "${STATE_DIR}/pre_failed.txt" || true
+        | awk '{print $1}' | grep -Ev '^agendar-atualizacao-' | sort -u > "${STATE_DIR}/pre_failed.txt" || true
 
     ss -tlnH 2>/dev/null | awk '{print $4}' | sed -E 's/.*:([0-9]+)$/\1/' | sort -nu > "${STATE_DIR}/pre_ports.txt" || true
 
@@ -954,12 +971,12 @@ trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
     fi
     echo ""
 
-    # 4. Restaurar holds e remover o timer one-shot
-    echo ">>> [4/5] Limpando agendamento one-shot e restaurando holds temporários..."
+    # 4. Restaurar holds e desativar o timer one-shot
+    echo ">>> [4/5] Desativando timer one-shot e restaurando holds temporários..."
     restaurar_holds
     HELD_BY_US=()
-    remover_agendamento_unico
-    echo "  - Timer one-shot removido (não haverá reexecução automática)."
+    desativar_timer_unico
+    echo "  - Timer one-shot parado e removido (não haverá reexecução automática)."
     echo ""
 
     # 5. Decisão de reboot
@@ -994,15 +1011,26 @@ trap 'restaurar_holds; remover_agendamento_unico; publicar_relatorio' EXIT
         if [[ -f "$POSTBOOT_SERVICE_FILE" ]]; then
             systemctl enable "${POSTBOOT_UNIT}.service" >/dev/null 2>&1 || true
         fi
-        echo "  - Encerramento gracioso e reinicialização em 5 segundos ($(date '+%d-%m-%Y %H:%M:%S'))..."
-        publicar_relatorio
-        sync
-        sleep 5
-        systemctl reboot
+        echo "  - Encerramento gracioso e reinicialização acionados em: $(date '+%d-%m-%Y %H:%M:%S')"
+        DEVE_ACIONAR_REBOOT=1
     else
+        echo "  - Limpando unidades transitórias (execução sem reboot)..."
+        rm -f -- "$POSTBOOT_SERVICE_FILE" "$CONFIG_FILE"
+        if command -v systemd-run >/dev/null 2>&1; then
+            systemd-run --quiet --on-active=3s --description="Limpeza pos-execucao agendar-atualizacao" \
+                /bin/sh -c "rm -f -- '${SERVICE_FILE}' '${TIMER_FILE}'; systemctl daemon-reload; systemctl reset-failed '${UNIT_NAME}.service' '${UNIT_NAME}.timer' 2>/dev/null || true" >/dev/null 2>&1 || true
+        fi
         echo "  - Execução concluída sem reboot em: $(date '+%d-%m-%Y %H:%M:%S')"
     fi
 } >> "$REPORT_PATH" 2>&1
+
+publicar_relatorio
+sync
+
+if [[ "$DEVE_ACIONAR_REBOOT" -eq 1 ]]; then
+    sleep 2
+    systemctl --no-block reboot
+fi
 EOF
 install_config "${RUNTIME_DIR}/executar_atualizacao.sh" "$RUNNER_SCRIPT" 700
 log_success "Runner instalado em ${RUNNER_SCRIPT}"
@@ -1019,6 +1047,9 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 readonly BASE_DIR="/usr/local/lib/agendar-atualizacao-servidor"
 readonly STATE_DIR="${BASE_DIR}/estado"
 readonly CONFIG_FILE="${BASE_DIR}/config.env"
+readonly UNIT_NAME="agendar-atualizacao-servidor"
+readonly SERVICE_FILE="/etc/systemd/system/${UNIT_NAME}.service"
+readonly TIMER_FILE="/etc/systemd/system/${UNIT_NAME}.timer"
 readonly POSTBOOT_UNIT="agendar-atualizacao-posboot"
 readonly POSTBOOT_SERVICE_FILE="/etc/systemd/system/${POSTBOOT_UNIT}.service"
 
@@ -1147,10 +1178,13 @@ chmod 600 "/root/${REPORT_LATEST}" 2>/dev/null || true
 copy_to_home "${REAL_USER:-}" "${REAL_USER_HOME:-}" "$REPORT_PATH" "$REPORT_NAME"
 copy_to_home "${REAL_USER:-}" "${REAL_USER_HOME:-}" "$REPORT_PATH" "$REPORT_LATEST"
 
-# Auto-limpeza do verificador pós-boot (disparo único)
+# Auto-limpeza segura do verificador pós-boot e da unit de atualização (após saída desta unit oneshot)
 systemctl disable "${POSTBOOT_UNIT}.service" >/dev/null 2>&1 || true
-rm -f -- "$POSTBOOT_SERVICE_FILE"
-systemctl daemon-reload >/dev/null 2>&1 || true
+rm -f -- "$SERVICE_FILE" "$TIMER_FILE" "$CONFIG_FILE"
+if command -v systemd-run >/dev/null 2>&1; then
+    systemd-run --quiet --on-active=3s --description="Limpeza pos-boot agendar-atualizacao" \
+        /bin/sh -c "rm -f -- '${POSTBOOT_SERVICE_FILE}'; systemctl daemon-reload; systemctl reset-failed '${UNIT_NAME}.service' '${UNIT_NAME}.timer' '${POSTBOOT_UNIT}.service' 2>/dev/null || true" >/dev/null 2>&1 || true
+fi
 EOF
 install_config "${RUNTIME_DIR}/verificar_posboot.sh" "$POSTBOOT_SCRIPT" 700
 log_success "Verificador pós-boot instalado em ${POSTBOOT_SCRIPT}"
@@ -1211,8 +1245,9 @@ EOF
 install_config "${RUNTIME_DIR}/${POSTBOOT_UNIT}.service" "$POSTBOOT_SERVICE_FILE" 644
 systemctl disable "${POSTBOOT_UNIT}.service" >/dev/null 2>&1 || true
 
-# 5.4 - Recarregar systemd e ativar timer
+# 5.4 - Recarregar systemd, limpar estados falhos anteriores e ativar timer
 systemctl daemon-reload
+systemctl reset-failed "${UNIT_NAME}.service" "${UNIT_NAME}.timer" "${POSTBOOT_UNIT}.service" >/dev/null 2>&1 || true
 systemctl enable --now "${UNIT_NAME}.timer" >/dev/null
 
 if systemctl is-active --quiet "${UNIT_NAME}.timer"; then
