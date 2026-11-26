@@ -17,25 +17,33 @@
     Quando informado em sistemas compativeis (Server 2012 R2 / Windows 8.1 ou superior), adiciona '/ResetBase'
     ao comando '/StartComponentCleanup' para remover versoes antigas de componentes ja substituidos
     (impede a desinstalacao de atualizacoes ja instaladas).
+.PARAMETER ConfirmarResetBaseIrreversivel
+    Quando informado em conjunto com -ResetBase, dispensa a confirmacao textual interativa para
+    automacoes nao-interativas conscientes do impacto irreversivel do /ResetBase.
 .EXAMPLE
     .\limpeza_armaz_windows_server.ps1
 .EXAMPLE
     .\limpeza_armaz_windows_server.ps1 -ResetBase
+.EXAMPLE
+    .\limpeza_armaz_windows_server.ps1 -ResetBase -WhatIf
 .NOTES
-    Versao: 1.5
+    Versao: 1.6
     Requisitos: PowerShell 3.0 ou superior (Windows Server 2012, 2012 R2, 2016, 2019, 2022, 2025 e Windows 10/11).
-    Requer privilegios de Administrador para operacoes do DISM (validacao realizada em tempo de execucao
-    para manter compatibilidade com PowerShell 3.0 e com Invoke-Expression).
-    Saida: 0 = sucesso (com ou sem reinicializacao pendente); 1 = falha.
+    Privilegios: Requer privilegios de Administrador para operacoes do DISM (validacao realizada em tempo
+    de execucao para manter compatibilidade com PowerShell 3.0, -WhatIf e Invoke-Expression).
+    Saida: 0 = sucesso ou simulacao; 1 = falha; 2 = cancelamento pelo operador.
 #>
 
 #Requires -Version 3.0
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Script interativo de console com interface visual para o operador')]
 param(
     [Parameter(Mandatory = $false)]
-    [switch]$ResetBase
+    [switch]$ResetBase,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$ConfirmarResetBaseIrreversivel
 )
 
 $ErrorActionPreference = 'Stop'
@@ -110,6 +118,7 @@ function Invoke-DismEtapa {
     .SYNOPSIS
         Executa o Dism.exe exibindo a saida em tempo real e valida o codigo de retorno.
     #>
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Exibicao de alerta de codigo 3010 no console')]
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -148,113 +157,150 @@ function Invoke-DismEtapa {
     }
 }
 
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " Script de Limpeza do Component Store (WinSxS) v1.5" -ForegroundColor Cyan
-Write-Host "==========================================================" -ForegroundColor Cyan
-
-# Validacao de privilegios de Administrador (compativel com PowerShell 3.0+ e Invoke-Expression / iex)
 $identidade = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = [Security.Principal.WindowsPrincipal]$identidade
 $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$textoPrivilegio = if ($isAdmin) { 'Administrador' } else { 'Usuario padrao (insuficiente para DISM)' }
+$dataExecucao = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 
-if (-not $isAdmin) {
-    Write-Host "`nERRO: Este script requer privilegios de Administrador para executar o DISM." -ForegroundColor Red
-    Write-Host "Por favor, abra o PowerShell como Administrador e execute novamente." -ForegroundColor Yellow
-    $status = 'Falha de privilegios (requer Administrador)'
-    $corStatus = 'Red'
-    $codigoSaida = 1
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host " Script de Limpeza do Component Store (WinSxS) v1.6" -ForegroundColor Cyan
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "  Computador: $env:COMPUTERNAME | Data/Hora: $dataExecucao" -ForegroundColor DarkGray
+Write-Host "  Privilegio: $textoPrivilegio" -ForegroundColor DarkGray
+
+$acaoPlanejada = if ($ResetBase) {
+    'Analisar e limpar Component Store (WinSxS) com /ResetBase'
 }
 else {
-    try {
-        $caminhoDism = Get-DismCaminho
-        $buildSistema = Get-NumeroBuildSistema
-        # /AnalyzeComponentStore e /ResetBase foram introduzidos no Windows 8.1 / Server 2012 R2 (build 9600)
-        $suportaRecursosAvancadosDism = ($buildSistema -ge 9600)
+    'Analisar e limpar Component Store (WinSxS)'
+}
 
-        $letraDiscoSistema = ($env:SystemDrive -replace ':', '').Trim()
-        $espacoAntesBytes = (Get-PSDrive -Name $letraDiscoSistema).Free
-        $reinicioPendenteAntes = Test-ReinicioPendente
-
-        if ($reinicioPendenteAntes) {
-            $reinicioNecessario = $true
-            Write-Host "`n[AVISO] Reinicializacao pendente detectada antes da execucao; a limpeza pode reter arquivos ate o proximo boot." -ForegroundColor Yellow
-        }
-
-        # -------------------------------------------------------------------------
-        # Etapa 1: Verifica (AnalyzeComponentStore)
-        # -------------------------------------------------------------------------
-        $etapa = 'Analise do Component Store'
-        Write-Host "`n==========================================================" -ForegroundColor Cyan
-        Write-Host " Etapa 1/2: Analisando o Component Store..." -ForegroundColor Cyan
-        Write-Host "==========================================================" -ForegroundColor Cyan
-
-        if ($suportaRecursosAvancadosDism) {
-            Write-Host "(Aguarde a conclusao da verificacao pelo DISM...)`n" -ForegroundColor Yellow
-            Invoke-DismEtapa -CaminhoDism $caminhoDism -NomeEtapa $etapa -Argumentos @('/Online', '/Cleanup-Image', '/AnalyzeComponentStore') -ReinicioDetectado ([ref]$reinicioNecessario)
+try {
+    if (($null -eq $PSCmdlet) -or $PSCmdlet.ShouldProcess($env:COMPUTERNAME, $acaoPlanejada)) {
+        if (-not $isAdmin) {
+            Write-Host "`nERRO: Este script requer privilegios de Administrador para executar o DISM." -ForegroundColor Red
+            Write-Host "Por favor, abra o PowerShell como Administrador e execute novamente." -ForegroundColor Yellow
+            $status = 'Falha de privilegios (requer Administrador)'
+            $corStatus = 'Red'
+            $codigoSaida = 1
         }
         else {
-            Write-Host "[AVISO] Build $buildSistema detectada (Windows Server 2012 / 8). A flag /AnalyzeComponentStore requer build 9600+ (Server 2012 R2+)." -ForegroundColor Yellow
-            Write-Host "Prosseguindo diretamente para a Etapa 2 (Limpeza)..." -ForegroundColor Yellow
-        }
+            $caminhoDism = Get-DismCaminho
+            $buildSistema = Get-NumeroBuildSistema
+            # /AnalyzeComponentStore e /ResetBase foram introduzidos no Windows 8.1 / Server 2012 R2 (build 9600)
+            $suportaRecursosAvancadosDism = ($buildSistema -ge 9600)
 
-        # -------------------------------------------------------------------------
-        # Etapa 2: Limpeza (StartComponentCleanup)
-        # -------------------------------------------------------------------------
-        $etapa = 'Limpeza do Component Store'
-        $argumentosLimpeza = @('/Online', '/Cleanup-Image', '/StartComponentCleanup')
-        $usandoResetBase = $false
-
-        if ($ResetBase) {
-            if ($suportaRecursosAvancadosDism) {
-                $argumentosLimpeza += '/ResetBase'
-                $usandoResetBase = $true
+            $confirmadoResetBase = $true
+            if ($ResetBase -and $suportaRecursosAvancadosDism -and (-not $ConfirmarResetBaseIrreversivel)) {
+                Write-Host "`n[ATENCAO] A opcao -ResetBase remove versoes antigas de componentes substituidos." -ForegroundColor Yellow
+                Write-Host "Apos a execucao, nao sera possivel desinstalar atualizacoes do Windows ja instaladas." -ForegroundColor Yellow
+                $respostaResetBase = Read-Host 'Digite RESETBASE para confirmar e prosseguir'
+                if ($respostaResetBase -cne 'RESETBASE') {
+                    $confirmadoResetBase = $false
+                    $status = 'Cancelado pelo operador na confirmacao de ResetBase'
+                    $corStatus = 'Yellow'
+                    $codigoSaida = 2
+                }
             }
-            else {
-                Write-Host "`n[AVISO] A flag /ResetBase nao e suportada na build $buildSistema (requer Server 2012 R2+). Executando apenas /StartComponentCleanup." -ForegroundColor Yellow
+
+            if ($confirmadoResetBase) {
+                $letraDiscoSistema = ($env:SystemDrive -replace ':', '').Trim()
+                $espacoAntesBytes = (Get-PSDrive -Name $letraDiscoSistema).Free
+                $reinicioPendenteAntes = Test-ReinicioPendente
+
+                if ($reinicioPendenteAntes) {
+                    $reinicioNecessario = $true
+                    Write-Host "`n[AVISO] Reinicializacao pendente detectada antes da execucao; a limpeza pode reter arquivos ate o proximo boot." -ForegroundColor Yellow
+                }
+
+                # -----------------------------------------------------------------
+                # Etapa 1: Verifica (AnalyzeComponentStore)
+                # -----------------------------------------------------------------
+                $etapa = 'Analise do Component Store'
+                Write-Host "`n==========================================================" -ForegroundColor Cyan
+                Write-Host " Etapa 1/2: Analisando o Component Store..." -ForegroundColor Cyan
+                Write-Host "==========================================================" -ForegroundColor Cyan
+
+                if ($suportaRecursosAvancadosDism) {
+                    Write-Host "(Aguarde a conclusao da verificacao pelo DISM...)`n" -ForegroundColor Yellow
+                    Invoke-DismEtapa -CaminhoDism $caminhoDism -NomeEtapa $etapa -Argumentos @('/Online', '/Cleanup-Image', '/AnalyzeComponentStore') -ReinicioDetectado ([ref]$reinicioNecessario)
+                }
+                else {
+                    Write-Host "[AVISO] Build $buildSistema detectada (Windows Server 2012 / 8). A flag /AnalyzeComponentStore requer build 9600+ (Server 2012 R2+)." -ForegroundColor Yellow
+                    Write-Host "Prosseguindo diretamente para a Etapa 2 (Limpeza)..." -ForegroundColor Yellow
+                }
+
+                # -----------------------------------------------------------------
+                # Etapa 2: Limpeza (StartComponentCleanup)
+                # -----------------------------------------------------------------
+                $etapa = 'Limpeza do Component Store'
+                $argumentosLimpeza = @('/Online', '/Cleanup-Image', '/StartComponentCleanup')
+                $usandoResetBase = $false
+
+                if ($ResetBase) {
+                    if ($suportaRecursosAvancadosDism) {
+                        $argumentosLimpeza += '/ResetBase'
+                        $usandoResetBase = $true
+                    }
+                    else {
+                        Write-Host "`n[AVISO] A flag /ResetBase nao e suportada na build $buildSistema (requer Server 2012 R2+). Executando apenas /StartComponentCleanup." -ForegroundColor Yellow
+                    }
+                }
+
+                Write-Host "`n==========================================================" -ForegroundColor Cyan
+                Write-Host " Etapa 2/2: Executando a Limpeza do Component Store..." -ForegroundColor Cyan
+                if ($usandoResetBase) {
+                    Write-Host " Modo: /StartComponentCleanup /ResetBase" -ForegroundColor Yellow
+                }
+                Write-Host "==========================================================" -ForegroundColor Cyan
+                Write-Host "(Aguarde a conclusao da limpeza pelo DISM...)`n" -ForegroundColor Yellow
+
+                Invoke-DismEtapa -CaminhoDism $caminhoDism -NomeEtapa $etapa -Argumentos $argumentosLimpeza -ReinicioDetectado ([ref]$reinicioNecessario)
+
+                $espacoDepoisBytes = (Get-PSDrive -Name $letraDiscoSistema).Free
+                $diferencaBytes = $espacoDepoisBytes - $espacoAntesBytes
+                if ($diferencaBytes -gt 0) {
+                    $liberadoMB = [math]::Round($diferencaBytes / 1MB, 2)
+                    $liberadoGB = [math]::Round($diferencaBytes / 1GB, 2)
+                    $detalheEspaco = "$liberadoMB MB ($liberadoGB GB) liberados em $env:SystemDrive"
+                }
+                else {
+                    $detalheEspaco = "Sem liberacao imediata mensuravel em $env:SystemDrive"
+                }
+
+                $status = 'Processo concluido com exito'
+                $corStatus = 'Green'
+                $codigoSaida = 0
             }
         }
-
-        Write-Host "`n==========================================================" -ForegroundColor Cyan
-        Write-Host " Etapa 2/2: Executando a Limpeza do Component Store..." -ForegroundColor Cyan
-        if ($usandoResetBase) {
-            Write-Host " Modo: /StartComponentCleanup /ResetBase" -ForegroundColor Yellow
-        }
-        Write-Host "==========================================================" -ForegroundColor Cyan
-        Write-Host "(Aguarde a conclusao da limpeza pelo DISM...)`n" -ForegroundColor Yellow
-
-        Invoke-DismEtapa -CaminhoDism $caminhoDism -NomeEtapa $etapa -Argumentos $argumentosLimpeza -ReinicioDetectado ([ref]$reinicioNecessario)
-
-        $espacoDepoisBytes = (Get-PSDrive -Name $letraDiscoSistema).Free
-        $diferencaBytes = $espacoDepoisBytes - $espacoAntesBytes
-        if ($diferencaBytes -gt 0) {
-            $liberadoMB = [math]::Round($diferencaBytes / 1MB, 2)
-            $liberadoGB = [math]::Round($diferencaBytes / 1GB, 2)
-            $detalheEspaco = "$liberadoMB MB ($liberadoGB GB) liberados em $env:SystemDrive"
-        }
-        else {
-            $detalheEspaco = "Sem liberacao imediata mensuravel em $env:SystemDrive"
-        }
-
-        $status = 'Processo concluido com exito'
-        $corStatus = 'Green'
+    }
+    elseif ($WhatIfPreference) {
+        $status = 'Simulacao concluida; nenhuma limpeza executada'
+        $corStatus = 'Yellow'
         $codigoSaida = 0
     }
-    catch {
-        if ($null -ne $_.Exception -and $null -ne $_.Exception.Data -and $null -ne $_.Exception.Data['CodigoDism']) {
-            $codigoDismErro = $_.Exception.Data['CodigoDism']
-        }
-
-        Write-Host "`n==========================================================" -ForegroundColor Red
-        Write-Host "  [ERRO] Falha na etapa: $etapa" -ForegroundColor Red
-        if ($null -ne $codigoDismErro) {
-            Write-Host "  Codigo de retorno do DISM: $codigoDismErro" -ForegroundColor Red
-        }
-        Write-Host "==========================================================" -ForegroundColor Red
-        Write-Host "A operacao foi interrompida antes de concluir todas as etapas." -ForegroundColor Yellow
-        $status = 'Falha durante a execucao'
-        $corStatus = 'Red'
-        $codigoSaida = 1
+    else {
+        $status = 'Cancelado pelo operador; nenhuma limpeza executada'
+        $corStatus = 'Yellow'
+        $codigoSaida = 2
     }
+}
+catch {
+    if ($null -ne $_.Exception -and $null -ne $_.Exception.Data -and $null -ne $_.Exception.Data['CodigoDism']) {
+        $codigoDismErro = $_.Exception.Data['CodigoDism']
+    }
+
+    Write-Host "`n==========================================================" -ForegroundColor Red
+    Write-Host "  [ERRO] Falha na etapa: $etapa" -ForegroundColor Red
+    if ($null -ne $codigoDismErro) {
+        Write-Host "  Codigo de retorno do DISM: $codigoDismErro" -ForegroundColor Red
+    }
+    Write-Host "==========================================================" -ForegroundColor Red
+    Write-Host "A operacao foi interrompida antes de concluir todas as etapas." -ForegroundColor Yellow
+    $status = 'Falha durante a execucao'
+    $corStatus = 'Red'
+    $codigoSaida = 1
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan
@@ -272,7 +318,10 @@ if ($null -ne $codigoDismErro) {
     Write-Host "  - Codigo erro DISM:  $codigoDismErro" -ForegroundColor Red
 }
 if ($codigoSaida -eq 0) {
-    $descricaoCodigoSaida = '0 (Sucesso - concluido sem erros)'
+    $descricaoCodigoSaida = if ($WhatIfPreference) { '0 (Simulacao concluida sem alteracoes)' } else { '0 (Sucesso - concluido sem erros)' }
+}
+elseif ($codigoSaida -eq 2) {
+    $descricaoCodigoSaida = '2 (Cancelado pelo operador)'
 }
 else {
     $descricaoCodigoSaida = "$codigoSaida (Falha - operacao interrompida por erro)"

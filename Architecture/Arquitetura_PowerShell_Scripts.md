@@ -51,6 +51,7 @@
 >      * **Avisos ou Ignorados (Nao necessario):** Cor `Yellow`.
 >      * **Erros:** Cor `Red`.
 >      * **Valores e Detalhes de Resumo:** Cor `White` para texto de chave/valor e `DarkGray` para linhas tracejadas.
+>      * **Subcabecalho de Contexto (Opcional):** Em scripts de auditoria, diagnostico ou operacoes de sistema, exiba logo abaixo do banner principal duas linhas compactas em `DarkGray` com `Computador`, `Usuario`, `Data/Hora` e `Privilegio` (usando variaveis de ambiente e `.NET`, sem depender de `$PSScriptRoot` ou `$PSCommandPath`).
 >
 > 4. **Conformidade Estatica com PSScriptAnalyzer e Boas Praticas de Codificacao**:
 >    - **Proibicao de Aliases (`PSAvoidUsingCmdletAliases`):** Nunca utilize apelidos em scripts (ex: use `Get-ChildItem` em vez de `dir`/`ls`, `Where-Object` em vez de `?`, `ForEach-Object` em vez de `%`, `Select-Object` em vez de `select`, `Remove-Item` em vez de `rm`/`del`).
@@ -121,8 +122,16 @@
 >      ```
 >    - **Compatibilidade obrigatoria com `irm ... | iex`**:
 >      * Proteja chamadas a `$PSCmdlet.ShouldProcess(...)` contra `$null -eq $PSCmdlet`: `(($null -eq $PSCmdlet) -or $PSCmdlet.ShouldProcess(...))`.
+>      * Evite `[ValidateNotNullOrEmpty()]` em parametros `[string]` opcionais no bloco `param()` principal (pois em `Invoke-Expression` a variavel e iniciada vazia e falha antes da execucao); prefira validar `$PSBoundParameters.ContainsKey(...)` no corpo.
 >      * Ao encerrar o script, use `if ([string]::IsNullOrEmpty($PSCommandPath)) { return }` antes de `exit $codigoSaida`, evitando fechar a janela do PowerShell do operador quando executado em memoria via `iex`.
 >    - A URL deve apontar sempre diretamente para a raiz da branch `main` (`https://raw.githubusercontent.com/Lucasolidev/Scripts/main/<NOME_DO_SCRIPT>.ps1`). Recomende revisar o conteudo antes de executar em producao.
+>
+> 12. **Padronizacao Visual para Listagens, Tabelas e Auditorias**:
+>    Para scripts de diagnostico, inventario e auditoria que exibem multiplas entradas no console (mantendo os scripts simples de acao unica enxutos):
+>    - **Tags Coloridas Alinhadas (`Show-LinhaComTag` com `-NoNewline`)**: pinte apenas o selo de status com largura fixa (`PadRight(10)`): `[OK]` / `[ATIVA]` em `Green`, `[REVISAR]` / `[ALERTA]` / `[REDE!]` em `Yellow`, `[ERRO]` / `[CRITICO]` em `Red`, `[ADMIN]` em `Cyan` e `[INATIVA]` em `DarkGray`. Mantenha o texto principal em `White` (ou `Yellow` em alertas) e detalhes secundarios indentados em `DarkGray`. Funcoes auxiliares que renderizam UI no console devem declarar `[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', ...)]`.
+>    - **Priorizacao e Agrupamento sem Duplicacao**: ordene itens `[REVISAR]` sempre no topo de cada secao. Agrupe ocorrencias repetidas pela mesma entidade (ex.: conexoes por processo/PID, portas dual-stack IPv4/IPv6 `0.0.0.0` + `::` unificadas como `*:PORTA (Dual)`, ou portas dinamicas agrupadas por processo) e contabilize `1` alerta por item unico em vez de inflar o total com linhas repetidas.
+>    - **Alinhamento Tabular e Caminhos Longos**: utilize formatacao tabular com colunas de largura fixa (`-f` ou `PadRight`) em listagens de contas, membros e portas expostas. Quando caminhos forem muito extensos no console, compacte apenas entradas `[OK]` no meio com `...`, preservando o caminho completo nos alertas `[REVISAR]` e nos relatorios exportados.
+>    - **Bloco de Alertas Consolidados**: quando houver alertas que exijam acao ou revisao manual, exiba um bloco numerado `ALERTAS CONSOLIDADOS PARA REVISAO` com categoria e motivo explicito imediatamente antes do painel `RESUMO DA EXECUCAO`.
 > "
 >
 > ---
@@ -175,6 +184,8 @@
 > Write-Host "==========================================================" -ForegroundColor Cyan
 > Write-Host " Script de Exemplo v1.0" -ForegroundColor Cyan
 > Write-Host "==========================================================" -ForegroundColor Cyan
+# Opcional em scripts de auditoria/diagnostico: subcabecalho de contexto em DarkGray
+# Write-Host "  Computador: $env:COMPUTERNAME | Data/Hora: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor DarkGray
 >
 > try {
 >     # Validar aqui o alvo exato e as pre-condicoes, usando apenas leitura.

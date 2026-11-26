@@ -11,13 +11,28 @@
     Prepara imagens-base do Ubuntu no WSL ou cria instancias descartaveis de teste.
 
 .DESCRIPTION
-    Script PowerShell compativel com versoes antigas e recentes.
+    Script PowerShell compativel com versoes antigas e recentes (Windows PowerShell 5.1 e PowerShell 7).
     No modo PrepararBases, instala e atualiza Ubuntu-26.04 e Ubuntu-24.04,
     cria o usuario solicitado, instala ShellCheck, exporta VHDX em C:\WSL,
     desregistra as instalacoes originais e reimporta as distribuicoes.
 
     No modo CriarTestes, importa copias independentes das imagens-base com o
     sufixo -Teste.
+
+.PARAMETER Modo
+    Define o modo de operacao: 'PrepararBases' ou 'CriarTestes'.
+
+.PARAMETER Usuario
+    Nome do usuario Linux padrao a ser criado/validado nas distribuicoes Ubuntu.
+
+.PARAMETER SenhaSegura
+    Credencial do usuario Linux como SecureString (solicitada interativamente quando omitida).
+
+.PARAMETER UsarDistribuicoesExistentes
+    Permite preparar distribuicoes Ubuntu-26.04 / Ubuntu-24.04 ja registradas no WSL.
+
+.PARAMETER SemConfirmacao
+    Dispensa a confirmacao textual 'DESREGISTRAR' antes de recriar as distribuicoes base.
 
 .EXAMPLE
     .\Implantacao_WSL.ps1
@@ -28,47 +43,65 @@
 .EXAMPLE
     .\Implantacao_WSL.ps1 -Modo CriarTestes
 
+.EXAMPLE
+    .\Implantacao_WSL.ps1 -Modo CriarTestes -WhatIf
+
 .NOTES
-    Versao: 1.0
+    Versao: 1.1
+    Requisitos: Windows PowerShell 5.1 ou PowerShell 7 no Windows.
     Requer privilegios de Administrador.
     A senha e solicitada como SecureString e nao fica fixa no codigo-fonte.
+    Saida: 0 = sucesso ou simulacao; 1 = falha; 2 = cancelamento pelo operador.
 #>
 
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Script interativo de console com interface visual para o operador')]
 [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'SemConfirmacao', Justification = 'Utilizado pelo operador para ignorar confirmacoes')]
-[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification = 'Funcoes internas que operam sobre multiplas distribuicoes')]
-[System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Funcoes internas orquestradas pelo bloco principal')]
 param(
+    [Parameter(Mandatory = $false)]
     [ValidateSet('PrepararBases', 'CriarTestes')]
     [string]$Modo = 'PrepararBases',
 
+    [Parameter(Mandatory = $false)]
     [ValidatePattern('^[a-z_][a-z0-9_-]*$')]
     [string]$Usuario = 'administrador',
 
+    [Parameter(Mandatory = $false)]
     [System.Security.SecureString]$SenhaSegura,
 
+    [Parameter(Mandatory = $false)]
     [switch]$UsarDistribuicoesExistentes,
 
+    [Parameter(Mandatory = $false)]
     [switch]$SemConfirmacao
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$codigoSaida = 1
+$status = 'Falha'
+$corStatus = 'Red'
+$etapa = 'Validacao inicial'
+
 $WslRoot = 'C:\WSL'
-$PasswordFile = Join-Path $WslRoot 'wsl-pass.txt'
-$WslConfigFile = Join-Path $env:USERPROFILE '.wslconfig'
+$PasswordFile = Join-Path -Path $WslRoot -ChildPath 'wsl-pass.txt'
+$WslConfigFile = Join-Path -Path $env:USERPROFILE -ChildPath '.wslconfig'
 $BaseDistros = @('Ubuntu-26.04', 'Ubuntu-24.04')
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $SenhaTexto = $null
 $ConfirmacaoSegura = $null
 $ConfirmacaoTexto = $null
 
-function Write-Step {
+function Show-TituloSecao {
+    <#
+    .SYNOPSIS
+        Exibe um cabecalho de etapa padronizado no console.
+    #>
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Cabecalho visual de console para o operador')]
     param([Parameter(Mandatory)][string]$Message)
 
     Write-Host '' -ForegroundColor Cyan
@@ -77,7 +110,11 @@ function Write-Step {
     Write-Host '==========================================================' -ForegroundColor Cyan
 }
 
-function ConvertTo-PlainText {
+function ConvertTo-TextoPlano {
+    <#
+    .SYNOPSIS
+        Converte um SecureString em texto puro temporario liberando o buffer BSTR.
+    #>
     param([Parameter(Mandatory)][System.Security.SecureString]$SecureValue)
 
     $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureValue)
@@ -89,7 +126,11 @@ function ConvertTo-PlainText {
     }
 }
 
-function Invoke-NativeCommand {
+function Invoke-ComandoNativo {
+    <#
+    .SYNOPSIS
+        Executa um comando nativo validando o codigo de saida imediatamente.
+    #>
     param(
         [Parameter(Mandatory)][string]$FilePath,
         [Parameter(Mandatory)][string[]]$Arguments,
@@ -97,15 +138,21 @@ function Invoke-NativeCommand {
     )
 
     & $FilePath @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "$FailureMessage (codigo de saida: $LASTEXITCODE)."
+    $exitCodeNativo = $LASTEXITCODE
+    if ($exitCodeNativo -ne 0) {
+        throw "$FailureMessage (codigo de saida: $exitCodeNativo)."
     }
 }
 
-function Get-WslDistributions {
+function Get-DistribuicaoWsl {
+    <#
+    .SYNOPSIS
+        Lista as distribuicoes atualmente registradas no WSL.
+    #>
     $output = & wsl.exe --list --quiet 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Nao foi possivel consultar as distribuicoes registradas no WSL.'
+    $wslExit = $LASTEXITCODE
+    if ($wslExit -ne 0) {
+        throw "Nao foi possivel consultar as distribuicoes registradas no WSL (codigo $wslExit)."
     }
 
     return @(
@@ -115,7 +162,11 @@ function Get-WslDistributions {
     )
 }
 
-function Assert-EmptyInstallLocation {
+function Assert-DiretorioInstalacaoVazio {
+    <#
+    .SYNOPSIS
+        Garante que o diretorio de destino da distribuicao exista e esteja vazio.
+    #>
     param([Parameter(Mandatory)][string]$Path)
 
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -128,8 +179,15 @@ function Assert-EmptyInstallLocation {
     }
 }
 
-function Write-WslConfig {
-    Write-Step "Criando $WslConfigFile"
+function Save-ConfiguracaoWsl {
+    <#
+    .SYNOPSIS
+        Grava .wslconfig preservando eventual configuracao anterior em backup.
+    #>
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Aviso visual de backup preservado no console')]
+    param()
+
+    Show-TituloSecao -Message "Criando $WslConfigFile"
 
     $content = @'
 [wsl2]
@@ -154,9 +212,27 @@ vmIdleTimeout=600000
     [System.IO.File]::WriteAllText($WslConfigFile, $content, $Utf8NoBom)
 }
 
-function Write-PasswordFile {
-    Write-Step "Criando $PasswordFile"
+function Save-ArquivoCredencialWsl {
+    <#
+    .SYNOPSIS
+        Prepara ACL restrita antes de gravar o arquivo de credenciais do WSL.
+    #>
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Aviso de seguranca em texto puro no console')]
+    param()
+
+    Show-TituloSecao -Message "Criando $PasswordFile"
     Write-Host 'AVISO: O arquivo solicitado armazenara a senha em texto puro.' -ForegroundColor Yellow
+
+    # Prepara arquivo vazio com ACL restrita antes de gravar o segredo
+    [System.IO.File]::WriteAllText($PasswordFile, '', $Utf8NoBom)
+
+    $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    & icacls.exe $PasswordFile '/inheritance:r' '/grant:r' "${currentIdentity}:(F)" '*S-1-5-18:(F)' '*S-1-5-32-544:(F)' | Out-Null
+    $icaclsExit = $LASTEXITCODE
+    if ($icaclsExit -ne 0) {
+        Remove-Item -LiteralPath $PasswordFile -Force -ErrorAction SilentlyContinue
+        throw "Falha ao restringir permissoes ACL de wsl-pass.txt antes da gravacao (codigo $icaclsExit)."
+    }
 
     $content = @"
 Distribuicoes: Ubuntu-26.04, Ubuntu-24.04
@@ -165,18 +241,16 @@ Senha: $SenhaTexto
 "@
     $content += [Environment]::NewLine
     [System.IO.File]::WriteAllText($PasswordFile, $content, $Utf8NoBom)
-
-    $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    & icacls.exe $PasswordFile '/inheritance:r' '/grant:r' "${currentIdentity}:(F)" '*S-1-5-18:(F)' '*S-1-5-32-544:(F)' | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host 'AVISO: Nao foi possivel restringir as permissoes de wsl-pass.txt.' -ForegroundColor Yellow
-    }
 }
 
-function Initialize-UbuntuDistribution {
+function Initialize-DistribuicaoUbuntu {
+    <#
+    .SYNOPSIS
+        Atualiza pacotes, instala ShellCheck, cria o usuario padrao e grava wsl.conf.
+    #>
     param([Parameter(Mandatory)][string]$Distro)
 
-    Write-Step "Atualizando $Distro e instalando ShellCheck"
+    Show-TituloSecao -Message "Atualizando $Distro e instalando ShellCheck"
 
     $setupCommand = @"
 set -e
@@ -202,38 +276,43 @@ apt-get clean
 shellcheck --version
 "@
 
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
+    Invoke-ComandoNativo -FilePath 'wsl.exe' `
         -Arguments @('-d', $Distro, '-u', 'root', '--', 'bash', '-lc', $setupCommand) `
         -FailureMessage "Falha ao preparar $Distro"
 
     "$Usuario`:$SenhaTexto" | & wsl.exe -d $Distro -u root -- chpasswd
-    if ($LASTEXITCODE -ne 0) {
-        throw "Falha ao definir a senha do usuario $Usuario em $Distro."
+    $chpasswdExit = $LASTEXITCODE
+    if ($chpasswdExit -ne 0) {
+        throw "Falha ao definir a senha do usuario $Usuario em $Distro (codigo $chpasswdExit)."
     }
 
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
+    Invoke-ComandoNativo -FilePath 'wsl.exe' `
         -Arguments @('--terminate', $Distro) `
         -FailureMessage "Falha ao encerrar $Distro"
 }
 
-function Export-WslBases {
+function Export-ImagemBaseWsl {
+    <#
+    .SYNOPSIS
+        Exporta as imagens-base VHDX preservando arquivos ja existentes.
+    #>
     foreach ($distro in $BaseDistros) {
-        $imagePath = Join-Path $WslRoot "$distro.vhdx"
+        $imagePath = Join-Path -Path $WslRoot -ChildPath "$distro.vhdx"
         if (Test-Path -LiteralPath $imagePath) {
             throw "A imagem-base ja existe e foi preservada: $imagePath. Renomeie ou remova o arquivo antes de repetir a preparacao."
         }
     }
 
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
+    Invoke-ComandoNativo -FilePath 'wsl.exe' `
         -Arguments @('--shutdown') `
         -FailureMessage 'Falha ao desligar o WSL antes da exportacao'
 
     foreach ($distro in $BaseDistros) {
-        $imagePath = Join-Path $WslRoot "$distro.vhdx"
-        Write-Step "Exportando $distro para $imagePath"
+        $imagePath = Join-Path -Path $WslRoot -ChildPath "$distro.vhdx"
+        Show-TituloSecao -Message "Exportando $distro para $imagePath"
 
         try {
-            Invoke-NativeCommand -FilePath 'wsl.exe' `
+            Invoke-ComandoNativo -FilePath 'wsl.exe' `
                 -Arguments @('--export', $distro, $imagePath, '--vhd') `
                 -FailureMessage "Falha ao exportar $distro"
         }
@@ -251,69 +330,93 @@ function Export-WslBases {
     }
 }
 
-function Confirm-Unregister {
+function Confirm-DesregistroBase {
+    <#
+    .SYNOPSIS
+        Solicita confirmacao textual explicita antes de desregistrar as distribuicoes originais.
+    #>
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Aviso visual de operacao irreversivel antes da confirmacao')]
+    [OutputType([bool])]
+    param()
+
     if ($SemConfirmacao) {
-        return
+        return $true
     }
 
     Write-Host "`nAs duas imagens-base foram exportadas e validadas." -ForegroundColor Yellow
     Write-Host 'A proxima etapa executara wsl --unregister nas distribuicoes originais.' -ForegroundColor Yellow
     $confirmation = Read-Host 'Digite DESREGISTRAR para continuar'
-    if ($confirmation -cne 'DESREGISTRAR') {
-        throw 'Operacao cancelada. As imagens exportadas foram mantidas em C:\WSL.'
-    }
+    return ($confirmation -ceq 'DESREGISTRAR')
 }
 
-function Import-BaseDistributions {
+function Import-DistribuicaoBase {
+    <#
+    .SYNOPSIS
+        Reimporta as distribuicoes-base a partir dos arquivos VHDX exportados.
+    #>
+    [OutputType([bool])]
+    param()
+
     foreach ($distro in $BaseDistros) {
-        $imagePath = Join-Path $WslRoot "$distro.vhdx"
+        $imagePath = Join-Path -Path $WslRoot -ChildPath "$distro.vhdx"
         if (-not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
             throw "Imagem-base nao encontrada: $imagePath"
         }
-        Assert-EmptyInstallLocation -Path (Join-Path $WslRoot $distro)
+        Assert-DiretorioInstalacaoVazio -Path (Join-Path -Path $WslRoot -ChildPath $distro)
     }
 
-    Confirm-Unregister
+    if (-not (Confirm-DesregistroBase)) {
+        return $false
+    }
 
     foreach ($distro in $BaseDistros) {
-        Write-Step "Removendo o registro antigo de $distro"
-        Invoke-NativeCommand -FilePath 'wsl.exe' `
+        Show-TituloSecao -Message "Removendo o registro antigo de $distro"
+        Invoke-ComandoNativo -FilePath 'wsl.exe' `
             -Arguments @('--unregister', $distro) `
             -FailureMessage "Falha ao desregistrar $distro"
     }
 
     foreach ($distro in $BaseDistros) {
-        $imagePath = Join-Path $WslRoot "$distro.vhdx"
-        $installPath = Join-Path $WslRoot $distro
+        $imagePath = Join-Path -Path $WslRoot -ChildPath "$distro.vhdx"
+        $installPath = Join-Path -Path $WslRoot -ChildPath $distro
         $validationCommand = "test `$(id -un) = '$Usuario' && command -v shellcheck >/dev/null"
 
-        Write-Step "Importando $distro em $installPath"
-        Invoke-NativeCommand -FilePath 'wsl.exe' `
+        Show-TituloSecao -Message "Importando $distro em $installPath"
+        Invoke-ComandoNativo -FilePath 'wsl.exe' `
             -Arguments @('--import', $distro, $installPath, $imagePath, '--vhd') `
             -FailureMessage "Falha ao importar $distro"
 
-        Invoke-NativeCommand -FilePath 'wsl.exe' `
+        Invoke-ComandoNativo -FilePath 'wsl.exe' `
             -Arguments @('-d', $distro, '--', 'bash', '-lc', $validationCommand) `
             -FailureMessage "A validacao final de $distro falhou"
     }
 
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
+    Invoke-ComandoNativo -FilePath 'wsl.exe' `
         -Arguments @('--set-default', 'Ubuntu-26.04') `
         -FailureMessage 'Falha ao definir Ubuntu-26.04 como distribuicao padrao'
 
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
+    Invoke-ComandoNativo -FilePath 'wsl.exe' `
         -Arguments @('--shutdown') `
         -FailureMessage 'Falha ao aplicar o desligamento final do WSL'
+
+    return $true
 }
 
-function New-TestDistributions {
+function New-DistribuicaoTeste {
+    <#
+    .SYNOPSIS
+        Cria instancias descartaveis -Teste a partir das imagens VHDX base.
+    #>
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Confirmacao ShouldProcess controlada pelo ponto de entrada')]
+    param()
+
     [System.IO.Directory]::CreateDirectory($WslRoot) | Out-Null
-    $registered = @(Get-WslDistributions)
+    $registered = @(Get-DistribuicaoWsl)
 
     foreach ($distro in $BaseDistros) {
         $testName = "$distro-Teste"
-        $imagePath = Join-Path $WslRoot "$distro.vhdx"
-        $installPath = Join-Path $WslRoot $testName
+        $imagePath = Join-Path -Path $WslRoot -ChildPath "$distro.vhdx"
+        $installPath = Join-Path -Path $WslRoot -ChildPath $testName
         $validationCommand = "test `$(id -un) = '$Usuario' && command -v shellcheck >/dev/null"
 
         if (-not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
@@ -323,125 +426,137 @@ function New-TestDistributions {
             throw "A distribuicao de teste ja esta registrada: $testName"
         }
 
-        Assert-EmptyInstallLocation -Path $installPath
-        Write-Step "Criando $testName a partir de $imagePath"
-        Invoke-NativeCommand -FilePath 'wsl.exe' `
+        Assert-DiretorioInstalacaoVazio -Path $installPath
+        Show-TituloSecao -Message "Criando $testName a partir de $imagePath"
+        Invoke-ComandoNativo -FilePath 'wsl.exe' `
             -Arguments @('--import', $testName, $installPath, $imagePath, '--vhd') `
             -FailureMessage "Falha ao importar $testName"
 
-        Invoke-NativeCommand -FilePath 'wsl.exe' `
+        Invoke-ComandoNativo -FilePath 'wsl.exe' `
             -Arguments @('-d', $testName, '--', 'bash', '-lc', $validationCommand) `
             -FailureMessage "A validacao final de $testName falhou"
     }
 
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
+    Invoke-ComandoNativo -FilePath 'wsl.exe' `
         -Arguments @('--shutdown') `
         -FailureMessage 'Falha ao encerrar as distribuicoes de teste'
-
-    Write-Host '' -ForegroundColor Cyan
-    Write-Host '==========================================================' -ForegroundColor Cyan
-    Write-Host ' [OK] RESUMO - INSTANCIAS DE TESTE CRIADAS' -ForegroundColor Green
-    Write-Host '==========================================================' -ForegroundColor Cyan
-    Write-Host '  - Ubuntu-26.04-Teste: Criada e validada' -ForegroundColor White
-    Write-Host '  - Ubuntu-24.04-Teste: Criada e validada' -ForegroundColor White
-    Write-Host '  - ShellCheck:         Disponivel' -ForegroundColor White
-    Write-Host '----------------------------------------------------------' -ForegroundColor DarkGray
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
-        -Arguments @('--list', '--verbose') `
-        -FailureMessage 'Falha ao listar as distribuicoes de teste'
 }
+
+$dataExecucao = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+$usuarioWindows = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+
+Write-Host '==========================================================' -ForegroundColor Cyan
+Write-Host ' Implantacao de Imagens-Base WSL v1.1' -ForegroundColor Cyan
+Write-Host '==========================================================' -ForegroundColor Cyan
+Write-Host "  Computador: $env:COMPUTERNAME | Operador: $usuarioWindows" -ForegroundColor DarkGray
+Write-Host "  Data/Hora:  $dataExecucao | Modo: $Modo" -ForegroundColor DarkGray
+
+$listagemWslFinal = $false
 
 try {
-    if ($Modo -eq 'CriarTestes') {
-        New-TestDistributions
-        return
-    }
-
-    Write-Step 'Coletando a credencial das distribuicoes'
-    if ($null -eq $SenhaSegura) {
-        $SenhaSegura = Read-Host 'Informe a senha do usuario WSL' -AsSecureString
-        $ConfirmacaoSegura = Read-Host 'Confirme a senha do usuario WSL' -AsSecureString
-        $ConfirmacaoTexto = ConvertTo-PlainText -SecureValue $ConfirmacaoSegura
-    }
-
-    $SenhaTexto = ConvertTo-PlainText -SecureValue $SenhaSegura
-    if ([string]::IsNullOrEmpty($SenhaTexto)) {
-        throw 'A senha do usuario WSL nao pode ficar vazia.'
-    }
-    if (($null -ne $ConfirmacaoTexto) -and ($SenhaTexto -cne $ConfirmacaoTexto)) {
-        throw 'As senhas informadas nao conferem.'
-    }
-
-    Write-Step 'Executando verificacoes iniciais'
-    [System.IO.Directory]::CreateDirectory($WslRoot) | Out-Null
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
-        -Arguments @('--update') `
-        -FailureMessage 'Falha ao atualizar o componente WSL'
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
-        -Arguments @('--set-default-version', '2') `
-        -FailureMessage 'Falha ao definir WSL 2 como versao padrao'
-
-    $registeredBeforeInstall = @(Get-WslDistributions)
-    foreach ($distro in $BaseDistros) {
-        if ($registeredBeforeInstall -contains $distro) {
-            if (-not $UsarDistribuicoesExistentes) {
-                throw "A distribuicao $distro ja existe. Para preparar essa instalacao conscientemente, repita com -UsarDistribuicoesExistentes."
+    if (($null -eq $PSCmdlet) -or $PSCmdlet.ShouldProcess("WSL ($WslRoot)", "Executar modo $Modo")) {
+        if ($Modo -eq 'CriarTestes') {
+            $etapa = 'Criacao das distribuicoes de teste'
+            New-DistribuicaoTeste
+            $listagemWslFinal = $true
+            $status = 'Instancias de teste criadas e validadas'
+            $corStatus = 'Green'
+            $codigoSaida = 0
+        }
+        else {
+            $etapa = 'Coleta de credencial'
+            Show-TituloSecao -Message 'Coletando a credencial das distribuicoes'
+            if ($null -eq $SenhaSegura) {
+                $SenhaSegura = Read-Host 'Informe a senha do usuario WSL' -AsSecureString
+                $ConfirmacaoSegura = Read-Host 'Confirme a senha do usuario WSL' -AsSecureString
+                $ConfirmacaoTexto = ConvertTo-TextoPlano -SecureValue $ConfirmacaoSegura
             }
-            Write-Host "Usando a distribuicao existente: $distro" -ForegroundColor Yellow
-            continue
+
+            $SenhaTexto = ConvertTo-TextoPlano -SecureValue $SenhaSegura
+            if ([string]::IsNullOrEmpty($SenhaTexto)) {
+                throw 'A senha do usuario WSL nao pode ficar vazia.'
+            }
+            if (($null -ne $ConfirmacaoTexto) -and ($SenhaTexto -cne $ConfirmacaoTexto)) {
+                throw 'As senhas informadas nao conferem.'
+            }
+
+            $etapa = 'Verificacoes iniciais do WSL'
+            Show-TituloSecao -Message 'Executando verificacoes iniciais'
+            [System.IO.Directory]::CreateDirectory($WslRoot) | Out-Null
+            Invoke-ComandoNativo -FilePath 'wsl.exe' `
+                -Arguments @('--update') `
+                -FailureMessage 'Falha ao atualizar o componente WSL'
+            Invoke-ComandoNativo -FilePath 'wsl.exe' `
+                -Arguments @('--set-default-version', '2') `
+                -FailureMessage 'Falha ao definir WSL 2 como versao padrao'
+
+            $registeredBeforeInstall = @(Get-DistribuicaoWsl)
+            foreach ($distro in $BaseDistros) {
+                if ($registeredBeforeInstall -contains $distro) {
+                    if (-not $UsarDistribuicoesExistentes) {
+                        throw "A distribuicao $distro ja existe. Para preparar essa instalacao conscientemente, repita com -UsarDistribuicoesExistentes."
+                    }
+                    Write-Host "Usando a distribuicao existente: $distro" -ForegroundColor Yellow
+                    continue
+                }
+
+                Show-TituloSecao -Message "Instalando $distro sem iniciar a configuracao interativa"
+                Invoke-ComandoNativo -FilePath 'wsl.exe' `
+                    -Arguments @('--install', '-d', $distro, '--no-launch') `
+                    -FailureMessage "Falha ao instalar $distro"
+            }
+
+            $registeredAfterInstall = @(Get-DistribuicaoWsl)
+            foreach ($distro in $BaseDistros) {
+                if ($registeredAfterInstall -notcontains $distro) {
+                    throw "$distro ainda nao esta registrada. Reinicie o Windows e execute o script novamente com -UsarDistribuicoesExistentes."
+                }
+            }
+
+            $etapa = 'Gravacao de .wslconfig'
+            Save-ConfiguracaoWsl
+
+            $etapa = 'Gravacao do arquivo de credenciais'
+            Save-ArquivoCredencialWsl
+
+            $etapa = 'Configuracao das distribuicoes Ubuntu'
+            foreach ($distro in $BaseDistros) {
+                Initialize-DistribuicaoUbuntu -Distro $distro
+            }
+
+            $etapa = 'Exportacao das imagens-base VHDX'
+            Export-ImagemBaseWsl
+
+            $etapa = 'Reimportacao das distribuicoes-base'
+            if (Import-DistribuicaoBase) {
+                $listagemWslFinal = $true
+                $status = 'Imagens-base preparadas, exportadas e validadas'
+                $corStatus = 'Green'
+                $codigoSaida = 0
+            }
+            else {
+                $status = 'Cancelado pelo operador; imagens exportadas preservadas em C:\WSL'
+                $corStatus = 'Yellow'
+                $codigoSaida = 2
+            }
         }
-
-        Write-Step "Instalando $distro sem iniciar a configuracao interativa"
-        Invoke-NativeCommand -FilePath 'wsl.exe' `
-            -Arguments @('--install', '-d', $distro, '--no-launch') `
-            -FailureMessage "Falha ao instalar $distro"
     }
-
-    $registeredAfterInstall = @(Get-WslDistributions)
-    foreach ($distro in $BaseDistros) {
-        if ($registeredAfterInstall -notcontains $distro) {
-            throw "$distro ainda nao esta registrada. Reinicie o Windows e execute o script novamente com -UsarDistribuicoesExistentes."
-        }
+    elseif ($WhatIfPreference) {
+        $status = "Simulacao concluida ($Modo); nenhuma alteracao aplicada"
+        $corStatus = 'Yellow'
+        $codigoSaida = 0
     }
-
-    Write-WslConfig
-    Write-PasswordFile
-
-    foreach ($distro in $BaseDistros) {
-        Initialize-UbuntuDistribution -Distro $distro
+    else {
+        $status = 'Cancelado pelo operador; nenhuma alteracao aplicada'
+        $corStatus = 'Yellow'
+        $codigoSaida = 2
     }
-
-    Export-WslBases
-    Import-BaseDistributions
-
-    Write-Host '' -ForegroundColor Cyan
-    Write-Host '==========================================================' -ForegroundColor Cyan
-    Write-Host ' [OK] RESUMO DA EXECUCAO - PROCESSO CONCLUIDO' -ForegroundColor Green
-    Write-Host '==========================================================' -ForegroundColor Cyan
-    Write-Host '  - Ubuntu-26.04:       Preparada, exportada e importada' -ForegroundColor White
-    Write-Host '  - Ubuntu-24.04:       Preparada, exportada e importada' -ForegroundColor White
-    Write-Host '  - ShellCheck:         Instalado nas duas distribuicoes' -ForegroundColor White
-    Write-Host '  - Imagens-base:       C:\WSL\Ubuntu-*.vhdx' -ForegroundColor White
-    Write-Host "  - Usuario WSL:        $Usuario" -ForegroundColor White
-    Write-Host "  - Credenciais:        $PasswordFile" -ForegroundColor White
-    Write-Host "  - Configuracao WSL:   $WslConfigFile" -ForegroundColor White
-    Write-Host '  - Distribuicao padrao: Ubuntu-26.04' -ForegroundColor White
-    Write-Host '  - Criar testes:       .\Implantacao_WSL.ps1 -Modo CriarTestes' -ForegroundColor White
-    Write-Host '----------------------------------------------------------' -ForegroundColor DarkGray
-    Invoke-NativeCommand -FilePath 'wsl.exe' `
-        -Arguments @('--list', '--verbose') `
-        -FailureMessage 'Falha ao listar as distribuicoes no resumo final'
 }
 catch {
-    Write-Host '' -ForegroundColor Red
-    Write-Host '==========================================================' -ForegroundColor Red
-    Write-Host ' ERRO NA EXECUCAO' -ForegroundColor Red
-    Write-Host '==========================================================' -ForegroundColor Red
-    Write-Host " $($_.Exception.Message)" -ForegroundColor Red
-    if ([string]::IsNullOrEmpty($PSCommandPath)) {
-        return
-    }
-    exit 1
+    Write-Error -Message "Falha na etapa: $etapa. Operacao interrompida; verifique o estado em $WslRoot antes de repetir." -ErrorAction Continue
+    $status = 'Falha durante a execucao'
+    $corStatus = 'Red'
+    $codigoSaida = 1
 }
 finally {
     $SenhaTexto = $null
@@ -453,3 +568,32 @@ finally {
         $SenhaSegura.Dispose()
     }
 }
+
+Write-Host "`n==========================================================" -ForegroundColor Cyan
+Write-Host '  RESUMO DA EXECUCAO' -ForegroundColor Cyan
+Write-Host '==========================================================' -ForegroundColor Cyan
+Write-Host "  - Status:              $status" -ForegroundColor $corStatus
+Write-Host "  - Modo executado:      $Modo" -ForegroundColor White
+if ($Modo -eq 'PrepararBases') {
+    Write-Host "  - Usuario WSL:         $Usuario" -ForegroundColor White
+    Write-Host "  - Imagens-base:        $WslRoot\Ubuntu-*.vhdx" -ForegroundColor White
+    Write-Host "  - Configuracao WSL:    $WslConfigFile" -ForegroundColor White
+}
+else {
+    Write-Host '  - Instancias alvo:     Ubuntu-26.04-Teste, Ubuntu-24.04-Teste' -ForegroundColor White
+}
+Write-Host "  - Codigo de saida:     $codigoSaida" -ForegroundColor $corStatus
+Write-Host '----------------------------------------------------------' -ForegroundColor DarkGray
+
+if ($listagemWslFinal) {
+    Invoke-ComandoNativo -FilePath 'wsl.exe' `
+        -Arguments @('--list', '--verbose') `
+        -FailureMessage 'Falha ao listar as distribuicoes no resumo final'
+}
+
+# Quando executado via Invoke-Expression (iex), usa return para nao fechar a janela do PowerShell do operador
+if ([string]::IsNullOrEmpty($PSCommandPath)) {
+    return
+}
+
+exit $codigoSaida

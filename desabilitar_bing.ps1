@@ -15,7 +15,7 @@
 .EXAMPLE
     .\desabilitar_bing.ps1 -WhatIf
 .NOTES
-    Versao: 1.1
+    Versao: 1.2
     Requisitos: Windows PowerShell 5.1 ou PowerShell 7.
     Ajusta configuracao de usuario corrente (HKCU).
     Saida: 0 = sucesso ou simulacao; 1 = falha; 2 = cancelamento.
@@ -34,7 +34,7 @@ $corStatus = 'Red'
 $etapa = 'Validacao inicial'
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " Script para Desabilitar o Bing Search v1.1" -ForegroundColor Cyan
+Write-Host " Script para Desabilitar o Bing Search v1.2" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 try {
@@ -52,6 +52,11 @@ try {
         }
 
         New-ItemProperty -LiteralPath $path -Name $name -Value $value -PropertyType DWord -Force | Out-Null
+
+        $propriedade = Get-ItemProperty -LiteralPath $path -Name $name -ErrorAction Stop
+        if ($propriedade.$name -ne $value) {
+            throw "A verificacao pos-gravacao falhou para $name."
+        }
 
         $etapa = 'Reinicio do Explorer'
         Write-Host "Reiniciando o Explorador de Arquivos para aplicar as alteracoes..." -ForegroundColor Yellow

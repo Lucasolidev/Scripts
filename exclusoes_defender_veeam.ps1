@@ -38,7 +38,7 @@
 .EXAMPLE
     .\exclusoes_defender_veeam.ps1 -WhatIf
 .NOTES
-    Versao: 1.0
+    Versao: 1.1
     Requisitos: Windows PowerShell 5.1 ou PowerShell 7 no Windows.
     Privilegios: Requer execucao como Administrador para alterar preferencias do Microsoft Defender
     (validacao realizada em tempo de execucao para compatibilidade com Invoke-Expression).
@@ -81,6 +81,54 @@ $resumoNovosProcessos = 0
 $resumoNovasExtensoes = 0
 $resumoNaoPersistidos = 0
 $avisoPoliticaCentral = $false
+$alertasConsolidados = New-Object 'System.Collections.Generic.List[string]'
+
+function Show-TituloSecao {
+    <#
+    .SYNOPSIS
+        Exibe um cabecalho padronizado de secao no console.
+    #>
+    [CmdletBinding()]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Cabecalho visual de console para o operador')]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Titulo
+    )
+
+    Write-Host "`n==========================================================" -ForegroundColor Cyan
+    Write-Host " $Titulo" -ForegroundColor Cyan
+    Write-Host "==========================================================" -ForegroundColor Cyan
+}
+
+function Show-LinhaComTag {
+    <#
+    .SYNOPSIS
+        Exibe uma linha com selo colorido alinhado seguido pelo texto principal.
+    #>
+    [CmdletBinding()]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Renderizacao colorida de tags no console')]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Tag,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$CorTag,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$Texto,
+
+        [Parameter(Mandatory = $false)]
+        [string]$CorTexto = 'White'
+    )
+
+    $tagFormatada = ("[$Tag]").PadRight(13)
+    Write-Host ("  $tagFormatada ") -ForegroundColor $CorTag -NoNewline
+    Write-Host $Texto -ForegroundColor $CorTexto
+}
 
 function Test-PrivilegioAdministrador {
     <#
@@ -384,7 +432,7 @@ function Invoke-AplicacaoExclusaoCategoria {
         [switch]$SimularApenas
     )
 
-    Write-Host "`n--- $TituloSecao ---" -ForegroundColor Yellow
+    Show-TituloSecao -Titulo $TituloSecao
 
     $comparador = [System.StringComparer]::OrdinalIgnoreCase
     $conjuntoAtual = New-Object 'System.Collections.Generic.HashSet[string]' ($comparador)
@@ -415,7 +463,7 @@ function Invoke-AplicacaoExclusaoCategoria {
         }
 
         if ($conjuntoAtual.Contains($valorFinal)) {
-            Write-Host "  [JA EXISTE]  $Tipo`: $valorFinal" -ForegroundColor DarkGray
+            Show-LinhaComTag -Tag 'JA EXISTE' -CorTag 'DarkGray' -Texto "$Tipo`: $valorFinal" -CorTexto 'DarkGray'
         }
         else {
             [void]$pendentes.Add($valorFinal)
@@ -433,7 +481,7 @@ function Invoke-AplicacaoExclusaoCategoria {
 
     if ($SimularApenas) {
         foreach ($itemSimulado in $pendentes) {
-            Write-Host "  [SIMULADO]   $Tipo`: $itemSimulado" -ForegroundColor Yellow
+            Show-LinhaComTag -Tag 'SIMULADO' -CorTag 'Yellow' -Texto "$Tipo`: $itemSimulado" -CorTexto 'White'
         }
         return [pscustomobject]@{
             Pendentes      = @($pendentes)
@@ -463,7 +511,7 @@ function Invoke-AplicacaoExclusaoCategoria {
         }
 
         foreach ($itemOk in $arrayPendentes) {
-            Write-Host "  [ADICIONADO] $Tipo`: $itemOk" -ForegroundColor Green
+            Show-LinhaComTag -Tag 'ADICIONADO' -CorTag 'Green' -Texto "$Tipo`: $itemOk" -CorTexto 'White'
             $aplicados++
         }
     }
@@ -477,11 +525,11 @@ function Invoke-AplicacaoExclusaoCategoria {
                     'Process'   { Add-MpPreference -ExclusionProcess $itemIndividual -ErrorAction Stop }
                     'Extension' { Add-MpPreference -ExclusionExtension $itemIndividual -ErrorAction Stop }
                 }
-                Write-Host "  [ADICIONADO] $Tipo`: $itemIndividual" -ForegroundColor Green
+                Show-LinhaComTag -Tag 'ADICIONADO' -CorTag 'Green' -Texto "$Tipo`: $itemIndividual" -CorTexto 'White'
                 $aplicados++
             }
             catch {
-                Write-Host "  [FALHA]      $Tipo`: $itemIndividual" -ForegroundColor Red
+                Show-LinhaComTag -Tag 'FALHA' -CorTag 'Red' -Texto "$Tipo`: $itemIndividual" -CorTexto 'Yellow'
                 $falhas++
             }
         }
@@ -494,11 +542,18 @@ function Invoke-AplicacaoExclusaoCategoria {
     }
 }
 
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " Exclusoes Microsoft Defender para Veeam (KB1999) v1.0" -ForegroundColor Cyan
-Write-Host "==========================================================" -ForegroundColor Cyan
+$ehAdminSessao = Test-PrivilegioAdministrador
+$textoPrivilegio = if ($ehAdminSessao) { 'Administrador' } else { 'Usuario padrao (insuficiente para alterar Defender)' }
+$dataExecucao = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+$usuarioAtual = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 
-if (-not (Test-PrivilegioAdministrador)) {
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host " Exclusoes Microsoft Defender para Veeam (KB1999) v1.1" -ForegroundColor Cyan
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "  Computador: $env:COMPUTERNAME | Usuario: $usuarioAtual" -ForegroundColor DarkGray
+Write-Host "  Data/Hora:  $dataExecucao | Privilegio: $textoPrivilegio" -ForegroundColor DarkGray
+
+if (-not $ehAdminSessao) {
     Write-Host "`nERRO: Este script requer privilegios de Administrador para configurar o Microsoft Defender." -ForegroundColor Red
     Write-Host "Abra o PowerShell como Administrador e execute novamente." -ForegroundColor Yellow
     $status = 'Falha de privilegios (requer Administrador)'
@@ -539,14 +594,17 @@ else {
 
         if ($mpStatus.IsTamperProtected) {
             Write-Host "  [AVISO] Tamper Protection esta ATIVO. Algumas exclusoes locais podem ser bloqueadas." -ForegroundColor Yellow
+            [void]$alertasConsolidados.Add('[POLITICA] Tamper Protection ativo no servidor; exclusoes locais podem sofrer restricao.')
         }
         if ($tpExclusions -eq '1') {
             $avisoPoliticaCentral = $true
             Write-Host "  [AVISO] TPExclusions=1 detectado. Exclusoes podem estar protegidas pelo Microsoft Defender Portal/Intune." -ForegroundColor Yellow
+            [void]$alertasConsolidados.Add('[POLITICA] TPExclusions=1 ativo; exclusoes gerenciadas pelo Microsoft Defender Portal/Intune.')
         }
         if ($disableLocalMerge -eq '1') {
             $avisoPoliticaCentral = $true
             Write-Host "  [AVISO] DisableLocalAdminMerge=1 detectado via GPO/MDM. Exclusoes locais podem ser ignoradas pela politica." -ForegroundColor Yellow
+            [void]$alertasConsolidados.Add('[POLITICA] DisableLocalAdminMerge=1 ativo via GPO/MDM; exclusoes locais podem ser ignoradas.')
         }
 
         # -------------------------------------------------------------------------
@@ -845,6 +903,12 @@ else {
                 }
 
                 $totalFalhasExecucao = $resPastas.FalhasCount + $resProcessos.FalhasCount + $resExtensoes.FalhasCount
+                if ($totalFalhasExecucao -gt 0) {
+                    [void]$alertasConsolidados.Add("[EXECUCAO] $totalFalhasExecucao exclusao(oes) falharam ao chamar Add-MpPreference.")
+                }
+                if ($resumoNaoPersistidos -gt 0) {
+                    [void]$alertasConsolidados.Add("[VALIDACAO] $resumoNaoPersistidos item(ns) aceito(s) nao persistiram em Get-MpPreference (possivel bloqueio por politica).")
+                }
                 if ($totalFalhasExecucao -gt 0 -or $resumoNaoPersistidos -gt 0) {
                     $status = 'Concluido parcialmente (itens bloqueados ou descartados por politica)'
                     $corStatus = 'Yellow'
@@ -871,6 +935,15 @@ else {
         $status = 'Falha durante a execucao'
         $corStatus = 'Red'
         $codigoSaida = 1
+    }
+}
+
+if ($alertasConsolidados.Count -gt 0) {
+    Show-TituloSecao -Titulo 'ALERTAS CONSOLIDADOS PARA REVISAO'
+    $indiceAlerta = 1
+    foreach ($alertaMsg in $alertasConsolidados) {
+        Write-Host "  [$indiceAlerta] $alertaMsg" -ForegroundColor Yellow
+        $indiceAlerta++
     }
 }
 
